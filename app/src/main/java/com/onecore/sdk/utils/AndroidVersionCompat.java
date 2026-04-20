@@ -31,6 +31,11 @@ public class AndroidVersionCompat {
         return Build.VERSION.SDK_INT >= 37;
     }
 
+    @ChecksSdkIntAtLeast(api = 38) // Android 18
+    public static boolean isAndroid18() {
+        return Build.VERSION.SDK_INT >= 38;
+    }
+
     /**
      * Set up Edge-to-Edge display for modern Android versions.
      * Required for Android 15+.

@@ -72,7 +72,7 @@ public class OffsetFinder {
      * Scans memory for a pattern of bytes (AOB Scan).
      */
     public static long findPattern(int pid, long start, long end, String pattern) {
-        byte[] patternBytes = parsePattern(pattern);
+        int[] patternBytes = parsePattern(pattern);
         int patternLen = patternBytes.length;
         
         // Optimized scanning logic (Searching in 1MB chunks to avoid OOM)

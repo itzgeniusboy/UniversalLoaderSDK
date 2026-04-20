@@ -13,24 +13,7 @@ public class UniversalInjector {
     private static final String TAG = "UniversalInjector";
 
     public static void performInjection(Context context, String packageName, String libPath) {
-        int api = Build.VERSION.SDK_INT;
-        Logger.i(TAG, "Targeting API " + api + " for " + packageName);
-
-        try {
-            if (api >= 34) { // Android 15, 16, 17, 18
-                // Use Modern Virtualization Loading (BlackBox style)
-                // This loads the SO before the entry point of the guest activity
-                VirtualContainer.getInstance().injectToVirtualSpace(context, packageName, libPath);
-            } else if (api >= 30) { // Android 11-13
-                // Use Namespace bridging for Scoped Storage bypass
-                VirtualContainer.getInstance().injectLibrary(context, packageName, libPath);
-            } else { // Android 8-10
-                // Standard Loader with Legacy Path support
-                VirtualContainer.getInstance().injectLibrary(context, packageName, libPath);
-            }
-            Logger.d(TAG, "Injection sequence completed successfully.");
-        } catch (Exception e) {
-            Logger.e(TAG, "Critical Injection Failure", e);
-        }
+        // Delegate to the modern BlackBox-style LibraryInjector
+        LibraryInjector.inject(context, packageName, libPath);
     }
 }
