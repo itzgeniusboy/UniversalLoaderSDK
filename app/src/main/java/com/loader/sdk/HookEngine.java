@@ -58,7 +58,7 @@ public class HookEngine {
      * Reflection-based Method Interceptor.
      * Wraps any object and intercepts calls made via this interceptor.
      */
-    public Object callMethod(Object target, String methodName, Object[] args, HookCallback callback) throws Exception {
+    public Object callMethod(Object target, String methodName, Object[] args, HookCallback callback) throws Throwable {
         Class<?>[] argTypes = new Class<?>[args.length];
         for (int i = 0; i < args.length; i++) {
             argTypes[i] = args[i].getClass();
