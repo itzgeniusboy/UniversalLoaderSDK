@@ -1,9 +1,7 @@
 package com.onecore.sdk.core;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.res.AssetManager;
@@ -15,96 +13,82 @@ import java.lang.reflect.Method;
 import dalvik.system.DexClassLoader;
 
 /**
- * The Host Activity that actually loads the Cloned App's code and resources.
- * This is the "Heart" of the Real Non-Root Cloning mechanism.
+ * Sandbox Host: The Process that runs the Cloned App.
+ * Solves: Context Mismatch and Namespace Isolation.
  */
 public class SandboxActivity extends Activity {
     private static final String TAG = "SandboxActivity";
-    private String targetPackage;
-    private Resources targetResources;
-    private DexClassLoader targetClassLoader;
+    private PackageInfo guestInfo;
+    private DexClassLoader guestClassLoader;
+    private Resources guestResources;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        targetPackage = getIntent().getStringExtra("target_package");
-        if (targetPackage == null) {
-            finish();
-            return;
-        }
-
-        Logger.i(TAG, "Starting Sandbox Host for: " + targetPackage);
+        String originalPkg = getIntent().getStringExtra("target_package");
+        String libPath = getIntent().getStringExtra("library_path");
 
         try {
-            // 1. Prepare Target Info
-            PackageInfo packageInfo = CloneManager.getInstance().getClonedPackage(targetPackage);
-            ApplicationInfo appInfo = packageInfo.applicationInfo;
+            guestInfo = CloneManager.getInstance().getClonedPackage(originalPkg);
+            if (guestInfo == null) throw new Exception("Metadata not found for " + originalPkg);
 
-            // 2. Load Resources (Skinning the host as the guest)
-            loadTargetResources(appInfo.sourceDir);
+            Logger.i(TAG, "Booting Sandbox Process for: " + guestInfo.packageName);
 
-            // 3. Setup ClassLoader (DEX Loading)
-            loadTargetCode(appInfo.sourceDir);
+            // 1. Load Resources (Skinning)
+            AssetManager assets = AssetManager.class.newInstance();
+            Method addAssetPath = assets.getClass().getMethod("addAssetPath", String.class);
+            addAssetPath.invoke(assets, guestInfo.applicationInfo.sourceDir);
+            guestResources = new Resources(assets, super.getResources().getDisplayMetrics(), super.getResources().getConfiguration());
 
-            // 4. Hook Environment for this Process
-            // This is where we lie to the game about its identity
-            EnvironmentHooker.apply(this, targetPackage);
+            // 2. Load Guest Code (Isolated ClassLoader)
+            File dexDir = new File(getFilesDir(), "sandbox_dex/" + originalPkg);
+            if (!dexDir.exists()) dexDir.mkdirs();
+            guestClassLoader = new DexClassLoader(
+                    guestInfo.applicationInfo.sourceDir,
+                    dexDir.getAbsolutePath(),
+                    guestInfo.applicationInfo.nativeLibraryDir,
+                    getClassLoader()
+            );
 
-            // 5. Find Target Main Activity and Launch it
-            launchTargetMainActivity(packageInfo);
+            // 3. APPLY GLOBAL HOOKS (System Identity Fake)
+            EnvironmentHooker.apply(this, guestInfo.packageName);
+
+            // 4. FIX: LOAD ESP LIBRARY IN GUEST NAMESPACE
+            if (libPath != null && new File(libPath).exists()) {
+                Logger.i(TAG, "Injecting ESP Library into Sandbox Namespace: " + libPath);
+                // We use System.load within the Host Activity which now shares 
+                // the environment with the Guest DEX.
+                System.load(libPath);
+                Logger.d(TAG, "ESP Library linked successfully.");
+            }
+
+            // 5. Jump to Guest Entry Point
+            launchGuest();
 
         } catch (Exception e) {
-            Logger.e(TAG, "Failed to initialize sandbox environment", e);
+            Logger.e(TAG, "Sandbox Boot Failure", e);
             finish();
         }
     }
 
-    private void loadTargetResources(String apkPath) throws Exception {
-        AssetManager assetManager = AssetManager.class.newInstance();
-        Method addAssetPath = assetManager.getClass().getMethod("addAssetPath", String.class);
-        addAssetPath.invoke(assetManager, apkPath);
+    private void launchGuest() throws Exception {
+        String mainActivity = guestInfo.activities[0].name;
+        Logger.d(TAG, "Starting Guest Entry: " + mainActivity);
         
-        Resources superRes = super.getResources();
-        targetResources = new Resources(assetManager, superRes.getDisplayMetrics(), superRes.getConfiguration());
-    }
-
-    private void loadTargetCode(String apkPath) {
-        File dexCache = new File(getFilesDir(), "dex_cache/" + targetPackage);
-        if (!dexCache.exists()) dexCache.mkdirs();
-
-        targetClassLoader = new DexClassLoader(
-                apkPath,
-                dexCache.getAbsolutePath(),
-                null,
-                getClassLoader()
-        );
-        
-        // Replace current ActivityThread classloader (Deep Hook)
-        Logger.d(TAG, "Code loaded via custom DexClassLoader.");
-    }
-
-    private void launchTargetMainActivity(PackageInfo info) throws Exception {
-        String mainClassName = info.activities[0].name; // Simplified for this example
-        Logger.d(TAG, "Attempting to launch target activity: " + mainClassName);
-        
-        Class<?> targetClass = targetClassLoader.loadClass(mainClassName);
-        Intent intent = new Intent(this, targetClass);
-        // Copy extras to ensure game flow
+        Class<?> clazz = guestClassLoader.loadClass(mainActivity);
+        Intent intent = new Intent(this, clazz);
         intent.putExtras(getIntent());
-        
-        // This would typically involve starting the activity manually via reflection 
-        // to bypass system registration if it's not declared in our manifest
         startActivity(intent);
     }
 
     @Override
-    public Resources getResources() {
-        return targetResources != null ? targetResources : super.getResources();
+    public ClassLoader getClassLoader() {
+        return guestClassLoader != null ? guestClassLoader : super.getClassLoader();
     }
 
     @Override
-    public ClassLoader getClassLoader() {
-        return targetClassLoader != null ? targetClassLoader : super.getClassLoader();
+    public Resources getResources() {
+        return guestResources != null ? guestResources : super.getResources();
     }
 }

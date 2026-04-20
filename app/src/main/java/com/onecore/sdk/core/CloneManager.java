@@ -10,13 +10,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Manages the "Cloning" state of target applications.
- * Prepares isolated directories and environment variables for the sandbox.
+ * Orchestrates the "Deep Clone" state.
+ * Manages metadata and isolated filesystem mapping for the Sandbox.
  */
 public class CloneManager {
     private static final String TAG = "CloneManager";
     private static CloneManager instance;
-    private final Map<String, PackageInfo> clonedPackages = new HashMap<>();
+    private final Map<String, PackageInfo> cache = new HashMap<>();
 
     private CloneManager() {}
 
@@ -27,38 +27,31 @@ public class CloneManager {
         return instance;
     }
 
-    /**
-     * Prepares the app for cloning.
-     * This involves caching metadata and ensuring the virtual filesystem is ready.
-     */
     public boolean prepareClone(Context context, String packageName) {
         try {
             PackageManager pm = context.getPackageManager();
-            PackageInfo info = pm.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES | PackageManager.GET_SERVICES);
-            clonedPackages.put(packageName, info);
+            PackageInfo info = pm.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES | PackageManager.GET_SERVICES | PackageManager.GET_PROVIDERS);
             
-            // Create Sandbox Directories
-            File sandboxDir = new File(context.getFilesDir(), "sandbox/" + packageName);
-            if (!sandboxDir.exists()) sandboxDir.mkdirs();
+            // Apply Fake Identity Metadata
+            info.packageName = "com.onecore.cloned." + packageName.substring(packageName.lastIndexOf('.') + 1);
+            info.applicationInfo.packageName = info.packageName;
+            info.applicationInfo.dataDir = context.getFilesDir().getAbsolutePath() + "/sandbox/" + packageName;
             
-            // Subdirectories for internal isolation
-            new File(sandboxDir, "data").mkdirs();
-            new File(sandboxDir, "cache").mkdirs();
-            new File(sandboxDir, "libs").mkdirs();
-
-            Logger.i(TAG, "Application " + packageName + " is prepared for Real Cloning.");
+            cache.put(packageName, info);
+            
+            // Initialize Physical Sandbox Directories
+            File dataDir = new File(info.applicationInfo.dataDir);
+            if (!dataDir.exists()) dataDir.mkdirs();
+            
+            Logger.i(TAG, "Clone Ready: Original=" + packageName + " -> Fake=" + info.packageName);
             return true;
         } catch (Exception e) {
-            Logger.e(TAG, "Failed to prepare clone for " + packageName, e);
+            Logger.e(TAG, "Failed to prepare CloneManager metadata", e);
             return false;
         }
     }
 
-    public PackageInfo getClonedPackage(String packageName) {
-        return clonedPackages.get(packageName);
-    }
-    
-    public String getSandboxDataPath(Context context, String packageName) {
-        return new File(context.getFilesDir(), "sandbox/" + packageName + "/data").getAbsolutePath();
+    public PackageInfo getClonedPackage(String originalPackageName) {
+        return cache.get(originalPackageName);
     }
 }

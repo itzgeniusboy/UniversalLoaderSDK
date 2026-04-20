@@ -85,8 +85,14 @@ public class VirtualContainer {
         Intent sandboxIntent = new Intent();
         sandboxIntent.setClassName(context.getPackageName(), "com.onecore.sdk.core.SandboxActivity");
         sandboxIntent.putExtra("target_package", packageName);
-        sandboxIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         
+        // Pass library to be injected inside the guest context
+        if (pendingLibraryPath != null) {
+            sandboxIntent.putExtra("library_path", pendingLibraryPath);
+            pendingLibraryPath = null;
+        }
+
+        sandboxIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(sandboxIntent);
     }
 
@@ -185,9 +191,13 @@ public class VirtualContainer {
         new ApkPatcher().patchApk(originalPath, outputPath, "/data/local/tmp/loader.dex", null);
     }
 
+    private String pendingLibraryPath;
+
     public void injectToVirtualSpace(Context context, String packageName, String libraryPath) {
         if (!SDKLicense.getInstance().isLicensed()) return;
-        new VirtualSpaceInjector().inject(context, packageName, libraryPath);
+        // Queue for sandbox injection instead of immediate load
+        this.pendingLibraryPath = libraryPath;
+        Logger.d(TAG, "Library queued for Sandbox Injection: " + libraryPath);
     }
 
     private void installSystemHooks(Context context, String packageName) {
