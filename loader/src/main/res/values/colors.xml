@@ -1,22 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Premium Icons / Core Colors -->
     <color name="primary">#FF5722</color>
     <color name="primary_dark">#BF360C</color>
     <color name="accent">#FF9800</color>
     <color name="background">#1A1A1A</color>
+    <color name="text_main">#FFFFFF</color>
+    <color name="text_muted">#888888</color>
+    <color name="card_bg">#2A2A2A</color>
 
-    <!-- iOS Premium Palette Mapping -->
+    <!-- iOS Palette mapping (backwards compatibility) -->
     <color name="ios_bg_dark">#000000</color>
-    <color name="ios_bg_light">#F2F2F7</color>
-    <color name="ios_glass">#1C1C1E</color>
-    <color name="ios_accent">#007AFF</color>
-    <color name="ios_success">#34C759</color>
-    <color name="ios_warning">#FF9500</color>
-    <color name="ios_error">#FF3B30</color>
     <color name="ios_text_primary">#FFFFFF</color>
     <color name="ios_text_secondary">#8E8E93</color>
-    <color name="ios_card_bg">#1C1C1E</color>
-    <color name="ios_gradient_start">#007AFF</color>
-    <color name="ios_gradient_end">#5856D6</color>
+    <color name="ios_accent">#007AFF</color>
+    <color name="ios_success">#34C759</color>
 </resources>
