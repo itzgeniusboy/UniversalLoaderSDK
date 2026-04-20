@@ -16,11 +16,11 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/ios_glass_bg"
-        android:label="OneCore Premium"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="OneCore Loader"
         android:preserveLegacyExternalStorage="true"
         android:supportsRtl="true"
-        android:theme="@style/Theme.OneCore">
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
         
         <activity
             android:name=".SplashActivity"

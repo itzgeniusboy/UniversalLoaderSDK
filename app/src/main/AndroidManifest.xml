@@ -15,21 +15,8 @@
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
 
     <application
-        android:theme="@style/Theme.OneCore"
-        android:label="OneCore Loader"
-        android:icon="@drawable/ios_glass_bg">
+        android:label="OneCore SDK">
 
-        <activity android:name="com.onecore.loader.SplashActivity" android:exported="true" android:screenOrientation="portrait">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
-        <activity android:name="com.onecore.loader.MainActivity" android:screenOrientation="portrait" />
-        <activity android:name="com.onecore.loader.SettingsActivity" android:screenOrientation="portrait" />
-        <activity android:name="com.onecore.loader.StatusActivity" android:screenOrientation="portrait" />
-        
         <activity android:name="com.onecore.sdk.core.SandboxActivity" 
                   android:process=":sandbox" 
                   android:screenOrientation="portrait" />
