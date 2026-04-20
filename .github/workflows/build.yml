@@ -23,7 +23,12 @@ jobs:
       uses: android-actions/setup-android@v3
     
     - name: Grant execute permission for gradlew
-      run: chmod +x gradlew || true
+      run: |
+        if [ ! -f gradlew ]; then
+          echo "gradlew not found, bootstrapping..."
+          gradle wrapper --gradle-version 8.7
+        fi
+        chmod +x gradlew || true
     
     - name: Build AAR
       run: ./gradlew :app:assembleRelease --no-daemon
