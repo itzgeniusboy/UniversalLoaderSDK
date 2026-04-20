@@ -7,19 +7,29 @@
   --accent: #F27D26;
   --text: #ffffff;
   --text-muted: #8E9299;
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
 }
 
 body {
   background-color: var(--bg);
   color: var(--text);
   font-family: 'Inter', sans-serif;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 .nav-link {
   width: 100%;
   display: flex;
   align-items: center;
-  padding: 1rem 2rem;
+  padding: 1rem 1.5rem;
+  min-height: 48px;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-muted);
@@ -43,7 +53,7 @@ body {
   background: var(--card);
   border: 1px solid var(--border);
   padding: 1.5rem;
-  border-radius: 0.75rem;
+  border-radius: 1rem;
 }
 
 .stat-card .label {
@@ -56,8 +66,8 @@ body {
 }
 
 .stat-card .value {
-  font-size: 1.75rem;
-  font-weight: 300;
+  font-size: 1.5rem;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
@@ -67,14 +77,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2000;
+  padding: 1rem;
 }
 
 .modal-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.8);
-  backdrop-filter: blur(4px);
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(8px);
 }
 
 .status-badge {
@@ -94,12 +105,12 @@ table tr {
   border-bottom: 1px solid var(--border);
 }
 
-table tr:hover {
-  background: rgba(255,255,255,0.01);
+table tr:last-child {
+  border-bottom: none;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -108,9 +119,136 @@ table tr:hover {
 
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 3px;
+  border-radius: 10px;
 }
 
 .font-mono {
   font-family: 'JetBrains Mono', monospace;
+}
+
+/* Mobile Responsive Adjustments */
+@media (max-width: 1024px) {
+  aside {
+    width: 100% !important;
+    height: auto !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    top: auto !important;
+    left: 0 !important;
+    z-index: 1000 !important;
+    border-right: none !important;
+    border-top: 1px solid var(--border) !important;
+    padding-bottom: var(--safe-area-bottom) !important;
+  }
+
+  aside .p-8.border-b {
+    display: none;
+  }
+
+  nav {
+    flex-direction: row !important;
+    padding: 0 !important;
+    display: flex !important;
+    justify-content: space-around !important;
+    white-space: nowrap;
+    overflow-x: auto;
+  }
+
+  .nav-link {
+    width: auto !important;
+    padding: 0.75rem 1rem !important;
+    flex-direction: column !important;
+    border-left: none !important;
+    border-top: 2px solid transparent !important;
+    text-align: center !important;
+    font-size: 10px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .nav-link.active {
+    border-top-color: var(--accent) !important;
+  }
+
+  aside .p-8.border-t {
+    display: none; /* Hide desktop logout */
+  }
+
+  main {
+    margin-left: 0 !important;
+    padding: 1.5rem !important;
+    padding-bottom: 80px !important; /* Space for bottom nav */
+  }
+
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  h2 {
+    font-size: 1.5rem !important;
+  }
+
+  /* Table to Card conversion */
+  table execution-thead, thead {
+    display: none;
+  }
+
+  table, tbody, tr, td {
+    display: block;
+    width: 100%;
+  }
+
+  tr {
+    padding: 1.5rem !important;
+    border-bottom: 1px solid var(--border) !important;
+    position: relative;
+  }
+
+  td {
+    text-align: right !important;
+    padding: 0.5rem 0 !important;
+    font-size: 13px !important;
+    border: none !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+  }
+
+  td:last-child {
+    text-align: center !important;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    border-top: 1px dashed var(--border) !important;
+    padding-top: 1rem !important;
+  }
+
+  td:last-child::before {
+    display: none;
+  }
+
+  .modal-content {
+    margin: 1rem !important;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
 }

@@ -88,17 +88,17 @@ function renderCustomers() {
 
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td class="px-8 py-5 text-sm font-medium text-white">${c.name}</td>
-            <td class="px-8 py-5 text-xs font-mono text-gray-500 uppercase">${c.key}</td>
-            <td class="px-8 py-5 text-sm text-gray-400">${c.expiry || '∞'}</td>
-            <td class="px-8 py-5 text-sm font-mono text-gray-500">${calculateDays(c.expiry)}</td>
-            <td class="px-8 py-5">
+            <td data-label="Name" class="px-8 py-5 text-sm font-medium text-white">${c.name}</td>
+            <td data-label="License Key" class="px-8 py-5 text-xs font-mono text-gray-500 uppercase">${c.key}</td>
+            <td data-label="Expiry" class="px-8 py-5 text-sm text-gray-400">${c.expiry || '∞'}</td>
+            <td data-label="Days Left" class="px-8 py-5 text-sm font-mono text-gray-500">${calculateDays(c.expiry)}</td>
+            <td data-label="Status" class="px-8 py-5">
                 <span class="status-badge status-${c.status}">${c.status}</span>
             </td>
             <td class="px-8 py-5 text-right space-x-3">
-                <button onclick="editCustomer(${i})" class="text-blue-500 hover:text-blue-400 text-[10px] font-bold uppercase">Edit</button>
-                <button onclick="toggleSuspend(${i})" class="text-yellow-500 hover:text-yellow-400 text-[10px] font-bold uppercase">${c.status === 'suspended' ? 'Activate' : 'Suspend'}</button>
-                <button onclick="deleteCustomer(${i})" class="text-red-500 hover:text-red-400 text-[10px] font-bold uppercase">Delete</button>
+                <button onclick="editCustomer(${i})" class="text-blue-500 hover:text-blue-400 text-[10px] font-bold uppercase min-h-[44px] min-w-[44px]">Edit</button>
+                <button onclick="toggleSuspend(${i})" class="text-yellow-500 hover:text-yellow-400 text-[10px] font-bold uppercase min-h-[44px] min-w-[44px]">${c.status === 'suspended' ? 'Activate' : 'Suspend'}</button>
+                <button onclick="deleteCustomer(${i})" class="text-red-500 hover:text-red-400 text-[10px] font-bold uppercase min-h-[44px] min-w-[44px]">Delete</button>
             </td>
         `;
         list.appendChild(row);
@@ -208,10 +208,10 @@ function renderSales() {
     sales.forEach(s => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td class="px-8 py-5 text-sm font-mono text-gray-500">${s.date}</td>
-            <td class="px-8 py-5 text-sm text-white">${s.customer}</td>
-            <td class="px-8 py-5 text-sm text-gray-400">${s.plan}</td>
-            <td class="px-8 py-5 text-sm font-mono text-green-500">$${s.amount}</td>
+            <td data-label="Date" class="px-8 py-5 text-sm font-mono text-gray-500">${s.date}</td>
+            <td data-label="Customer" class="px-8 py-5 text-sm text-white">${s.customer}</td>
+            <td data-label="Plan" class="px-8 py-5 text-sm text-gray-400">${s.plan}</td>
+            <td data-label="Amount" class="px-8 py-5 text-sm font-mono text-green-500">$${s.amount}</td>
         `;
         list.prepend(row);
     });
