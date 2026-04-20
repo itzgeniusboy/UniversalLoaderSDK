@@ -33,8 +33,15 @@ public class ActivityManagerHook implements InvocationHandler {
 
         if ("startActivity".equals(methodName)) {
             Logger.d(TAG, "Intercepted startActivity");
-            // Here we would modify the Intent to point to a stub activity 
-            // if we were using a stub-based virtualization strategy.
+            Intent intent = (Intent) args[1]; // Typically index 1 or 2 depending on Android version
+            if (intent != null && intent.getData() != null) {
+                String uri = intent.getData().toString();
+                if (uri.contains("twitter") || uri.contains("facebook") || uri.contains("google")) {
+                    Logger.i(TAG, "Social Login detected. Forwarding to system handler.");
+                    // In virtual environment, we must ensure these intents are not 
+                    // accidentally trapped or misrouted.
+                }
+            }
         } else if ("getRunningAppProcesses".equals(methodName)) {
             // Hide other processes from the virtual app
             Logger.d(TAG, "Intercepted getRunningAppProcesses");

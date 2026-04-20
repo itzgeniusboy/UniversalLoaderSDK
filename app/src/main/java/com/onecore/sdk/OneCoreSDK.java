@@ -184,4 +184,20 @@ public class OneCoreSDK {
         if (!SDKLicense.getInstance().isLicensed()) return;
         Analytics.getInstance().flushAnalytics();
     }
+
+    // Feature 6 - Social Login Helper
+    public static void twitterLogin(android.app.Activity activity, String key, String secret) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        SocialLoginHelper.getInstance().loginWithTwitter(activity, key, secret);
+    }
+
+    public static void facebookLogin(android.app.Activity activity, String appId) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        SocialLoginHelper.getInstance().loginWithFacebook(activity, appId);
+    }
+
+    public static void googleLogin(android.app.Activity activity, String clientId) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        SocialLoginHelper.getInstance().loginWithGoogle(activity, clientId);
+    }
 }

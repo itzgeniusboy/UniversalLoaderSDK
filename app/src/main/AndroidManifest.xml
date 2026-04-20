@@ -11,7 +11,23 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application>
-        <!-- The SDK doesn't have a main activity, it's a library -->
+        <!-- Testing Activity for Social Login -->
+        <activity android:name=".SocialLoginDemo" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                
+                <!-- Twitter Callback -->
+                <data android:scheme="onecore.oauth" android:host="callback" />
+                
+                <!-- Facebook Callback (Replace {APP_ID} with real ID in production) -->
+                <data android:scheme="fbYOUR_APP_ID" />
+                
+                <!-- Google Callback (Replace {CLIENT_ID} with real ID in production) -->
+                <data android:scheme="com.googleusercontent.apps.YOUR_CLIENT_ID" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>

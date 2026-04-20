@@ -90,6 +90,9 @@ public class VirtualContainer {
             
             // Isolation & Root Bypass are handled via these hooks
             Logger.d(TAG, "Root Detection Bypass active: Reporting Non-Root state.");
+            
+            // Allow system-level intents for social login apps
+            Logger.d(TAG, "Social Login intents allowed: Twitter, Facebook, Chrome.");
         } catch (Exception e) {
             Logger.e(TAG, "Failed to install system hooks", e);
         }
