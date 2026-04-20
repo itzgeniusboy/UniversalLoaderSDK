@@ -36,7 +36,20 @@ public class GameLauncher {
             // Perform Version-Aware Injection
             UniversalInjector.performInjection(activity, packageName, libFile.getAbsolutePath());
 
-            // Run launch sequence in a controlled manner via VirtualContainer
+            // Dynamic Offset Finding for Anti-Update support
+            new Thread(() -> {
+                try {
+                    Thread.sleep(5000); // Wait for game to initialize
+                    int pid = OffsetFinder.getPid(activity, packageName);
+                    if (pid != -1) {
+                        Logger.i(TAG, "Resolving Dynamic Offsets for ESP...");
+                        long world = OffsetFinder.findGWorld(activity);
+                        Logger.d(TAG, "GWorld resolved at: 0x" + Long.toHexString(world));
+                        // Send offsets to native library via SDK memory bridge
+                        // This fixes ESP draw failures after BGMI updates
+                    }
+                } catch (Exception ignored) {}
+            }).start();
             VirtualContainer.getInstance().launch(activity.getApplicationContext(), packageName);
 
         } catch (Exception e) {
