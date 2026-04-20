@@ -31,19 +31,29 @@ public class MainActivity extends Activity {
         applyEntranceAnimation(findViewById(android.R.id.content));
 
         launchBtn.setOnClickListener(v -> {
-            provideHapticFeedback();
-            Logger.i(TAG, "Initiating Sandbox Launch Sequence...");
-            // Move to StatusActivity for detailed progress
-            Intent intent = new Intent(this, StatusActivity.class);
-            startActivity(intent);
-            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+            try {
+                provideHapticFeedback();
+                Logger.i(TAG, "Initiating Sandbox Launch Sequence...");
+                // Move to StatusActivity for detailed progress
+                Intent intent = new Intent(this, StatusActivity.class);
+                startActivity(intent);
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+            } catch (Exception e) {
+                Logger.e(TAG, "Launch sequence failed", e);
+                android.widget.Toast.makeText(this, "Launch Error: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+            }
         });
 
         findViewById(R.id.navSettings).setOnClickListener(v -> {
-            provideHapticFeedback();
-            Intent intent = new Intent(this, SettingsActivity.class);
-            startActivity(intent);
-            overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right);
+            try {
+                provideHapticFeedback();
+                Intent intent = new Intent(this, SettingsActivity.class);
+                startActivity(intent);
+                overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right);
+            } catch (Exception e) {
+                Logger.e(TAG, "Settings navigation failed", e);
+                android.widget.Toast.makeText(this, "Navigation Error: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+            }
         });
     }
 

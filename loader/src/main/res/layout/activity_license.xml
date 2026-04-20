@@ -10,8 +10,8 @@
     <ImageView
         android:layout_width="80dp"
         android:layout_height="80dp"
-        android:background="@color/primary"
-        android:padding="16dp"
+        android:background="@drawable/ios_glass_bg"
+        android:padding="20dp"
         android:src="@android:drawable/ic_lock_lock"
         android:layout_marginBottom="24dp" />
 
@@ -19,8 +19,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/license_required"
-        android:textColor="@color/text_main"
-        android:textSize="20sp"
+        android:textColor="@color/ios_text_primary"
+        android:textSize="22sp"
         android:textStyle="bold"
         android:layout_marginBottom="8dp" />
 
@@ -28,22 +28,23 @@
         android:id="@+id/license_input"
         android:layout_width="match_parent"
         android:layout_height="60dp"
-        android:background="@color/card_bg"
+        android:background="@drawable/ios_glass_bg"
         android:hint="@string/enter_key"
         android:padding="16dp"
-        android:textColor="@color/text_main"
-        android:textColorHint="@color/text_muted"
-        android:layout_marginBottom="16dp" />
+        android:textColor="@color/ios_text_primary"
+        android:textColorHint="@color/ios_text_secondary"
+        android:layout_marginBottom="16dp"
+        android:gravity="center_vertical" />
 
-    <Button
+    <com.onecore.loader.views.GradientButton
         android:id="@+id/btn_verify"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:backgroundTint="@color/primary"
         android:text="@string/verify"
-        android:textColor="@android:color/black"
+        android:textColor="#FFFFFF"
         android:textStyle="bold"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="12dp"
+        android:gravity="center" />
 
     <Button
         android:id="@+id/btn_paste"

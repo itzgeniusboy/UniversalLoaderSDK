@@ -79,7 +79,10 @@
                     android:text="LAUNCH CLONE"
                     android:textColor="#FFFFFF"
                     android:textStyle="bold"
-                    android:textSize="17sp" />
+                    android:textSize="17sp"
+                    android:gravity="center"
+                    android:paddingTop="0dp"
+                    android:paddingBottom="0dp" />
             </LinearLayout>
 
             <!-- Feature Cards (Skeleton/Status) -->
