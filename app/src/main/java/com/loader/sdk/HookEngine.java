@@ -21,7 +21,13 @@ public class HookEngine {
         Object onInvoke(Object target, Method method, Object[] args) throws Throwable;
     }
 
-    private HookEngine() {}
+    private NativeHook nativeHook;
+
+    private HookEngine() {
+        if (NativeHook.isAvailable()) {
+            nativeHook = new NativeHook();
+        }
+    }
 
     public static synchronized HookEngine getInstance() {
         if (instance == null) {
@@ -32,6 +38,17 @@ public class HookEngine {
 
     public void init() {
         Logger.d(TAG, "Enhanced Hook Engine initialized.");
+    }
+
+    /**
+     * Native Hooking wrapper
+     */
+    public long hookNativeFunction(long targetAddr, long replaceAddr) {
+        if (nativeHook != null) {
+            return nativeHook.hookFunction(targetAddr, replaceAddr);
+        }
+        Logger.e(TAG, "Native hooking not available.");
+        return -1;
     }
 
     /**
