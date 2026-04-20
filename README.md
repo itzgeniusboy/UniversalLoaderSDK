@@ -13,7 +13,8 @@ Located in `/admin/`. You can host this using **GitHub Pages**.
 
 ### 2. Server API
 Located in `/server/`. Upload the contents of this folder to any **PHP hosting** provider.
-- **Verification Endpoint**: `https://your-host.com/server/verify.php?key=YOUR_KEY`
+- **Verification Endpoint**: `https://darkdevel.dynamicflash.xyz/connect?key=YOUR_KEY`
+- **Panel Support**: Works with standard external panels (returns SUCCESS/TRUE/VALID)
 - **Database**: Uses `admin/data/customers.json` as a flat-file database.
 
 ### 3. SDK Configuration

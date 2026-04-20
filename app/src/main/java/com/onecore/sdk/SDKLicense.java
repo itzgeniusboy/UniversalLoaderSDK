@@ -102,9 +102,11 @@ public class SDKLicense {
         executor.execute(() -> {
             try {
                 String devId = LicenseProtector.getDeviceId(context);
-                URL url = new URL("https://your-php-host.com/server/verify.php?key=" + customerKey + "&hwid=" + devId);
+                // Updated to new external panel
+                URL url = new URL("https://darkdevel.dynamicflash.xyz/connect?key=" + customerKey + "&hwid=" + devId);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
+                conn.setConnectTimeout(10000);
                 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 StringBuilder response = new StringBuilder();
@@ -114,11 +116,22 @@ public class SDKLicense {
                 }
                 reader.close();
 
-                JSONObject json = new JSONObject(response.toString());
-                boolean valid = json.getBoolean("valid");
-                String expiry = json.getString("expiry");
+                String result = response.toString().toLowerCase();
+                boolean valid = false;
+                String expiry = "2099-12-31"; // Default for external panels if not specified
 
-                mainHandler.post(() -> updateStatus(valid, expiry));
+                // Robust parsing for different response formats
+                if (result.startsWith("{")) {
+                    JSONObject json = new JSONObject(result);
+                    valid = json.optBoolean("valid", json.optString("status").contains("success"));
+                    expiry = json.optString("expiry", expiry);
+                } else {
+                    valid = result.contains("true") || result.contains("success") || result.contains("valid") || result.contains("1");
+                }
+
+                boolean finalValid = valid;
+                String finalExpiry = expiry;
+                mainHandler.post(() -> updateStatus(finalValid, finalExpiry));
                 
             } catch (Exception e) {
                 Logger.e(TAG, "Server verification failed: " + e.getMessage());
