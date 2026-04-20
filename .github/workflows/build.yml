@@ -38,6 +38,10 @@ jobs:
           gradle wrapper --gradle-version 8.7
         fi
         chmod +x gradlew || true
+
+    - name: Generate Release Keystore
+      run: |
+        keytool -genkey -v -keystore release.keystore -alias onecore -keyalg RSA -keysize 2048 -validity 10000 -storepass onecore123 -keypass onecore123 -dname "CN=OneCore SDK, O=OneCore, C=US"
     
     - name: Build SDK and Loader
       run: ./gradlew :app:assembleRelease :loader:assembleRelease --no-daemon

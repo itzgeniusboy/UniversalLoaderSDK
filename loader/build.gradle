@@ -16,10 +16,18 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        release {
+            storeFile file("../release.keystore")
+            storePassword "onecore123"
+            keyAlias "onecore"
+            keyPassword "onecore123"
+        }
+    }
+
     buildTypes {
         release {
-            debuggable true
-            signingConfig null
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
