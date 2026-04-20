@@ -9,6 +9,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import com.onecore.sdk.OneCoreSDK;
 import com.onecore.sdk.SDKLicense;
 import com.onecore.sdk.utils.AndroidVersionCompat;
 
@@ -46,9 +47,9 @@ public class LicenseActivity extends AppCompatActivity {
                 return;
             }
 
-            // Using SDK license system
-            SDKLicense.getInstance().setLicenseKey(key);
-            if (SDKLicense.getInstance().isLicensed()) {
+            // Using SDK license system via re-initialization
+            OneCoreSDK.init(getApplicationContext(), key);
+            if (OneCoreSDK.isLicenseValid()) {
                 Toast.makeText(this, "License Verified", Toast.LENGTH_SHORT).show();
                 startActivity(new Intent(this, MainActivity.class));
                 finish();

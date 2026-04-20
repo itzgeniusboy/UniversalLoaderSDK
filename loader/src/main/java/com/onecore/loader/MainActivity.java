@@ -25,7 +25,7 @@ public class MainActivity extends AppCompatActivity {
         
         setContentView(R.layout.activity_main);
 
-        OneCoreSDK.init(getApplicationContext());
+        OneCoreSDK.init(getApplicationContext(), "LOADER_TEST_KEY");
 
         progressBar = findViewById(R.id.clone_progress);
         btnLaunch = findViewById(R.id.btn_launch);
