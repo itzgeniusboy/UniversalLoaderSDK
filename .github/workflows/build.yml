@@ -43,3 +43,4 @@ jobs:
       with:
         name: UniversalLoaderSDK-AAR
         path: app/build/outputs/aar/*.aar
+        if-no-files-found: error
