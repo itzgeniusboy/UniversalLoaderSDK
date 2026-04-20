@@ -5,50 +5,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - OneCore SDK Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #050505; color: #fff; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #050505; 
+            color: #fff;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(242, 125, 38, 0.05) 0%, transparent 50%),
+                linear-gradient(rgba(20, 20, 20, 0.5) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(20, 20, 20, 0.5) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(10, 10, 10, 0.8); backdrop-filter: blur(12px); }
     </style>
 </head>
-<body class="flex items-center justify-center h-screen">
-    <div class="max-w-md w-full bg-[#0A0A0A] border border-[#1F1F1F] p-8 rounded-xl shadow-2xl">
-        <div class="text-center mb-8">
-            <h1 class="text-2xl font-bold text-white mb-2">OneCore SDK Engine</h1>
-            <p class="text-gray-500 text-sm italic serif">Admin Control Panel</p>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="max-w-md w-full glass border border-[#1F1F1F] p-10 rounded-2xl shadow-[0_0_50px_-12px_rgba(242,125,38,0.2)]">
+        <div class="text-center mb-10">
+            <div class="w-16 h-16 bg-[#F27D26] rounded-xl mx-auto mb-6 flex items-center justify-center shadow-[0_0_20px_rgba(242,125,38,0.4)]">
+                <span class="text-black font-black text-3xl">O</span>
+            </div>
+            <h1 class="text-2xl font-bold text-white tracking-tight mb-2">OneCore SDK Engine</h1>
+            <p class="text-gray-500 text-xs uppercase tracking-[0.2em] font-medium">Access Control Panel</p>
         </div>
 
         <form id="login-form" class="space-y-6">
             <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Username</label>
-                <input type="text" id="username" required class="w-full bg-[#050505] border border-[#1F1F1F] rounded-lg px-4 py-3 text-sm focus:border-[#F27D26] outline-none transition-colors">
+                <label class="block text-[10px] uppercase tracking-[0.15em] font-bold text-gray-500 mb-3 ml-1">Identity</label>
+                <input type="text" id="username" placeholder="Username" required 
+                    class="w-full bg-[#080808] border border-[#1F1F1F] rounded-xl px-5 py-3.5 text-sm focus:border-[#F27D26] focus:ring-1 focus:ring-[#F27D26] outline-none transition-all placeholder:text-gray-700">
             </div>
             <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Password</label>
-                <input type="password" id="password" required class="w-full bg-[#050505] border border-[#1F1F1F] rounded-lg px-4 py-3 text-sm focus:border-[#F27D26] outline-none transition-colors">
+                <label class="block text-[10px] uppercase tracking-[0.15em] font-bold text-gray-500 mb-3 ml-1">Authentication</label>
+                <input type="password" id="password" placeholder="Password" required 
+                    class="w-full bg-[#080808] border border-[#1F1F1F] rounded-xl px-5 py-3.5 text-sm focus:border-[#F27D26] focus:ring-1 focus:ring-[#F27D26] outline-none transition-all placeholder:text-gray-700">
             </div>
-            <div id="error-msg" class="text-red-500 text-xs hidden">Invalid credentials. Please try again.</div>
-            <button type="submit" class="w-full bg-[#F27D26] hover:bg-[#F49147] text-black font-bold py-3 rounded-lg text-sm uppercase tracking-tighter transition-all">
-                Login
+            <div id="error-msg" class="bg-red-500/10 border border-red-500/20 text-red-500 text-[11px] px-4 py-3 rounded-lg hidden">
+                <span class="font-bold">Access Denied:</span> Invalid credentials provided.
+            </div>
+            <button type="submit" class="w-full bg-[#F27D26] hover:bg-[#ff8e3a] active:scale-[0.98] text-black font-bold py-4 rounded-xl text-xs uppercase tracking-[0.1em] transition-all shadow-lg shadow-orange-900/10">
+                Establish Session
             </button>
         </form>
+
+        <div class="mt-8 pt-8 border-t border-[#1F1F1F] text-center">
+            <p class="text-[10px] text-gray-600 font-medium tracking-wide">ONECORE SECURE MANAGEMENT INTERFACE &copy; 2026</p>
+        </div>
     </div>
 
     <script>
-        document.getElementById('login-form').addEventListener('submit', (e) => {
+        const loginForm = document.getElementById('login-form');
+        const errorMsg = document.getElementById('error-msg');
+        
+        loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
             
-            // Hardcoded credentials for Demo/Admin
-            if (u === 'admin' && p === 'admin123') {
-                localStorage.setItem('sdk_admin_token', 'logged_in');
+            // SECURITY REQUIREMENT: Updated credentials
+            // Username: OneCoreSDK
+            // Password: OneCore@1234SDK
+            if (u === 'OneCoreSDK' && p === 'OneCore@1234SDK') {
+                // Set persistent session token
+                localStorage.setItem('sdk_admin_token', 'sha256_' + Date.now());
                 window.location.href = 'dashboard.html';
             } else {
-                document.getElementById('error-msg').classList.remove('hidden');
+                // Visual feedback for error
+                errorMsg.classList.remove('hidden');
+                document.querySelectorAll('input').forEach(i => {
+                    i.classList.add('border-red-900/50');
+                    setTimeout(() => i.classList.remove('border-red-900/50'), 2000);
+                });
             }
         });
 
-        // Check if already logged in
+        // Initialize session check
         if (localStorage.getItem('sdk_admin_token')) {
             window.location.href = 'dashboard.html';
         }

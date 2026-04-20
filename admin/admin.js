@@ -248,5 +248,6 @@ function exportCSV() {
 
 // Init
 window.onload = () => {
+    checkAuth();
     updateDashboard();
 }
