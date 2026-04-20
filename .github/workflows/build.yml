@@ -42,11 +42,23 @@ jobs:
     - name: Build SDK and Loader
       run: ./gradlew :app:assembleRelease :loader:assembleRelease --no-daemon
     
+    - name: Sign APK
+      uses: r0adkll/sign-android-release@v1
+      id: sign_app
+      with:
+        releaseDirectory: loader/build/outputs/apk/release
+        signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+        alias: ${{ secrets.ALIAS }}
+        keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+        keyPassword: ${{ secrets.KEY_PASSWORD }}
+      env:
+        BUILD_TOOLS_VERSION: "35.0.0"
+
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: OneCore-Assets
         path: |
           app/build/outputs/aar/*.aar
-          loader/build/outputs/apk/release/*.apk
+          ${{ steps.sign_app.outputs.signedReleaseFile }}
         if-no-files-found: error
