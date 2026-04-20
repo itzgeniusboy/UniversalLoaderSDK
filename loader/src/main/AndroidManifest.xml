@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.onecore.loader">
 
     <uses-permission android:name="android.permission.INTERNET" />
@@ -20,7 +21,8 @@
         android:label="OneCore Loader"
         android:preserveLegacyExternalStorage="true"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+        tools:replace="android:label">
         
         <activity
             android:name=".SplashActivity"
