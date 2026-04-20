@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#FF5722</color>
-    <color name="primary_dark">#E64A19</color>
-    <color name="accent">#FFAB40</color>
-    <color name="background">#1A1A1A</color>
-    <color name="card_bg">#252525</color>
-    <color name="text_main">#FFFFFF</color>
-    <color name="text_muted">#8E8E8E</color>
+    <color name="ios_bg_dark">#000000</color>
+    <color name="ios_bg_light">#F2F2F7</color>
+    <color name="ios_glass">#1C1C1E</color>
+    <color name="ios_accent">#007AFF</color>
+    <color name="ios_success">#34C759</color>
+    <color name="ios_warning">#FF9500</color>
+    <color name="ios_error">#FF3B30</color>
+    <color name="ios_text_primary">#FFFFFF</color>
+    <color name="ios_text_secondary">#8E8E93</color>
+    <color name="ios_card_bg">#1C1C1E</color>
+    <color name="ios_gradient_start">#007AFF</color>
+    <color name="ios_gradient_end">#5856D6</color>
 </resources>

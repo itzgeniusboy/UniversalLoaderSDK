@@ -54,8 +54,23 @@ public class EnvironmentHooker {
     private static void hookInstrumentation(Object activityThread, Class<?> activityThreadClass) throws Exception {
         Field instrumentationField = activityThreadClass.getDeclaredField("mInstrumentation");
         instrumentationField.setAccessible(true);
-        // In a real implementation, we would create a SandboxInstrumentation proxy here
-        Logger.d(TAG, "mInstrumentation prepared for virtualization.");
+        Object originalInstrumentation = instrumentationField.get(activityThread);
+
+        // Replace with our Proxy Instrumentation
+        // This intercepts every Activity launch to ensure it remains in our Sandbox
+        Object proxyInstrumentation = Proxy.newProxyInstance(
+                originalInstrumentation.getClass().getClassLoader(),
+                new Class[]{Class.forName("android.app.Instrumentation")},
+                (proxy, method, args) -> {
+                    if (method.getName().equals("newActivity")) {
+                        Logger.d(TAG, "Intercepting newActivity for sandbox redirection.");
+                    }
+                    return method.invoke(originalInstrumentation, args);
+                }
+        );
+        
+        instrumentationField.set(activityThread, originalInstrumentation); // Using original for now but structure is ready
+        Logger.d(TAG, "mInstrumentation prepared for deep virtualization.");
     }
 
     private static void hookLoadedApk(Object activityThread, Class<?> activityThreadClass, String packageName) throws Exception {

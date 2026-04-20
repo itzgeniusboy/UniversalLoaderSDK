@@ -6,22 +6,21 @@ import com.onecore.sdk.utils.Logger;
 import java.io.File;
 
 /**
- * High-level Library Manager.
- * Solves: Context Mismatch by queuing injection for the Sandbox Process.
+ * Optimized Injector for modded libraries with built-in offsets.
+ * Simply queues the library for delivery to the Sandbox Context.
  */
 public class LibraryInjector {
     private static final String TAG = "LibraryInjector";
 
     public static void inject(Context context, String packageName, String libPath) {
         if (libPath == null || !new File(libPath).exists()) {
-            Logger.e(TAG, "Library not found: " + libPath);
+            Logger.e(TAG, "Library file missing at: " + libPath);
             return;
         }
 
-        Logger.i(TAG, "Preparing Library for Sandbox Injection: " + libPath);
+        Logger.i(TAG, "Injecting modded library (ESP/Aimbot) into " + packageName);
         
-        // CRITICAL FIX: Do not inject in Loader process. 
-        // Pass to VirtualContainer to deliver to SandboxActivity via Intent.
+        // Pass to VirtualContainer for Sandbox Process Delivery
         VirtualContainer.getInstance().injectToVirtualSpace(context, packageName, libPath);
     }
 }

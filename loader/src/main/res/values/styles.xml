@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.OneCore" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/ios_bg_dark</item>
+        <item name="android:statusBarColor">@color/ios_bg_dark</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:colorAccent">@color/ios_accent</item>
+    </style>
+
+    <style name="IOSText">
+        <item name="android:textColor">@color/ios_text_primary</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="IOSCard">
+        <item name="android:background">@drawable/ios_glass_bg</item>
+        <item name="android:padding">16dp</item>
+    </style>
+</resources>

@@ -16,12 +16,11 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@android:drawable/sym_def_app_icon"
-        android:label="@string/app_name"
+        android:icon="@drawable/ios_glass_bg"
+        android:label="OneCore Premium"
         android:preserveLegacyExternalStorage="true"
-        android:roundIcon="@android:drawable/sym_def_app_icon"
         android:supportsRtl="true"
-        android:theme="@style/Theme.OneCoreLoader">
+        android:theme="@style/Theme.OneCore">
         
         <activity
             android:name=".SplashActivity"
@@ -33,13 +32,14 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".LicenseActivity"
-            android:screenOrientation="portrait" />
+        <activity android:name=".MainActivity" android:screenOrientation="portrait" />
+        <activity android:name=".SettingsActivity" android:screenOrientation="portrait" />
+        <activity android:name=".StatusActivity" android:screenOrientation="portrait" />
+        <activity android:name=".LicenseActivity" android:screenOrientation="portrait" />
 
-        <activity
-            android:name=".MainActivity"
-            android:screenOrientation="portrait" />
+        <activity android:name="com.onecore.sdk.core.SandboxActivity" 
+                  android:process=":sandbox" 
+                  android:screenOrientation="portrait" />
 
     </application>
 

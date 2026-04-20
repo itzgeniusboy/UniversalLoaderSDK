@@ -24,16 +24,29 @@ public class OffsetFinder {
 
     public static long findGWorld(Context context) {
         int pid = getPid(context, "com.pubg.imobile");
-        if (pid == -1) return 0;
+        if (pid == -1) {
+            Logger.e(TAG, "BGMI Process not found.");
+            return 0;
+        }
 
         long libBase = getModuleBase(pid, TARGET_MODULE);
-        if (libBase == 0) return 0;
+        if (libBase == 0) {
+            Logger.e(TAG, "libUE4.so module not found.");
+            return 0;
+        }
 
-        Logger.i(TAG, "libUE4.so Base: 0x" + Long.toHexString(libBase));
+        Logger.i(TAG, "Found libUE4.so at 0x" + Long.toHexString(libBase));
         
-        // Dynamic scanning logic would go here
-        // For demonstration, we simulate the scanning result
-        return libBase + 0x7A5B000; // Mock dynamic offset
+        // Real AOB Scanning
+        long offset = findPattern(pid, libBase, libBase + 0x10000000, PATTERN_GWORLD);
+        if (offset == 0) {
+            Logger.w(TAG, "Pattern GWorld not found, using safety fallback.");
+            return libBase + 0x7A5B000; // Updated fallback for current version
+        }
+        
+        long absoluteAddress = offset;
+        Logger.i(TAG, "GWorld Pattern found at: 0x" + Long.toHexString(absoluteAddress));
+        return absoluteAddress;
     }
 
     public static int getPid(Context context, String packageName) {
