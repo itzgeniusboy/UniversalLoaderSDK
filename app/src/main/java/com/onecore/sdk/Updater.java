@@ -1,16 +1,16 @@
-package com.loader.sdk;
+package com.onecore.sdk;
 
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import com.loader.sdk.utils.Logger;
+import com.onecore.sdk.utils.Logger;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Scanner;
 
 /**
- * Real HTTP-based auto updater.
+ * Real HTTP-based auto updater for OneCore SDK Engine.
  */
 public class Updater {
     private static final String TAG = "Updater";
@@ -27,9 +27,10 @@ public class Updater {
     }
 
     public void checkForUpdates(final Context context) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         new Thread(() -> {
             try {
-                URL url = new URL("https://api.loader.sdk/v1/version");
+                URL url = new URL("https://api.onecore.sdk/v1/version");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 

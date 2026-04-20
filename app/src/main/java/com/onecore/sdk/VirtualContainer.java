@@ -1,17 +1,17 @@
-package com.loader.sdk;
+package com.onecore.sdk;
 
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import com.loader.sdk.utils.Logger;
+import com.onecore.sdk.utils.Logger;
 import java.io.File;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
 /**
- * Handles app cloning and running apps in a sandboxed environment.
+ * Handles app cloning and running apps in a sandboxed environment for OneCore SDK Engine.
  * Uses reflection and proxying to redirect system calls.
  */
 public class VirtualContainer {
@@ -32,16 +32,20 @@ public class VirtualContainer {
      * This is a simplified architectural implementation of a container.
      */
     public void launch(Context context, String packageName) {
+        if (!SDKLicense.getInstance().isLicensed()) {
+            SDKLicense.getInstance().showExpiryDialog();
+            return;
+        }
         try {
             PackageManager pm = context.getPackageManager();
             ApplicationInfo appInfo = pm.getApplicationInfo(packageName, 0);
             
             Logger.d(TAG, "Preparing sandbox for " + packageName);
             
-            // In a real implementation, we would:
+            // In a real implementation:
             // 1. Create a custom ClassLoader for the target APK.
             // 2. Redirect data directories (/data/data/...) to a private path.
-            // 3. Proxy IActivityManager and IPackageManager to trick the app into thinking it's running normally.
+            // 3. Proxy system services to trick the app.
             
             // Simulate sandbox directory creation
             File sandboxDir = new File(context.getFilesDir(), "sandbox/" + packageName);
@@ -51,8 +55,7 @@ public class VirtualContainer {
 
             Logger.d(TAG, "Sandbox created at: " + sandboxDir.getAbsolutePath());
             
-            // Launch the intent normally for this demo code, 
-            // but in a real SDK we would use Instrumentation to intercept the startup.
+            // Launch the intent
             Intent intent = pm.getLaunchIntentForPackage(packageName);
             if (intent != null) {
                 context.startActivity(intent);

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneCore SDK Engine | Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="flex">
+    <!-- Sidebar -->
+    <aside class="w-64 h-screen bg-[#0A0A0A] border-r border-[#1F1F1F] flex flex-col fixed">
+        <div class="p-8 border-b border-[#1F1F1F]">
+            <h1 class="text-xl font-bold text-white tracking-tight">Admin<span class="text-[#F27D26]">Panel</span></h1>
+            <p class="text-[10px] text-gray-500 font-mono mt-1 uppercase tracking-widest">OneCore SDK Engine v1.0.4</p>
+        </div>
+
+        <nav class="flex-1 py-6">
+            <div class="px-8 mb-4 text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">Navigation</div>
+            <button onclick="showTab('dashboard')" class="nav-link active">Dashboard</button>
+            <button onclick="showTab('customers')" class="nav-link">Customers</button>
+            <button onclick="showTab('sales')" class="nav-link">Sales & Revenue</button>
+            <button onclick="showTab('settings')" class="nav-link">SDK Settings</button>
+        </nav>
+
+        <div class="p-8 border-t border-[#1F1F1F]">
+            <button onclick="logout()" class="text-xs font-bold text-red-500 hover:text-red-400 uppercase tracking-widest">Logout</button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="ml-64 flex-1 bg-[#050505] min-h-screen p-12 overflow-y-auto">
+        <!-- Dashboard Tab -->
+        <section id="tab-dashboard" class="tab-content">
+            <h2 class="text-3xl font-light text-white mb-8">OneCore SDK <span class="italic font-serif">Engine</span></h2>
+            <div class="grid grid-cols-4 gap-6 mb-12">
+                <div class="stat-card">
+                    <div class="label">Total Customers</div>
+                    <div class="value" id="stats-total">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Active Licenses</div>
+                    <div class="value text-green-500" id="stats-active">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Expired</div>
+                    <div class="value text-red-500" id="stats-expired">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Total Revenue</div>
+                    <div class="value" id="stats-revenue">$0</div>
+                </div>
+            </div>
+
+            <div class="bg-[#0A0A0A] border border-[#1F1F1F] rounded-xl p-8 mb-12">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">Recent Activity</h3>
+                <div id="recent-activity" class="space-y-4 font-mono text-xs">
+                    <!-- Logs generated here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Customers Tab -->
+        <section id="tab-customers" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-light text-white">License <span class="italic font-serif">Management</span></h2>
+                <button onclick="openModal('customer')" class="bg-[#F27D26] text-black px-4 py-2 rounded font-bold text-xs uppercase tracking-widest hover:bg-[#F49147]">Add Customer</button>
+            </div>
+            
+            <div class="mb-6 flex gap-4">
+                <input type="text" id="search-cust" placeholder="Search by name or key..." oninput="filterData()" class="flex-1 bg-[#0A0A0A] border border-[#1F1F1F] rounded px-4 py-2 text-sm text-white focus:border-[#F27D26] outline-none">
+                <select id="filter-status" onchange="filterData()" class="bg-[#0A0A0A] border border-[#1F1F1F] rounded px-4 py-2 text-sm text-white outline-none">
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="expired">Expired</option>
+                    <option value="suspended">Suspended</option>
+                </select>
+            </div>
+
+            <div class="bg-[#0A0A0A] border border-[#1F1F1F] rounded-xl overflow-hidden">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-[#0C0C0C] border-b border-[#1F1F1F] text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">
+                            <th class="px-8 py-5">Name</th>
+                            <th class="px-8 py-5">License Key</th>
+                            <th class="px-8 py-5">Expiry</th>
+                            <th class="px-8 py-5">Days</th>
+                            <th class="px-8 py-5">Status</th>
+                            <th class="px-8 py-5 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cust-table-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Sales Tab -->
+        <section id="tab-sales" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-light text-white">Sales & <span class="italic font-serif">Revenue</span></h2>
+                <div class="flex gap-2">
+                    <button onclick="exportCSV()" class="bg-white/5 text-gray-400 px-4 py-2 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-white/10">Export CSV</button>
+                </div>
+            </div>
+            
+            <div class="bg-[#0A0A0A] border border-[#1F1F1F] rounded-xl overflow-hidden">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-[#0C0C0C] border-b border-[#1F1F1F] text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">
+                            <th class="px-8 py-5">Date</th>
+                            <th class="px-8 py-5">Customer</th>
+                            <th class="px-8 py-5">Plan</th>
+                            <th class="px-8 py-5">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sales-table-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Settings Tab -->
+        <section id="tab-settings" class="tab-content hidden">
+            <h2 class="text-3xl font-light text-white mb-8">SDK <span class="italic font-serif">Settings</span></h2>
+            
+            <div class="grid grid-cols-2 gap-8">
+                <div class="bg-[#0A0A0A] border border-[#1F1F1F] rounded-xl p-8">
+                    <h3 class="text-xs font-bold text-[#F27D26] uppercase tracking-widest mb-6">Global Config</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-2">SDK Version</label>
+                            <input type="text" value="1.0.4" class="w-full bg-[#050505] border border-[#1F1F1F] rounded px-4 py-2 text-sm text-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-2">Download URL</label>
+                            <input type="text" value="https://cdn.onecore.sdk/aar/v1.0.4.aar" class="w-full bg-[#050505] border border-[#1F1F1F] rounded px-4 py-2 text-sm text-white">
+                        </div>
+                        <button class="bg-white/5 w-full py-3 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] rounded">Save Global Settings</button>
+                    </div>
+                </div>
+
+                <div class="bg-[#0A0A0A] border border-[#1F1F1F] rounded-xl p-8">
+                    <h3 class="text-xs font-bold text-[#F27D26] uppercase tracking-widest mb-6">Data Backup</h3>
+                    <div class="space-y-4">
+                        <button onclick="backupData()" class="w-full bg-[#1A1A1A] py-4 text-[10px] font-bold text-white uppercase tracking-[0.2em] rounded border border-[#F27D26]/20 hover:bg-[#222]">Backup All Data (JSON)</button>
+                        <div class="text-center text-[10px] text-gray-600 italic">Download local state as recovery file.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Customer Modal -->
+    <div id="modal-customer" class="modal hidden">
+        <div class="modal-overlay" onclick="closeModal('customer')"></div>
+        <div class="modal-content max-w-md w-full bg-[#0A0A0A] border border-[#1F1F1F] p-8 rounded-xl relative z-50">
+            <h3 id="cust-modal-title" class="text-lg font-bold text-white mb-6 uppercase tracking-widest">Add New License</h3>
+            <form id="cust-form" class="space-y-4">
+                <input type="hidden" id="cust-id">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Customer Name</label>
+                    <input type="text" id="cust-name" required class="w-full bg-[#050505] border border-[#1F1F1F] rounded px-4 py-2 text-sm text-white focus:border-[#F27D26] outline-none transition-colors">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Product Key</label>
+                    <input type="text" id="cust-key" required class="w-full bg-[#050505] border border-[#1F1F1F] rounded px-4 py-2 text-sm text-white font-mono font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Expiry Date</label>
+                    <input type="date" id="cust-expiry" class="w-full bg-[#050505] border border-[#1F1F1F] rounded px-4 py-2 text-sm text-white">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Subscription Plan</label>
+                    <select id="cust-plan" class="w-full bg-[#050505] border border-[#1F1F1F] rounded px-4 py-2 text-sm text-white outline-none">
+                        <option value="Basic">Basic ($19/mo)</option>
+                        <option value="Pro">Pro ($49/mo)</option>
+                        <option value="Enterprise">Enterprise ($149/mo)</option>
+                        <option value="Trial">7-Day Trial ($0)</option>
+                    </select>
+                </div>
+                <div class="flex gap-4 mt-8 pt-4 border-t border-[#1F1F1F]">
+                    <button type="button" onclick="closeModal('customer')" class="flex-1 text-gray-500 text-xs font-bold uppercase tracking-widest py-2">Cancel</button>
+                    <button type="submit" class="flex-1 bg-[#F27D26] text-black text-xs font-bold uppercase tracking-widest py-2 rounded">Save License</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

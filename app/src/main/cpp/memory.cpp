@@ -12,7 +12,7 @@
  * or fallback to direct access for same-process.
  */
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_loader_sdk_NativeHook_readProcessMemory(JNIEnv* env, jobject thiz, jint pid, jlong addr, jbyteArray buffer) {
+Java_com_onecore_sdk_NativeHook_readProcessMemory(JNIEnv* env, jobject thiz, jint pid, jlong addr, jbyteArray buffer) {
     jsize size = env->GetArrayLength(buffer);
     jbyte* local_buf = env->GetByteArrayElements(buffer, nullptr);
 
@@ -32,7 +32,7 @@ Java_com_loader_sdk_NativeHook_readProcessMemory(JNIEnv* env, jobject thiz, jint
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_loader_sdk_NativeHook_writeProcessMemory(JNIEnv* env, jobject thiz, jint pid, jlong addr, jbyteArray buffer) {
+Java_com_onecore_sdk_NativeHook_writeProcessMemory(JNIEnv* env, jobject thiz, jint pid, jlong addr, jbyteArray buffer) {
     jsize size = env->GetArrayLength(buffer);
     jbyte* local_buf = env->GetByteArrayElements(buffer, nullptr);
 

@@ -1,9 +1,9 @@
-# Deployment Guide for UniversalLoaderSDK
+# Deployment Guide for OneCore SDK Engine
 
 This guide explains how to deploy this project to GitHub and automate the build process to generate your `.aar` library.
 
 ## Step 1: Prepare GitHub Repository
-1. Create a new **public** repository on GitHub named `UniversalLoaderSDK`.
+1. Create a new **public** repository on GitHub named `OneCore`.
 2. Do **not** initialize with a README or .gitignore (we have our own).
 
 ## Step 2: Upload Files
@@ -20,7 +20,7 @@ git init
 git add .
 git commit -m "Initial SDK Build"
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/UniversalLoaderSDK.git
+git remote add origin https://github.com/YOUR_USERNAME/OneCore.git
 git push -u origin main
 ```
 
@@ -32,7 +32,7 @@ git push -u origin main
 ## Step 4: Download the SDK
 1. When the build finishes (green checkmark), click on the successful run.
 2. Scroll down to the **Artifacts** section.
-3. Click on `UniversalLoaderSDK-v1.0.4` to download the zip containing your `.aar` file.
+3. Click on `onecore-v1.0.4` to download the zip containing your `.aar` file.
 
 ## Step 5: Integration
 Copy the downloaded `.aar` file into your Android project's `libs/` folder and update your `build.gradle` (see README.md for details).

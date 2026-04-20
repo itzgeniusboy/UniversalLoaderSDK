@@ -1,6 +1,6 @@
-package com.loader.sdk;
+package com.onecore.sdk;
 
-import com.loader.sdk.utils.Logger;
+import com.onecore.sdk.utils.Logger;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,20 +22,24 @@ public class Analytics {
     }
 
     public void trackEvent(String eventName) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         Logger.d(TAG, "Tracking Event: " + eventName);
         // In real app, push to Firebase or custom backend
     }
 
     public void trackCrash(Throwable throwable) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         Logger.e(TAG, "Tracking Crash", throwable);
     }
 
     public void setUserProperty(String key, String value) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         userProperties.put(key, value);
         Logger.d(TAG, "User Property Set: " + key + "=" + value);
     }
 
     public void flushAnalytics() {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         Logger.d(TAG, "Flushing analytics data...");
     }
 }

@@ -17,7 +17,7 @@ bool set_memory_permissions(uintptr_t address, size_t size, int permissions) {
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_loader_sdk_NativeHook_hookFunction(JNIEnv* env, jobject thiz, jlong target_addr, jlong replace_addr) {
+Java_com_onecore_sdk_NativeHook_hookFunction(JNIEnv* env, jobject thiz, jlong target_addr, jlong replace_addr) {
     LOGD("Attempting native hook at 0x%lx to 0x%lx", (long)target_addr, (long)replace_addr);
     
     // In a real production scenario, use Dobby or Substrate here.
@@ -34,7 +34,7 @@ Java_com_loader_sdk_NativeHook_hookFunction(JNIEnv* env, jobject thiz, jlong tar
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_loader_sdk_NativeHook_readMemoryNative(JNIEnv* env, jobject thiz, jlong addr, jint size) {
+Java_com_onecore_sdk_NativeHook_readMemoryNative(JNIEnv* env, jobject thiz, jlong addr, jint size) {
     jbyteArray result = env->NewByteArray(size);
     if (result == nullptr) return nullptr;
 
@@ -44,7 +44,7 @@ Java_com_loader_sdk_NativeHook_readMemoryNative(JNIEnv* env, jobject thiz, jlong
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_loader_sdk_NativeHook_writeMemoryNative(JNIEnv* env, jobject thiz, jlong addr, jbyteArray data) {
+Java_com_onecore_sdk_NativeHook_writeMemoryNative(JNIEnv* env, jobject thiz, jlong addr, jbyteArray data) {
     jsize size = env->GetArrayLength(data);
     jbyte* buffer = env->GetByteArrayElements(data, nullptr);
     

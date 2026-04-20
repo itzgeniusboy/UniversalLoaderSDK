@@ -1,4 +1,4 @@
-package com.loader.sdk.utils;
+package com.onecore.sdk.utils;
 
 import android.content.Context;
 import android.os.Process;

@@ -1,4 +1,4 @@
-package com.loader.sdk;
+package com.onecore.sdk;
 
 import android.app.Service;
 import android.content.Context;
@@ -13,10 +13,10 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import com.loader.sdk.utils.Logger;
+import com.onecore.sdk.utils.Logger;
 
 /**
- * Floating Overlay Menu Service.
+ * Floating Overlay Menu Service for OneCore SDK Engine.
  * Provides in-game control for SDK features.
  */
 public class FloatingMenu extends Service {
@@ -32,6 +32,10 @@ public class FloatingMenu extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        if (!SDKLicense.getInstance().isLicensed()) {
+            stopSelf();
+            return;
+        }
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         setupLayout();
     }
@@ -43,7 +47,7 @@ public class FloatingMenu extends Service {
         menuLayout.setPadding(20, 20, 20, 20);
 
         TextView title = new TextView(this);
-        title.setText("UniversalLoader SDK");
+        title.setText("OneCore SDK Engine");
         title.setTextColor(Color.GREEN);
         title.setGravity(Gravity.CENTER);
         menuLayout.addView(title);

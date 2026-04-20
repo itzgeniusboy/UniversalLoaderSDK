@@ -9,7 +9,7 @@ Ensure the directory structure matches accurately:
 - [ ] `gradle.properties`
 - [ ] `app/build.gradle`
 - [ ] `app/src/main/AndroidManifest.xml`
-- [ ] `app/src/main/java/com/loader/sdk/...` (All 13 Java classes)
+- [ ] `app/src/main/java/com/onecore/sdk/...` (All 13 Java classes)
 - [ ] `.github/workflows/build.yml`
 
 ## 2. Code Verification [ ]
@@ -22,13 +22,13 @@ Ensure the directory structure matches accurately:
 | Error | Cause | Fix |
 |---|---|---|
 | `gradle: command not found` | Workflow environment issue | Use `gradle` (system) or include `gradlew` wrapper |
-| `Namespace not found` | Android Gradle Plugin v8+ requirement | Ensure `namespace 'com.loader.sdk'` is in `app/build.gradle` |
+| `Namespace not found` | Android Gradle Plugin v8+ requirement | Ensure `namespace 'com.onecore.sdk'` is in `app/build.gradle` |
 | `Java Version Mismatch` | JDK 17 used on JDK 11 code | Project is compatible with JDK 17, no fix needed |
 | `Permission Denied` | `gradlew` permissions | Workflow includes `chmod +x` step |
 
 ## 4. Build Success Confirmation
 1. GitHub Action Run status: **SUCCESS** (Green).
-2. Artifact produced: `UniversalLoaderSDK-v1.0.4`.
+2. Artifact produced: `onecore-v1.0.4`.
 3. Size: Approximately 30KB - 100KB (Pure Java size is small).
 
 ## 5. Integration Test

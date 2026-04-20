@@ -1,6 +1,6 @@
 {
-  "name": "UniversalLoaderSDK",
-  "description": "A comprehensive Android Loader SDK including Virtual Container, Method Hooking, Device Spoofing, and Memory Reading capabilities.",
+  "name": "OneCore SDK Engine",
+  "description": "OneCore SDK Engine - Advanced Android Virtualization & Hooking Framework",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

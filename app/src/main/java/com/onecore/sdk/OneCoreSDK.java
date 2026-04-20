@@ -1,28 +1,32 @@
-package com.loader.sdk;
+package com.onecore.sdk;
 
 import android.content.Context;
-import com.loader.sdk.utils.CrashHandler;
-import com.loader.sdk.utils.Logger;
+import com.onecore.sdk.utils.CrashHandler;
+import com.onecore.sdk.utils.Logger;
 
 /**
- * Main entry point for the UniversalLoaderSDK.
+ * Main entry point for the OneCore SDK Engine.
  * Handles initialization and global configurations.
  */
-public class LoaderSDK {
-    private static final String TAG = "LoaderSDK";
+public class OneCoreSDK {
+    private static final String TAG = "OneCoreSDK";
     private static boolean isInitialized = false;
     private static Context appContext;
 
     /**
-     * Initializes the SDK with the provided context.
+     * Initializes the SDK with the provided context and customer key.
      * @param context The application context.
+     * @param customerKey The customer's license key.
      */
-    public static void init(Context context) {
+    public static void init(Context context, String customerKey) {
         if (isInitialized) return;
         
         appContext = context.getApplicationContext();
         Logger.init(true); // Enable logging by default
         CrashHandler.getInstance().init(appContext);
+        
+        // Initialize License Control
+        SDKLicense.getInstance().init(appContext, customerKey);
         
         Logger.d(TAG, "SDK Initialized successfully.");
         isInitialized = true;
@@ -34,6 +38,11 @@ public class LoaderSDK {
     public static void install() {
         if (!isInitialized) {
             throw new IllegalStateException("SDK must be initialized before installation.");
+        }
+        
+        if (!SDKLicense.getInstance().isLicensed()) {
+            SDKLicense.getInstance().showExpiryDialog();
+            return;
         }
         
         Logger.d(TAG, "Installing SDK components...");
@@ -49,6 +58,11 @@ public class LoaderSDK {
         if (!isInitialized) {
             throw new IllegalStateException("SDK must be initialized before launching apps.");
         }
+
+        if (!SDKLicense.getInstance().isLicensed()) {
+            SDKLicense.getInstance().showExpiryDialog();
+            return;
+        }
         
         Logger.d(TAG, "Launching app: " + packageName);
         VirtualContainer.getInstance().launch(appContext, packageName);
@@ -58,42 +72,43 @@ public class LoaderSDK {
         return appContext;
     }
 
-    // NEW ADDITION: Feature 1 - Anti-Detection
+    // Feature 1 - Anti-Detection
     public static boolean isDebuggerAttached() {
+        if (!SDKLicense.getInstance().isLicensed()) return false;
         return AntiDetect.getInstance().isDebuggerAttached();
     }
 
     public static boolean isEmulator() {
+        if (!SDKLicense.getInstance().isLicensed()) return false;
         return AntiDetect.getInstance().isEmulator();
     }
 
     public static boolean isRooted() {
+        if (!SDKLicense.getInstance().isLicensed()) return false;
         return AntiDetect.getInstance().isRooted();
     }
 
     public static boolean isTampered() {
+        if (!SDKLicense.getInstance().isLicensed()) return false;
         return AntiDetect.getInstance().isTampered();
     }
 
-    // NEW ADDITION: Feature 2 - License System
-    public static void setLicenseKey(String key) {
-        LicenseManager.getInstance().setLicenseKey(key);
-    }
-
+    // Feature 2 - License System
     public static boolean isLicenseValid() {
-        return LicenseManager.getInstance().isLicenseValid(appContext);
+        return SDKLicense.getInstance().isLicensed();
     }
 
-    public static java.util.Date getExpiryDate() {
-        return LicenseManager.getInstance().getExpiryDate();
+    public static String getExpiryDate() {
+        return SDKLicense.getInstance().getExpiryDate();
     }
 
-    public static void setTrialDays(int days) {
-        LicenseManager.getInstance().setTrialDays(days);
+    public static long getDaysLeft() {
+        return SDKLicense.getInstance().getDaysLeft();
     }
 
-    // NEW ADDITION: Feature 3 - Auto-Updater
+    // Feature 3 - Auto-Updater
     public static void checkForUpdates() {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         Updater.getInstance().checkForUpdates(appContext);
     }
 
@@ -109,37 +124,45 @@ public class LoaderSDK {
         Updater.getInstance().installUpdate(appContext, path);
     }
 
-    // NEW ADDITION: Feature 4 - Remote Config
+    // Feature 4 - Remote Config
     public static void fetchRemoteConfig() {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         RemoteConfig.getInstance().fetchRemoteConfig();
     }
 
     public static String getConfigValue(String key) {
+        if (!SDKLicense.getInstance().isLicensed()) return null;
         return RemoteConfig.getInstance().getConfigValue(key);
     }
 
     public static boolean isFeatureEnabled(String feature) {
+        if (!SDKLicense.getInstance().isLicensed()) return false;
         return RemoteConfig.getInstance().isFeatureEnabled(feature);
     }
 
     public static void refreshConfig() {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         RemoteConfig.getInstance().refreshConfig();
     }
 
-    // NEW ADDITION: Feature 5 - Analytics
+    // Feature 5 - Analytics
     public static void trackEvent(String eventName) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         Analytics.getInstance().trackEvent(eventName);
     }
 
     public static void trackCrash(Throwable throwable) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         Analytics.getInstance().trackCrash(throwable);
     }
 
     public static void setUserProperty(String key, String value) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         Analytics.getInstance().setUserProperty(key, value);
     }
 
     public static void flushAnalytics() {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         Analytics.getInstance().flushAnalytics();
     }
 }

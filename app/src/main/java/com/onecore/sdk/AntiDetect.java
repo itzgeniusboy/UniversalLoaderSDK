@@ -1,8 +1,8 @@
-package com.loader.sdk;
+package com.onecore.sdk;
 
 import android.os.Build;
 import android.os.Debug;
-import com.loader.sdk.utils.Logger;
+import com.onecore.sdk.utils.Logger;
 import java.io.File;
 
 /**
@@ -23,12 +23,14 @@ public class AntiDetect {
     }
 
     public boolean isDebuggerAttached() {
+        if (!SDKLicense.getInstance().isLicensed()) return false;
         boolean attached = Debug.isDebuggerConnected() || Debug.waitingForDebugger();
         if (attached) Logger.w(TAG, "Debugger detected!");
         return attached;
     }
 
     public boolean isEmulator() {
+        if (!SDKLicense.getInstance().isLicensed()) return false;
         boolean isEmu = (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
                 || Build.FINGERPRINT.startsWith("generic")
                 || Build.FINGERPRINT.startsWith("unknown")
@@ -51,6 +53,7 @@ public class AntiDetect {
     }
 
     public boolean isRooted() {
+        if (!SDKLicense.getInstance().isLicensed()) return false;
         String[] paths = {
             "/system/app/Superuser.apk",
             "/sbin/su",
@@ -72,6 +75,7 @@ public class AntiDetect {
     }
 
     public boolean isTampered() {
+        if (!SDKLicense.getInstance().isLicensed()) return false;
         // Basic check for unconventional build tags
         String buildTags = Build.TAGS;
         boolean tampered = buildTags != null && buildTags.contains("test-keys");

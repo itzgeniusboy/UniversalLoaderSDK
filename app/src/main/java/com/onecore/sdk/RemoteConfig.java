@@ -1,6 +1,6 @@
-package com.loader.sdk;
+package com.onecore.sdk;
 
-import com.loader.sdk.utils.Logger;
+import com.onecore.sdk.utils.Logger;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 /**
- * Real HTTP-based remote configuration.
+ * Real HTTP-based remote configuration for OneCore SDK Engine.
  */
 public class RemoteConfig {
     private static final String TAG = "RemoteConfig";
@@ -27,9 +27,10 @@ public class RemoteConfig {
     }
 
     public void fetchRemoteConfig() {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         new Thread(() -> {
             try {
-                URL url = new URL("https://api.loader.sdk/config?sdk_version=1.0.4");
+                URL url = new URL("https://api.onecore.sdk/config?sdk_version=1.0.4");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setConnectTimeout(5000);
                 
@@ -59,10 +60,12 @@ public class RemoteConfig {
     }
 
     public String getConfigValue(String key) {
+        if (!SDKLicense.getInstance().isLicensed()) return null;
         return config.get(key);
     }
 
     public boolean isFeatureEnabled(String feature) {
+        if (!SDKLicense.getInstance().isLicensed()) return false;
         return "true".equals(config.get(feature));
     }
 

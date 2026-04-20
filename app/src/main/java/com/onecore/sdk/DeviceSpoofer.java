@@ -1,11 +1,11 @@
-package com.loader.sdk;
+package com.onecore.sdk;
 
 import android.content.Context;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.SystemClock;
-import com.loader.sdk.utils.Logger;
+import com.onecore.sdk.utils.Logger;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,6 +28,7 @@ public class DeviceSpoofer {
     }
 
     public void init(Context context) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         setDefaultFakeData();
         applyGlobalSpoof();
         Logger.d(TAG, "Device Spoofer initialized.");
@@ -64,6 +65,7 @@ public class DeviceSpoofer {
      * Real GPS Mocking using LocationManager Test Provider.
      */
     public void spoofLocation(Context context, double lat, double lon) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         try {
             LocationManager lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
             String provider = LocationManager.GPS_PROVIDER;

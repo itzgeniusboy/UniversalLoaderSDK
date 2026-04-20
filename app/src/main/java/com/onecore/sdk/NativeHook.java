@@ -1,9 +1,9 @@
-package com.loader.sdk;
+package com.onecore.sdk;
 
-import com.loader.sdk.utils.Logger;
+import com.onecore.sdk.utils.Logger;
 
 /**
- * JNI Wrapper for Native Hooking and Memory Operations.
+ * JNI Wrapper for Native Hooking and Memory Operations in OneCore SDK Engine.
  */
 public class NativeHook {
     private static final String TAG = "NativeHook";
@@ -11,7 +11,7 @@ public class NativeHook {
 
     static {
         try {
-            System.loadLibrary("loader-native");
+            System.loadLibrary("onecore-native");
             isLoaded = true;
             Logger.d(TAG, "Native library loaded successfully.");
         } catch (UnsatisfiedLinkError e) {

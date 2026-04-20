@@ -1,0 +1,4 @@
+[
+    { "date": "2025-03-10", "customer": "John Developer", "plan": "Pro", "amount": 49 },
+    { "date": "2025-03-12", "customer": "Mike Modder", "plan": "Enterprise", "amount": 149 }
+]

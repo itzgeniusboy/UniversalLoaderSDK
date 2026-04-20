@@ -1,0 +1,6 @@
+{
+    "admin_user": "admin",
+    "admin_pass_hash": "admin123",
+    "sdk_version": "1.0.4",
+    "changelog": "v1.0.4 - Integrated License System & Admin Panel"
+}

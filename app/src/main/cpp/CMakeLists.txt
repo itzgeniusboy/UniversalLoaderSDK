@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.22.1)
 
-project("loader-native")
+project("onecore-native")
 
-add_library(loader-native SHARED
+add_library(onecore-native SHARED
         native_hook.cpp
         memory.cpp)
 
 find_library(log-lib log)
 
-target_link_libraries(loader-native
+target_link_libraries(onecore-native
         ${log-lib})

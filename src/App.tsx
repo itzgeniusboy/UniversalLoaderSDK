@@ -18,27 +18,13 @@ import {
 } from 'lucide-react';
 
 const FILES = [
-  { id: 'loader', name: 'LoaderSDK.java', path: 'app/src/main/java/com/loader/sdk/LoaderSDK.java', icon: <Smartphone size={18} />, lang: 'java' },
-  { id: 'container', name: 'VirtualContainer.java', path: 'app/src/main/java/com/loader/sdk/VirtualContainer.java', icon: <Box size={18} />, lang: 'java' },
-  { id: 'hook', name: 'HookEngine.java', path: 'app/src/main/java/com/loader/sdk/HookEngine.java', icon: <Cpu size={18} />, lang: 'java' },
-  { id: 'spoofer', name: 'DeviceSpoofer.java', path: 'app/src/main/java/com/loader/sdk/DeviceSpoofer.java', icon: <ShieldCheck size={18} />, lang: 'java' },
-  { id: 'memory', name: 'MemoryReader.java', path: 'app/src/main/java/com/loader/sdk/MemoryReader.java', icon: <Database size={18} />, lang: 'java' },
-  { id: 'anti', name: 'AntiDetect.java', path: 'app/src/main/java/com/loader/sdk/AntiDetect.java', icon: <ShieldCheck size={18} />, lang: 'java' },
-  { id: 'license', name: 'LicenseManager.java', path: 'app/src/main/java/com/loader/sdk/LicenseManager.java', icon: <Check size={18} />, lang: 'java' },
-  { id: 'updater', name: 'Updater.java', path: 'app/src/main/java/com/loader/sdk/Updater.java', icon: <ChevronRight size={18} />, lang: 'java' },
-  { id: 'config', name: 'RemoteConfig.java', path: 'app/src/main/java/com/loader/sdk/RemoteConfig.java', icon: <Layers size={18} />, lang: 'java' },
-  { id: 'analytics', name: 'Analytics.java', path: 'app/src/main/java/com/loader/sdk/Analytics.java', icon: <Terminal size={18} />, lang: 'java' },
-  { id: 'menu', name: 'FloatingMenu.java', path: 'app/src/main/java/com/loader/sdk/FloatingMenu.java', icon: <Layers size={18} />, lang: 'java' },
-  { id: 'crash', name: 'CrashHandler.java', path: 'app/src/main/java/com/loader/sdk/utils/CrashHandler.java', icon: <AlertTriangle size={18} />, lang: 'java' },
-  { id: 'logger', name: 'Logger.java', path: 'app/src/main/java/com/loader/sdk/utils/Logger.java', icon: <Terminal size={18} />, lang: 'java' },
-  { id: 'native-hook-java', name: 'NativeHook.java', path: 'app/src/main/java/com/loader/sdk/NativeHook.java', icon: <Cpu size={18} />, lang: 'java' },
-  { id: 'native-hook-cpp', name: 'native_hook.cpp', path: 'app/src/main/cpp/native_hook.cpp', icon: <Cpu size={18} />, lang: 'cpp' },
-  { id: 'native-mem-cpp', name: 'memory.cpp', path: 'app/src/main/cpp/memory.cpp', icon: <Database size={18} />, lang: 'cpp' },
-  { id: 'cmake', name: 'CMakeLists.txt', path: 'app/src/main/cpp/CMakeLists.txt', icon: <Settings size={18} />, lang: 'cmake' },
-  { id: 'ci', name: 'build.yml', path: '.github/workflows/build.yml', icon: <Settings size={18} />, lang: 'yaml' },
-  { id: 'readme', name: 'README.md', path: '/README.md', icon: <Package size={18} />, lang: 'markdown' },
-  { id: 'deploy', name: 'DEPLOY.md', path: '/DEPLOY.md', icon: <ChevronRight size={18} />, lang: 'markdown' },
-  { id: 'checklist', name: 'CHECKLIST.md', path: '/CHECKLIST.md', icon: <ShieldCheck size={18} />, lang: 'markdown' },
+  { id: 'admin-dash', name: 'dashboard.html', path: 'admin/dashboard.html', icon: <Settings size={18} />, lang: 'html' },
+  { id: 'admin-js', name: 'admin.js', path: 'admin/admin.js', icon: <Terminal size={18} />, lang: 'javascript' },
+  { id: 'verify-php', name: 'verify.php', path: 'server/verify.php', icon: <Cpu size={18} />, lang: 'php' },
+  { id: 'customers-json', name: 'customers.json', path: 'admin/data/customers.json', icon: <Database size={18} />, lang: 'json' },
+  { id: 'entry', name: 'OneCoreSDK.java', path: 'app/src/main/java/com/onecore/sdk/OneCoreSDK.java', icon: <Smartphone size={18} />, lang: 'java' },
+  { id: 'license', name: 'SDKLicense.java', path: 'app/src/main/java/com/onecore/sdk/SDKLicense.java', icon: <ShieldCheck size={18} />, lang: 'java' },
+  { id: 'container', name: 'VirtualContainer.java', path: 'app/src/main/java/com/onecore/sdk/VirtualContainer.java', icon: <Box size={18} />, lang: 'java' },
   { id: 'build', name: 'build.gradle', path: 'app/build.gradle', icon: <Settings size={18} />, lang: 'groovy' },
   { id: 'manifest', name: 'AndroidManifest.xml', path: 'app/src/main/AndroidManifest.xml', icon: <Package size={18} />, lang: 'xml' },
 ];
@@ -61,7 +47,7 @@ export default function App() {
         <div className="p-6 border-b border-[#1F1F1F]">
           <div className="text-[#F27D26] font-bold text-xs tracking-widest uppercase mb-1">Project</div>
           <h1 className="text-lg font-semibold text-white leading-tight">
-            UniversalLoaderSDK
+            OneCore SDK Engine
           </h1>
           <div className="flex items-center mt-2">
             <div className="w-2 h-2 rounded-full bg-green-500 mr-2 status-glow" />
@@ -180,7 +166,7 @@ export default function App() {
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <div className="text-blue-400">package</div> com.loader.sdk;<br /><br />
+                      <div className="text-blue-400">package</div> com.onecore.sdk;<br /><br />
                       <div className="text-blue-400">public class</div> {selectedFile.name.replace('.java', '')} {'{'}<br />
                       &nbsp;&nbsp;<div className="text-gray-500">// Source implementation for {selectedFile.name}</div><br />
                       &nbsp;&nbsp;<div className="text-gray-500">// {selectedFile.path}</div><br /><br />
@@ -197,15 +183,15 @@ export default function App() {
               <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-6 flex flex-col justify-between shadow-2xl overflow-hidden">
                 <div className="space-y-8 overflow-y-auto pr-2">
                   <div>
-                    <div className="text-[#F27D26] text-xs font-bold uppercase mb-4 tracking-widest">Build Configuration</div>
+                    <div className="text-[#F27D26] text-xs font-bold uppercase mb-4 tracking-widest">OneCore Build Configuration</div>
                     <div className="space-y-3">
                       <div className="flex items-center">
                         <div className="w-1.5 h-1.5 bg-[#F27D26] rounded-full mr-3" />
-                        <div className="text-sm text-gray-300">Pure Java Implementation (No NDK)</div>
+                        <div className="text-sm text-gray-300">OneCore Engine - Advanced Hooking</div>
                       </div>
                       <div className="flex items-center">
                         <div className="w-1.5 h-1.5 bg-[#F27D26] rounded-full mr-3" />
-                        <div className="text-sm text-gray-300">AndroidIDE Compatibility Layer</div>
+                        <div className="text-sm text-gray-300">Android API Level 26 - 34 Support</div>
                       </div>
                       <div className="flex items-center">
                         <div className="w-1.5 h-1.5 bg-[#F27D26] rounded-full mr-3" />

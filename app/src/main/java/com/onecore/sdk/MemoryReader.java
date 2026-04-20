@@ -1,6 +1,6 @@
-package com.loader.sdk;
+package com.onecore.sdk;
 
-import com.loader.sdk.utils.Logger;
+import com.onecore.sdk.utils.Logger;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -30,6 +30,7 @@ public class MemoryReader {
      * @return Byte array of read memory.
      */
     public byte[] readMemory(int pid, long address, int size) {
+        if (!SDKLicense.getInstance().isLicensed()) return null;
         String path = pid == 0 ? "/proc/self/mem" : "/proc/" + pid + "/mem";
         byte[] buffer = new byte[size];
 
@@ -51,6 +52,7 @@ public class MemoryReader {
      * @return True if successful.
      */
     public boolean writeMemory(int pid, long address, byte[] data) {
+        if (!SDKLicense.getInstance().isLicensed()) return false;
         String path = pid == 0 ? "/proc/self/mem" : "/proc/" + pid + "/mem";
         try (RandomAccessFile raf = new RandomAccessFile(path, "rw")) {
             raf.seek(address);

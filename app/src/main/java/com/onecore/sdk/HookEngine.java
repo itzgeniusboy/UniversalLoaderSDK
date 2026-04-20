@@ -1,6 +1,6 @@
-package com.loader.sdk;
+package com.onecore.sdk;
 
-import com.loader.sdk.utils.Logger;
+import com.onecore.sdk.utils.Logger;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Enhanced Hook Engine.
+ * Enhanced Hook Engine for OneCore SDK Engine.
  * Supports interface-based proxying and a "Method Interceptor" pattern 
  * for arbitrary objects via reflection-based wrappers.
  */
@@ -37,6 +37,7 @@ public class HookEngine {
     }
 
     public void init() {
+        if (!SDKLicense.getInstance().isLicensed()) return;
         Logger.d(TAG, "Enhanced Hook Engine initialized.");
     }
 
@@ -44,6 +45,7 @@ public class HookEngine {
      * Native Hooking wrapper
      */
     public long hookNativeFunction(long targetAddr, long replaceAddr) {
+        if (!SDKLicense.getInstance().isLicensed()) return -1;
         if (nativeHook != null) {
             return nativeHook.hookFunction(targetAddr, replaceAddr);
         }

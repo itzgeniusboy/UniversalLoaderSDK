@@ -1,4 +1,4 @@
-package com.loader.sdk.utils;
+package com.onecore.sdk.utils;
 
 import android.util.Log;
 
@@ -6,7 +6,7 @@ import android.util.Log;
  * Simple logging utility with tag and level control.
  */
 public class Logger {
-    private static final String PREFIX = "[UniversalLoaderSDK] ";
+    private static final String PREFIX = "[OneCore] ";
     private static boolean debugEnabled = true;
 
     public static void init(boolean enabled) {
