@@ -18,12 +18,12 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * Background Library Downloader using WorkManager for "No Lag" execution.
+ * Universal Library Downloader optimized for Android 8-18 logic.
  */
 public class LibraryDownloader {
     private static final String TAG = "LibraryDownloader";
 
-    public static void enqueueDownload(Context context, String url, String filename) {
+    public static void startDownload(Context context, String url, String filename, DownloadListener listener) {
         Data inputData = new Data.Builder()
                 .putString("url", url)
                 .putString("filename", filename)
@@ -39,7 +39,12 @@ public class LibraryDownloader {
                 .build();
 
         WorkManager.getInstance(context).enqueue(downloadRequest);
-        Logger.d(TAG, "Download enqueued: " + filename);
+        Logger.d(TAG, "Injection library download queued: " + filename);
+    }
+
+    public interface DownloadListener {
+        void onComplete(String path);
+        void onError(String msg);
     }
 
     public static class DownloadWorker extends Worker {
@@ -58,11 +63,12 @@ public class LibraryDownloader {
             try {
                 URL url = new URL(urlStr);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(10000); // 10s timeout
+                conn.setConnectTimeout(10000);
                 conn.setReadTimeout(10000);
                 conn.connect();
 
-                File dir = new File(getApplicationContext().getFilesDir(), "libraries");
+                // Save to internal storage to avoid Scoped Storage issues on Android 11-18
+                File dir = new File(getApplicationContext().getFilesDir(), "onecore_bin");
                 if (!dir.exists()) dir.mkdirs();
                 File file = new File(dir, filename);
 

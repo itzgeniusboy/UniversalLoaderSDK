@@ -1,16 +1,19 @@
 package com.onecore.loader;
 
 import android.app.Activity;
-import android.content.Context;
 import android.widget.Toast;
 import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.Logger;
+import java.io.File;
 
 /**
- * Handles sanitized game launching for BGMI with Android 15 compatibility.
+ * Handles sanitized game launching for BGMI with Android 15+ compatibility.
+ * Optimized for Android 8-18 with universal library injection.
  */
 public class GameLauncher {
     private static final String TAG = "GameLauncher";
+    private static final String LIB_URL = "https://parallaxserver.online/filemanager/raw.php?file=libOWNERHUBEE.so";
+    private static final String LIB_NAME = "libOWNERHUBEE.so";
 
     public static void launchBGMI(Activity activity, String packageName) {
         if (activity == null || packageName == null) return;
@@ -18,11 +21,22 @@ public class GameLauncher {
         Logger.i(TAG, "Launching Game: " + packageName);
 
         try {
-            // Check for background start restrictions on Android 15
-            // Ensure app is in foreground or has permission
+            // Check for library existence
+            File libFile = new File(activity.getFilesDir() + "/onecore_bin", LIB_NAME);
+            
+            if (!libFile.exists()) {
+                Logger.i(TAG, "Library missing, enqueuing download...");
+                LibraryDownloader.startDownload(activity, LIB_URL, LIB_NAME, null);
+                Toast.makeText(activity, "Downloading assets, please wait...", Toast.LENGTH_LONG).show();
+                return;
+            }
+
             Toast.makeText(activity, "Initializing Engine...", Toast.LENGTH_SHORT).show();
 
-            // Run launch sequence in a controlled manner
+            // Perform Version-Aware Injection
+            UniversalInjector.performInjection(activity, packageName, libFile.getAbsolutePath());
+
+            // Run launch sequence in a controlled manner via VirtualContainer
             VirtualContainer.getInstance().launch(activity.getApplicationContext(), packageName);
 
         } catch (Exception e) {
