@@ -11,6 +11,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
+import com.onecore.sdk.core.CloneManager;
 import com.onecore.sdk.utils.AndroidVersionCompat;
 
 /**
@@ -41,7 +42,7 @@ public class VirtualContainer {
 
     /**
      * Launches a package inside the virtual environment.
-     * Updated for Android 16, 17, and 18 "BlackBox" style isolation.
+     * Implements "REAL CLONING" - intercepting IDs and isolating code.
      */
     public void launch(Context context, String packageName) {
         if (context == null || packageName == null) return;
@@ -52,36 +53,59 @@ public class VirtualContainer {
         }
 
         try {
-            Logger.d(TAG, "Initializing BlackBox Virtual Space for API " + Build.VERSION.SDK_INT + " : " + packageName);
+            Logger.d(TAG, "Starting REAL CLONE sequence for: " + packageName);
             setVirtualMode(true);
             
-            // Bypass Android Hidden API Restrictions (Required for Android 9+)
+            // 1. Prepare Metadata and Sandbox (Deep Clone)
+            boolean prepared = CloneManager.getInstance().prepareClone(context, packageName);
+            if (!prepared) {
+                Logger.e(TAG, "Clone Preparation Failed.");
+                return;
+            }
+
+            // 2. Bypass restrictions
             bypassHiddenApiRestrictions();
 
-            // Isolated VFS & Environment Setup
+            // 3. Isolated Context & Hooks Setup
             IORedirector.ensureVirtualEnv(context, packageName);
             
-            // System Service Virtualization Hooks
-            installSystemHooks(context, packageName);
-
-            PackageManager pm = context.getPackageManager();
-            Intent intent = pm.getLaunchIntentForPackage(packageName);
-            if (intent != null) {
-                // Android 14-18 Background Start Workaround
-                if (Build.VERSION.SDK_INT >= 34) {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    // Use Stub Process Launch for isolation
-                    launchViaStub(context, intent, packageName);
-                } else {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    context.startActivity(intent);
-                }
-                Logger.d(TAG, "App launched in virtual space.");
-            }
+            // 4. Sandbox Launch (Host Process)
+            launchInVirtualSandbox(context, packageName);
+            
         } catch (Exception e) {
             Logger.e(TAG, "VirtualContainer launch failed", e);
             fallbackLaunch(context, packageName);
         }
+    }
+
+    private void launchInVirtualSandbox(Context context, String packageName) {
+        Logger.i(TAG, "Executing Host-based Sandbox Launch for: " + packageName);
+        
+        // This launches our Sandbox Host which then loads the guest app's DEX
+        Intent sandboxIntent = new Intent();
+        sandboxIntent.setClassName(context.getPackageName(), "com.onecore.sdk.core.SandboxActivity");
+        sandboxIntent.putExtra("target_package", packageName);
+        sandboxIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        
+        context.startActivity(sandboxIntent);
+    }
+
+    private void launchTraditional(Context context, String packageName) {
+        PackageManager pm = context.getPackageManager();
+        Intent intent = pm.getLaunchIntentForPackage(packageName);
+        if (intent != null) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (Build.VERSION.SDK_INT >= 34) {
+                launchViaStub(context, intent, packageName);
+            } else {
+                context.startActivity(intent);
+            }
+            Logger.d(TAG, "App launched via Traditional/Root method.");
+        }
+    }
+
+    private boolean isRooted() {
+        return new File("/system/bin/su").exists() || new File("/system/xbin/su").exists();
     }
 
     private void bypassHiddenApiRestrictions() {
