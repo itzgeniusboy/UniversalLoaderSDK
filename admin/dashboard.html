@@ -9,49 +9,49 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="flex flex-col lg:flex-row">
+    <!-- Pull to Refresh Indicator -->
+    <div id="ptr-indicator">Pull down to refresh</div>
+
     <!-- Mobile Header -->
-    <header class="lg:hidden bg-[#0A0A0A] border-b border-[#1F1F1F] p-4 flex justify-between items-center fixed top-0 w-full z-[1000]">
+    <header class="lg:hidden bg-[#0A0A0A] border-b border-[#1F1F1F] p-4 flex justify-between items-center fixed top-0 w-full z-[1001] h-[4rem]">
         <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-[#F27D26] rounded-lg flex items-center justify-center font-black text-black">O</div>
+            <div class="w-8 h-8 bg-[#F27D26] rounded-lg flex items-center justify-center font-black text-black shadow-lg shadow-orange-900/20">O</div>
             <h1 class="text-sm font-bold text-white tracking-tight uppercase">OneCore <span class="text-[#F27D26]">SDk</span></h1>
         </div>
-        <button onclick="logout()" class="text-[10px] font-bold text-red-500 uppercase tracking-widest border border-red-500/20 px-3 py-1.5 rounded">Logout</button>
+        <button onclick="logout()" class="text-[10px] font-bold text-red-500 uppercase tracking-widest border border-red-500/20 px-3 py-2 rounded-lg bg-red-500/5 active:bg-red-500/10">Logout</button>
     </header>
 
     <!-- Sidebar / Bottom Nav -->
-    <aside class="w-64 h-screen bg-[#0A0A0A] border-r border-[#1F1F1F] flex flex-col fixed z-[1100]">
-        <div class="p-8 border-b border-[#1F1F1F]">
+    <aside class="lg:w-64 lg:h-screen bg-[#0A0A0A] border-r border-[#1F1F1F] flex flex-col fixed z-[1100]">
+        <div class="p-8 border-b border-[#1F1F1F] lg:block hidden">
             <h1 class="text-xl font-bold text-white tracking-tight">Admin<span class="text-[#F27D26]">Panel</span></h1>
             <p class="text-[10px] text-gray-500 font-mono mt-1 uppercase tracking-widest">OneCore SDK Engine v1.0.4</p>
         </div>
 
-        <nav class="flex-1 py-6">
+        <nav class="flex-1 py-4 lg:py-6">
             <div class="px-8 mb-4 text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] lg:block hidden">Navigation</div>
             <button onclick="showTab('dashboard')" class="nav-link active">
-                <span class="lg:hidden text-lg mb-1">📊</span>
-                Dashboard
+                <span class="lg:hidden text-xl mb-1">📊</span>
+                <span class="lg:block">Dashboard</span>
             </button>
             <button onclick="showTab('customers')" class="nav-link">
-                <span class="lg:hidden text-lg mb-1">🔑</span>
-                Licenses
+                <span class="lg:hidden text-xl mb-1">🔑</span>
+                <span class="lg:block">Licenses</span>
             </button>
             <button onclick="showTab('sales')" class="nav-link">
-                <span class="lg:hidden text-lg mb-1">💰</span>
-                Sales
+                <span class="lg:hidden text-xl mb-1">💰</span>
+                <span class="lg:block">Sales</span>
             </button>
             <button onclick="showTab('settings')" class="nav-link">
-                <span class="lg:hidden text-lg mb-1">⚙️</span>
-                Settings
+                <span class="lg:hidden text-xl mb-1">⚙️</span>
+                <span class="lg:block">Settings</span>
             </button>
         </nav>
-
-        <div class="p-8 border-t border-[#1F1F1F]">
-            <button onclick="logout()" class="text-xs font-bold text-red-500 hover:text-red-400 uppercase tracking-widest">Logout</button>
-        </div>
     </aside>
 
     <!-- Main Content -->
-    <main class="lg:ml-64 flex-1 bg-[#050505] min-h-screen p-6 lg:p-12 overflow-y-auto mt-[64px] lg:mt-0">
+    <main class="lg:ml-64 flex-1 bg-[#050505] min-h-screen">
+        <div class="p-6 lg:p-12" id="scroll-container">
         <!-- Dashboard Tab -->
         <section id="tab-dashboard" class="tab-content">
             <h2 class="text-3xl font-light text-white mb-8">OneCore SDK <span class="italic font-serif">Engine</span></h2>
@@ -169,6 +169,7 @@
                 </div>
             </div>
         </section>
+        </div>
     </main>
 
     <!-- Customer Modal -->

@@ -246,8 +246,62 @@ function exportCSV() {
     a.click();
 }
 
+// Touch Handlers (Swipe to Delete & Pull to Refresh)
+let touchStartTop = 0;
+let touchStartX = 0;
+const scrollContainer = document.getElementById('scroll-container');
+const ptrIndicator = document.getElementById('ptr-indicator');
+
+window.addEventListener('touchstart', (e) => {
+    touchStartTop = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+});
+
+window.addEventListener('touchmove', (e) => {
+    const touchY = e.touches[0].clientY;
+    const diff = touchY - touchStartTop;
+
+    if (window.scrollY === 0 && diff > 0) {
+        ptrIndicator.style.transform = `translateY(${Math.min(diff, 100)}px)`;
+        if (diff > 70) ptrIndicator.innerText = "Release to refresh";
+    }
+});
+
+window.addEventListener('touchend', (e) => {
+    const touchY = e.changedTouches[0].clientY;
+    const touchX = e.changedTouches[0].clientX;
+    const diffY = touchY - touchStartTop;
+    const diffX = touchX - touchStartX;
+
+    // Pull to Refresh Logic
+    if (window.scrollY === 0 && diffY > 70) {
+        ptrIndicator.innerText = "Refreshing...";
+        setTimeout(() => {
+            ptrIndicator.style.transform = `translateY(0)`;
+            updateDashboard();
+            renderCustomers();
+            renderSales();
+            ptrIndicator.innerText = "Pull down to refresh";
+        }, 800);
+    } else {
+        ptrIndicator.style.transform = `translateY(0)`;
+    }
+
+    // Swipe to Delete Detection
+    if (Math.abs(diffX) > 100 && Math.abs(diffY) < 30) {
+        const target = e.target.closest('tr');
+        if (target && target.querySelector('button[onclick*="deleteCustomer"]')) {
+            const index = target.querySelector('button[onclick*="deleteCustomer"]').getAttribute('onclick').match(/\d+/)[0];
+            if (diffX < -100) { // Swipe Left
+                deleteCustomer(index);
+            }
+        }
+    }
+});
+
 // Init
 window.onload = () => {
     checkAuth();
     updateDashboard();
+    // Pre-load if needed
 }
