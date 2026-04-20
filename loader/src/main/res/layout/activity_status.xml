@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#121212">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="OneCore Loader Status"
+        android:textColor="#FFFFFF"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="32dp" />
+
+    <!-- Step Indicator -->
+    <com.onecore.loader.views.StepIndicator
+        android:id="@+id/stepIndicator"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginBottom="32dp" />
+
+    <!-- Permission Status -->
+    <LinearLayout
+        android:id="@+id/permissionSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:background="#1E1E1E"
+        android:layout_marginBottom="16dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Permissions Checklist"
+            android:textColor="#BBBBBB"
+            android:textSize="12sp"
+            android:layout_marginBottom="8dp" />
+        <TextView android:id="@+id/permStorage" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚠️ Storage" android:textColor="#FFFFFF" />
+        <TextView android:id="@+id/permOverlay" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚠️ Overlay" android:textColor="#FFFFFF" />
+    </LinearLayout>
+
+    <!-- Cloning Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="16dp">
+        <TextView
+            android:id="@+id/cloneStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cloning: Waiting..."
+            android:textColor="#FFFFFF" />
+        <ProgressBar
+            android:id="@+id/cloneProgressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100" />
+    </LinearLayout>
+
+    <!-- Download Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="16dp">
+        <TextView
+            android:id="@+id/downloadStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Download: Not started"
+            android:textColor="#FFFFFF" />
+        <ProgressBar
+            android:id="@+id/downloadProgressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100" />
+        <TextView
+            android:id="@+id/downloadSpeedText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Speed: 0 KB/s"
+            android:textColor="#888888"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <!-- Injection Status -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/injectionStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Injection: Waiting..."
+            android:textColor="#FFFFFF" />
+        <TextView
+            android:id="@+id/pidText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Process ID: N/A"
+            android:textColor="#888888"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <Button
+        android:id="@+id/grantOverlayBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Enable Overlay"
+        android:visibility="gone" />
+
+</LinearLayout>

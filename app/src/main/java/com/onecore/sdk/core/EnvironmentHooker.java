@@ -4,6 +4,7 @@ import android.content.Context;
 import com.onecore.sdk.utils.Logger;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 
 /**
  * Orchestrates the application of hooks to the current process.

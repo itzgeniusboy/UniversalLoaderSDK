@@ -1,65 +1,61 @@
 package com.onecore.loader;
 
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.view.View;
-import android.widget.Button;
-import android.widget.ProgressBar;
-import android.widget.TextView;
-import android.widget.Toast;
-import androidx.appcompat.app.AppCompatActivity;
-import com.onecore.sdk.OneCoreSDK;
-import com.onecore.sdk.VirtualContainer;
-import com.onecore.sdk.utils.AndroidVersionCompat;
+import android.view.animation.AlphaAnimation;
+import com.onecore.loader.views.GradientButton;
+import com.onecore.sdk.utils.Logger;
 
-public class MainActivity extends AppCompatActivity {
-    private static final String BGMI_PKG = "com.pubg.imobile";
-    private ProgressBar progressBar;
-    private Button btnLaunch;
+/**
+ * Premium iOS-style Dashboard for OneCore Loader.
+ */
+public class MainActivity extends Activity {
+    private static final String TAG = "MainActivity";
+    private GradientButton launchBtn;
+    private Vibrator vibrator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        // Android 15 Edge-to-Edge support
-        AndroidVersionCompat.setupEdgeToEdge(this);
-        
         setContentView(R.layout.activity_main);
 
-        OneCoreSDK.init(getApplicationContext(), "LOADER_TEST_KEY");
+        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        launchBtn = findViewById(R.id.launchBtn);
 
-        progressBar = findViewById(R.id.clone_progress);
-        btnLaunch = findViewById(R.id.btn_launch);
-        Button btnClone = findViewById(R.id.btn_clone);
-        TextView statusMode = findViewById(R.id.status_mode);
+        // Start premium animations
+        launchBtn.startPulse();
+        applyEntranceAnimation(findViewById(android.R.id.content));
 
-        statusMode.setText("Mode: " + (isRooted() ? "Root" : "Non-Root"));
+        launchBtn.setOnClickListener(v -> {
+            provideHapticFeedback();
+            Logger.i(TAG, "Initiating Sandbox Launch Sequence...");
+            // Move to StatusActivity for detailed progress
+            Intent intent = new Intent(this, StatusActivity.class);
+            startActivity(intent);
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        });
 
-        btnClone.setOnClickListener(v -> startCloning());
-        btnLaunch.setOnClickListener(v -> launchGame());
+        findViewById(R.id.navSettings).setOnClickListener(v -> {
+            provideHapticFeedback();
+            Intent intent = new Intent(this, SettingsActivity.class);
+            startActivity(intent);
+            overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right);
+        });
     }
 
-    private void startCloning() {
-        progressBar.setVisibility(View.VISIBLE);
-        Toast.makeText(this, "Cloning BGMI...", Toast.LENGTH_SHORT).show();
-        
-        // Mock cloning delay for UI demonstration
-        new android.os.Handler().postDelayed(() -> {
-            progressBar.setVisibility(View.GONE);
-            Toast.makeText(this, "Clone Successful", Toast.LENGTH_LONG).show();
-        }, 3000);
+    private void applyEntranceAnimation(View view) {
+        AlphaAnimation fadeIn = new AlphaAnimation(0.0f, 1.0f);
+        fadeIn.setDuration(1000);
+        view.startAnimation(fadeIn);
     }
 
-    private void launchGame() {
-        Toast.makeText(this, "Injecting & Launching BGMI...", Toast.LENGTH_SHORT).show();
-        
-        // Use SDK to launch in virtual space
-        VirtualContainer.getInstance().launch(this, BGMI_PKG);
-        
-        // Auto-Injection (DEX/SO)
-        // OneCoreSDK.downloadAndInject(BGMI_PKG, "https://github.com/onecore/cheats/raw/main/bgmi.dex", "bgmi_cheat.dex");
-    }
-
-    private boolean isRooted() {
-        return new java.io.File("/system/bin/su").exists() || new java.io.File("/system/xbin/su").exists();
+    private void provideHapticFeedback() {
+        if (vibrator != null) {
+            vibrator.vibrate(50); // Light haptic tap
+        }
     }
 }

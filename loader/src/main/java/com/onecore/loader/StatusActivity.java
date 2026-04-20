@@ -14,7 +14,6 @@ import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.core.CloneManager;
 import com.onecore.sdk.utils.Logger;
 import com.onecore.sdk.utils.PermissionsHelper;
-import java.io.File;
 
 /**
  * Detailed status activity for visual feedback during the Loader sequence.

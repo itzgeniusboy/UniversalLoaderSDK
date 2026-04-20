@@ -1,50 +1,50 @@
 package com.onecore.loader;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
-import androidx.appcompat.app.AppCompatActivity;
-import com.onecore.sdk.OneCoreSDK;
-import com.onecore.sdk.SDKLicense;
-import com.onecore.sdk.utils.AndroidVersionCompat;
+import android.widget.Toast;
+import com.onecore.sdk.utils.Logger;
+import com.onecore.sdk.utils.PermissionsHelper;
 
-public class SplashActivity extends AppCompatActivity {
+/**
+ * Splash Screen that enforces permissions before the loader starts.
+ */
+public class SplashActivity extends Activity {
+    private static final String TAG = "SplashActivity";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // Android 15 Edge-to-Edge support
-        AndroidVersionCompat.setupEdgeToEdge(this);
-        
-        // Simple dark background for splash
-        android.view.View splashView = new android.view.View(this);
-        splashView.setBackgroundColor(0xFF050505);
-        setContentView(splashView);
+        // Check if permissions are granted
+        if (!PermissionsHelper.hasAllPermissions(this)) {
+            Logger.i(TAG, "Permissions missing. Redirecting to settings...");
+            Toast.makeText(this, "Please grant ALL permissions to enable ESP.", Toast.LENGTH_LONG).show();
+            PermissionsHelper.requestSpecialPermissions(this);
+            // We don't finish here, user needs to grant and come back or restart
+        } else {
+            Logger.i(TAG, "All permissions granted. Loading...");
+            startLoaderWithDelay();
+        }
+    }
 
-        // Deferred SDK initialization to ensure UI shows up instantly (< 1s)
-        new Handler(Looper.getMainLooper()).post(() -> {
-            try {
-                // Initialize OneCore SDK in background if needed
-                OneCoreSDK.init(getApplicationContext(), ""); 
-            } catch (Exception e) {
-                // Safe initializer fallback
-            }
-        });
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Check again when user returns from settings
+        if (PermissionsHelper.hasAllPermissions(this)) {
+            startLoaderWithDelay();
+        }
+    }
 
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            try {
-                if (SDKLicense.getInstance().isLicensed()) {
-                    startActivity(new Intent(SplashActivity.this, MainActivity.class));
-                } else {
-                    startActivity(new Intent(SplashActivity.this, LicenseActivity.class));
-                }
-                finish();
-            } catch (Exception e) {
-                // Global fallback to License activity if anything fails
-                startActivity(new Intent(SplashActivity.this, LicenseActivity.class));
-                finish();
-            }
+    private void startLoaderWithDelay() {
+        new Handler().postDelayed(() -> {
+            // Start the Premium iOS Dashboard
+            Intent intent = new Intent(this, MainActivity.class);
+            startActivity(intent);
+            finish();
         }, 1500);
     }
 }
