@@ -21,19 +21,41 @@ public class OneCoreSDK {
     public static void init(Context context, String customerKey) {
         if (isInitialized) return;
         
-        appContext = context.getApplicationContext();
-        Logger.init(true); // Enable logging by default
-        
-        // Initialize Security Shield FIRST
-        SecurityManager.init(appContext);
-        
-        CrashHandler.getInstance().init(appContext);
-        
-        // Initialize License Control
-        SDKLicense.getInstance().init(appContext, customerKey);
-        
-        Logger.d(TAG, "SDK Initialized successfully.");
-        isInitialized = true;
+        try {
+            appContext = context.getApplicationContext();
+            
+            // Set up Global Crash Protector
+            Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+                Logger.e("OneCoreSDK", "Global Crash Intercepted: " + throwable.getMessage(), throwable);
+                // Analytics track crash if possible
+                try { Analytics.getInstance().trackCrash(throwable); } catch (Exception ignored) {}
+                
+                // Allow some time for reporting
+                try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+                
+                // Finish process to prevent inconsistent state
+                android.os.Process.killProcess(android.os.Process.myPid());
+                System.exit(10);
+            });
+
+            // Lazy initialization for sub-components via background thread
+            new Thread(() -> {
+                try {
+                    Logger.init(true);
+                    SecurityManager.init(appContext);
+                    CrashHandler.getInstance().init(appContext);
+                    SDKLicense.getInstance().init(appContext, customerKey);
+                    Logger.d(TAG, "Sub-components initialized in background.");
+                } catch (Exception e) {
+                    Logger.e(TAG, "Lazy initialization failed", e);
+                }
+            }).start();
+            
+            Logger.d(TAG, "SDK Shell Initialized.");
+            isInitialized = true;
+        } catch (Exception e) {
+            Logger.e(TAG, "SDK Initialization failed", e);
+        }
     }
 
     /**

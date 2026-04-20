@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">OneCore Loader (BGMI)</string>
+    <string name="bgmi_title">BATTLEGROUNDS MOBILE INDIA</string>
+    <string name="onecore_engine">OneCore SDK Engine v1.0.4</string>
+    <string name="license_required">License Key Required</string>
+    <string name="enter_key">Enter Key</string>
+    <string name="verify">Verify License</string>
+    <string name="paste">Paste from Clipboard</string>
+    <string name="contact_tg">Contact on Telegram</string>
+    <string name="clone_game">Clone BGMI</string>
+    <string name="launch_game">Launch Game</string>
+    <string name="inject_status">Injection: READY</string>
+    <string name="device_status">Mode: Non-Root</string>
+</resources>

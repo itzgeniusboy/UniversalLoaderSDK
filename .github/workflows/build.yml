@@ -39,12 +39,14 @@ jobs:
         fi
         chmod +x gradlew || true
     
-    - name: Build AAR
-      run: ./gradlew :app:assembleRelease --no-daemon
+    - name: Build SDK and Loader
+      run: ./gradlew :app:assembleRelease :loader:assembleRelease --no-daemon
     
-    - name: Upload AAR Artifact
+    - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: OneCoreSDK-AAR
-        path: app/build/outputs/aar/*.aar
+        name: OneCore-Assets
+        path: |
+          app/build/outputs/aar/*.aar
+          loader/build/outputs/apk/release/*.apk
         if-no-files-found: error
