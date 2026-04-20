@@ -50,6 +50,13 @@ public class SDKLicense {
         this.customerKey = customerKey;
         loadFromCache();
         
+        // Time Tampering Check
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        long lastCheck = prefs.getLong(KEY_LAST_CHECK, 0);
+        if (LicenseProtector.isTimeTampered(lastCheck)) {
+            SecurityManager.handleViolation("Device time tampered");
+        }
+        
         if (shouldCheckServer()) {
             verifyWithServer();
         } else {
@@ -58,7 +65,8 @@ public class SDKLicense {
     }
 
     public boolean isLicensed() {
-        return isLicensed;
+        // Multiple Verification Points
+        return LicenseProtector.checkLicenseIntegrity(isLicensed);
     }
 
     public String getExpiryDate() {
@@ -93,8 +101,8 @@ public class SDKLicense {
     private void verifyWithServer() {
         executor.execute(() -> {
             try {
-                // Updated to point to the unified server directory
-                URL url = new URL("https://your-php-host.com/server/verify.php?key=" + customerKey);
+                String devId = LicenseProtector.getDeviceId(context);
+                URL url = new URL("https://your-php-host.com/server/verify.php?key=" + customerKey + "&hwid=" + devId);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 

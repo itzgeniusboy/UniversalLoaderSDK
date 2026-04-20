@@ -54,6 +54,18 @@ public class FloatingMenu extends Service {
 
         addButton("Hook Toggle", v -> Logger.d("Menu", "Hook toggled"));
         addButton("Spoof Device", v -> Logger.d("Menu", "Device spoof triggered"));
+        
+        addButton("Start Capture", v -> {
+            NetworkCapture.getInstance().startCapture();
+            Logger.d("Menu", "Net Capture Started");
+        });
+        
+        addButton("Export Net Logs", v -> {
+            for (NetworkCapture.NetworkLog log : NetworkCapture.getInstance().getRequestLog()) {
+                Logger.i("NetLog", log.method + " " + log.url);
+            }
+        });
+
         addButton("Exit Menu", v -> stopSelf());
 
         int type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;

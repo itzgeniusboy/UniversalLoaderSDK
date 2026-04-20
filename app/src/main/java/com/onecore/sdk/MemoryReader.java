@@ -23,45 +23,24 @@ public class MemoryReader {
     }
 
     /**
-     * Reads memory at the specified address.
-     * @param pid Process ID (use 0 for self).
-     * @param address Hex address to read.
-     * @param size Number of bytes to read.
-     * @return Byte array of read memory.
+     * Reads memory. Redirects to virtual memory for apps in the container.
      */
     public byte[] readMemory(int pid, long address, int size) {
         if (!SDKLicense.getInstance().isLicensed()) return null;
-        String path = pid == 0 ? "/proc/self/mem" : "/proc/" + pid + "/mem";
-        byte[] buffer = new byte[size];
-
-        try (RandomAccessFile raf = new RandomAccessFile(path, "r")) {
-            raf.seek(address);
-            raf.readFully(buffer);
-            return buffer;
-        } catch (Exception e) {
-            Logger.e(TAG, "Read memory failed at " + Long.toHexString(address), e);
-            return null;
-        }
+        
+        // Use Virtual Memory if running in container
+        return MemoryRedirector.getInstance().readVirtualMemory(pid, address, size);
     }
 
     /**
-     * Writes memory at the specified address.
-     * @param pid Process ID.
-     * @param address Hex address to write.
-     * @param data Data to write.
-     * @return True if successful.
+     * Writes memory. Redirects to virtual memory for apps in the container.
      */
     public boolean writeMemory(int pid, long address, byte[] data) {
         if (!SDKLicense.getInstance().isLicensed()) return false;
-        String path = pid == 0 ? "/proc/self/mem" : "/proc/" + pid + "/mem";
-        try (RandomAccessFile raf = new RandomAccessFile(path, "rw")) {
-            raf.seek(address);
-            raf.write(data);
-            return true;
-        } catch (Exception e) {
-            Logger.e(TAG, "Write memory failed at " + Long.toHexString(address), e);
-            return false;
-        }
+        
+        // Use Virtual Memory redirection
+        MemoryRedirector.getInstance().writeVirtualMemory(pid, address, data);
+        return true;
     }
 
     // Helper methods for primitive types

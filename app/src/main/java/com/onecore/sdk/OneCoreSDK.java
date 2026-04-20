@@ -23,6 +23,10 @@ public class OneCoreSDK {
         
         appContext = context.getApplicationContext();
         Logger.init(true); // Enable logging by default
+        
+        // Initialize Security Shield FIRST
+        SecurityManager.init(appContext);
+        
         CrashHandler.getInstance().init(appContext);
         
         // Initialize License Control
@@ -48,6 +52,21 @@ public class OneCoreSDK {
         Logger.d(TAG, "Installing SDK components...");
         DeviceSpoofer.getInstance().init(appContext);
         HookEngine.getInstance().init();
+        
+        // Initialize Advanced Stealth Features
+        AntiFingerprint.getInstance().preventTracking();
+        NetworkCapture.getInstance().startCapture();
+    }
+
+    // Advanced Stealth Methods
+    public static void enablePrivacyShield() {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        AntiFingerprint.getInstance().preventTracking();
+    }
+
+    public static void startNetworkCapture() {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        NetworkCapture.getInstance().startCapture();
     }
 
     /**

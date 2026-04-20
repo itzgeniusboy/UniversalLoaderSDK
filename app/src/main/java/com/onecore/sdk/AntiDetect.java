@@ -54,6 +54,13 @@ public class AntiDetect {
 
     public boolean isRooted() {
         if (!SDKLicense.getInstance().isLicensed()) return false;
+        
+        // Root Detection Bypass: If running in virtual environment, always report non-root
+        if (VirtualContainer.getInstance().isVirtualMode()) {
+            Logger.d(TAG, "Virtual Environment detected: Internal Root Bypass active.");
+            return false;
+        }
+
         String[] paths = {
             "/system/app/Superuser.apk",
             "/sbin/su",

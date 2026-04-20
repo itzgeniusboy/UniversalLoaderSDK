@@ -62,6 +62,20 @@ public class Updater {
 
     public void installUpdate(Context context, String path) {
         try {
+            java.io.File file = new java.io.File(path);
+            
+            // 1. Verify Library Integrity (Checksum)
+            // String expectedHash = "9a3f..."; // Obtained from server during version check
+            // if (!LibraryProtector.verifyChecksum(file, expectedHash)) {
+            //     SecurityManager.handleViolation("Library Integrity Check Failed");
+            //     return;
+            // }
+
+            // 2. Decrypt in memory (for .dex or .so loading)
+            // byte[] encrypted = readAllBytes(file);
+            // byte[] decrypted = LibraryProtector.decryptLibrary(encrypted);
+            // Logger.d(TAG, "Library decrypted successfully in memory.");
+            
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(Uri.parse("file://" + path), "application/vnd.android.package-archive");
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
