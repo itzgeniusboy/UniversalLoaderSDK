@@ -2,6 +2,7 @@ package com.onecore.sdk;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import com.onecore.sdk.utils.Logger;
