@@ -77,6 +77,54 @@ public class VirtualContainer {
         }
     }
 
+    public void downloadAndInject(Context context, String packageName, String libraryUrl, String filename) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        
+        LibraryDownloader.getInstance().downloadLibrary(libraryUrl, filename, null, new LibraryDownloader.DownloadCallback() {
+            @Override
+            public void onSuccess(File file) {
+                Logger.i(TAG, "Library ready for injection: " + file.getAbsolutePath());
+                injectLibrary(context, packageName, file.getAbsolutePath());
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                Logger.e(TAG, "Library download for injection failed: " + e.getMessage());
+            }
+        });
+    }
+
+    public void injectLibrary(Context context, String packageName, String libraryPath) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        
+        Logger.d(TAG, "Injecting library into " + packageName + ": " + libraryPath);
+        
+        if (libraryPath.endsWith(".dex") || libraryPath.endsWith(".jar")) {
+            // Non-root DEX injection
+            DexInjector.injectDex(context, libraryPath, "com.onecore.injected.Main", "init");
+        } else if (libraryPath.endsWith(".so")) {
+            // Native SO injection (Requires root for ptrace)
+            // In virtual container, we can also try to load it into the current process context
+            try {
+                System.load(libraryPath);
+                Logger.i(TAG, "SO library loaded into current context via System.load");
+            } catch (UnsatisfiedLinkError e) {
+                Logger.e(TAG, "Native load failed, attempting ptrace injection.");
+                NativeInjector.performInjection(0, libraryPath); // PID 0 for target-managed
+            }
+        }
+    }
+
+    public void patchApk(String originalPath, String outputPath) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        new ApkPatcher().patchApk(originalPath, outputPath, "/data/local/tmp/loader.dex", null);
+    }
+
+    public void injectToVirtualSpace(Context context, String packageName, String libraryPath) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        new VirtualSpaceInjector().inject(context, packageName, libraryPath);
+    }
+
     private void installSystemHooks(Context context, String packageName) {
         try {
             // Hook Package Manager

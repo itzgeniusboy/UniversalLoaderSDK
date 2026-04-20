@@ -200,4 +200,36 @@ public class OneCoreSDK {
         if (!SDKLicense.getInstance().isLicensed()) return;
         SocialLoginHelper.getInstance().loginWithGoogle(activity, clientId);
     }
+
+    // Feature 7 - Library Injection & Download
+    public static void setLibraryDownloadUrl(String url) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        // Logic to store the URL for auto-updates
+        Logger.d(TAG, "Library Download URL set to: " + url);
+    }
+
+    public static void downloadAndInject(String packageName, String url, String filename) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        VirtualContainer.getInstance().downloadAndInject(appContext, packageName, url, filename);
+    }
+
+    public static void injectLocalLibrary(String packageName, String path) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        VirtualContainer.getInstance().injectLibrary(appContext, packageName, path);
+    }
+
+    public static String getInjectionStatus() {
+        if (!SDKLicense.getInstance().isLicensed()) return "NOT_LICENSED";
+        return "READY";
+    }
+
+    public static void patchApk(String originalApkPath, String outputPath) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        VirtualContainer.getInstance().patchApk(originalApkPath, outputPath);
+    }
+
+    public static void enableSignatureBypass(boolean enable) {
+        if (!SDKLicense.getInstance().isLicensed()) return;
+        SignatureBypass.apply(enable);
+    }
 }
