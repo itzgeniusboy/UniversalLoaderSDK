@@ -22,9 +22,15 @@
 #endif
 
 /**
- * Ptrace-based Native Injection for OneCore SDK.
- * Supports ARM64 architecture (Standard for BGMI/PUBG).
+ * Architecture-aware Native Injection for OneCore SDK.
+ * Supports both ARM64 (aarch64) and ARM32 (armeabi-v7a).
  */
+
+#if defined(__aarch64__)
+    typedef struct user_pt_regs regs_struct;
+#elif defined(__arm__)
+    typedef struct pt_regs regs_struct;
+#endif
 
 // Prototypes
 long ptrace_read(pid_t pid, unsigned long addr, void* buf, int len);
@@ -49,10 +55,11 @@ Java_com_onecore_sdk_NativeInjector_injectSo(JNIEnv* env, jclass clazz, jint pid
     LOGI("Attached to %d", target_pid);
 
     // 2. Get Registers
-    struct user_pt_regs regs;
+    regs_struct regs;
     struct iovec iov;
     iov.iov_base = &regs;
     iov.iov_len = sizeof(regs);
+    
     if (ptrace(PTRACE_GETREGSET, target_pid, (void*)NT_PRSTATUS, &iov) < 0) {
         LOGE("ptrace_getregs failed");
         ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
@@ -60,13 +67,13 @@ Java_com_onecore_sdk_NativeInjector_injectSo(JNIEnv* env, jclass clazz, jint pid
         return -2;
     }
 
-    struct user_pt_regs old_regs = regs;
-
     // 3. Find dlopen address in remote process
-    // On modern Android, dlopen is in libdl.so or linker64
     void* remote_dlopen = get_remote_addr(target_pid, "libdl.so", (void*)dlopen);
     if (!remote_dlopen) {
         remote_dlopen = get_remote_addr(target_pid, "linker64", (void*)dlopen);
+    }
+    if (!remote_dlopen) {
+        remote_dlopen = get_remote_addr(target_pid, "linker", (void*)dlopen);
     }
 
     if (!remote_dlopen) {
@@ -77,26 +84,34 @@ Java_com_onecore_sdk_NativeInjector_injectSo(JNIEnv* env, jclass clazz, jint pid
     }
     LOGI("Remote dlopen found at %p", remote_dlopen);
 
-    // 4. Map memory for libPath in remote process (or use existing heap)
-    // Simplified for OneCore Loader: We reuse a safe area or use mmap
-    // For this implementation, we'll write the string after the current SP - 1024
+    // 4. Map memory for libPath in remote process
+    // Write the string after the current SP - 1024
+#if defined(__aarch64__)
     unsigned long remote_str_addr = regs.sp - 1024;
+#elif defined(__arm__)
+    unsigned long remote_str_addr = regs.ARM_sp - 1024;
+#endif
     ptrace_write(target_pid, remote_str_addr, (void*)libPath, strlen(libPath) + 1);
 
-    // 5. Setup call parameters for ARM64 (x0-x7)
-    // dlopen(path, RTLD_NOW)
-    regs.regs[0] = remote_str_addr; // x0 = const char *filename
-    regs.regs[1] = RTLD_NOW;        // x1 = int flag
+    // 5. Setup call parameters based on architecture
+#if defined(__aarch64__)
+    regs.regs[0] = remote_str_addr; // x0 = filename
+    regs.regs[1] = RTLD_NOW;        // x1 = flag
     regs.pc = (unsigned long)remote_dlopen;
-    regs.regs[30] = 0;              // lr = 0 to trigger crash/exit upon completion
+    regs.regs[30] = 0;              // lr = 0
+#elif defined(__arm__)
+    regs.ARM_r0 = (unsigned long)remote_str_addr; // r0 = filename
+    regs.ARM_r1 = RTLD_NOW;                       // r1 = flag
+    regs.ARM_pc = (unsigned long)remote_dlopen;
+    regs.ARM_lr = 0;                              // lr = 0
+#endif
 
-    // 6. Execute
+    // 6. Execute injection
     ptrace(PTRACE_SETREGSET, target_pid, (void*)NT_PRSTATUS, &iov);
     ptrace(PTRACE_CONT, target_pid, NULL, NULL);
-    waitpid(target_pid, NULL, WUNTRACED);
+    waitpid(target_pid, NULL, WUNTRACED); // Wait for remote call to trigger stop
 
-    // 7. Cleanup
-    ptrace(PTRACE_SETREGSET, target_pid, (void*)NT_PRSTATUS, &iov); // Restore regs
+    // 7. Detach
     ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
 
     LOGI("Injection sequence complete.");
