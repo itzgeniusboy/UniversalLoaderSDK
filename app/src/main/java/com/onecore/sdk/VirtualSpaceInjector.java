@@ -46,11 +46,15 @@ public class VirtualSpaceInjector {
                         System.load(libraryPath);
                         Logger.d(TAG, "SO successfully linked via context loading.");
                     } catch (UnsatisfiedLinkError e) {
-                        Logger.w(TAG, "Direct load failed, delegating to virtualized dlopen.");
-                        NativeInjector.performInjection(0, libraryPath);
+                        Logger.e(TAG, "Load failure: " + e.getMessage());
                     }
                 } else {
-                    NativeInjector.performInjection(0, libraryPath);
+                    try {
+                        System.load(libraryPath);
+                        Logger.d(TAG, "SO loaded via standard System.load.");
+                    } catch (UnsatisfiedLinkError e) {
+                        Logger.e(TAG, "Standard load failure: " + e.getMessage());
+                    }
                 }
             }
             

@@ -183,7 +183,7 @@ public class VirtualContainer {
                 libraryPath,
                 context.getDir("dex_out", Context.MODE_PRIVATE).getAbsolutePath(),
                 null,
-                getClassLoader()
+                context.getClassLoader()
             );
             Logger.i(TAG, "DEX Loaded in same process via DexClassLoader");
         } else if (libraryPath.endsWith(".so")) {

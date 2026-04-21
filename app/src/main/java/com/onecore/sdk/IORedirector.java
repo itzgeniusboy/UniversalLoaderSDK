@@ -2,6 +2,7 @@ package com.onecore.sdk;
 
 import java.io.File;
 import android.content.Context;
+import com.onecore.sdk.utils.Logger;
 
 /**
  * Handles file path redirection for the virtual environment.
