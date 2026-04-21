@@ -7,6 +7,7 @@ import android.content.pm.PackageInfo;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.os.Bundle;
+import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.Logger;
 import java.io.File;
 import java.lang.reflect.Method;
@@ -21,13 +22,14 @@ public class SandboxActivity extends Activity {
     private PackageInfo guestInfo;
     private DexClassLoader guestClassLoader;
     private Resources guestResources;
+    private String libPath;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
         String originalPkg = getIntent().getStringExtra("target_package");
-        String libPath = getIntent().getStringExtra("library_path");
+        this.libPath = getIntent().getStringExtra("library_path");
 
         try {
             guestInfo = CloneManager.getInstance().getClonedPackage(originalPkg);
@@ -65,11 +67,22 @@ public class SandboxActivity extends Activity {
 
             // 5. Jump to Guest Entry Point via STUB REDIRECTION
             launchGuestViaStub();
+            
+            // 6. Notify Result: SUCCESS
+            sendLaunchResult(true, null);
 
         } catch (Exception e) {
             Logger.e(TAG, "Sandbox Boot Failure", e);
+            sendLaunchResult(false, e.getMessage());
             finish();
         }
+    }
+
+    private void sendLaunchResult(boolean success, String error) {
+        Intent result = new Intent(VirtualContainer.ACTION_LAUNCH_RESULT);
+        result.putExtra("success", success);
+        if (error != null) result.putExtra("error", error);
+        sendBroadcast(result);
     }
 
     private void launchGuestViaStub() throws Exception {
@@ -97,6 +110,7 @@ public class SandboxActivity extends Activity {
         stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         stubIntent.putExtra("target_activity", mainActivity);
         stubIntent.putExtra("target_package", guestInfo.packageName);
+        stubIntent.putExtra("library_path", libPath);
         
         startActivity(stubIntent);
         

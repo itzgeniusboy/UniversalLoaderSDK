@@ -12,6 +12,8 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 import com.onecore.sdk.core.CloneManager;
 import com.onecore.sdk.utils.AndroidVersionCompat;
 
@@ -23,6 +25,13 @@ public class VirtualContainer {
     private static final String TAG = "VirtualContainer";
     private static VirtualContainer instance;
     private boolean virtualMode = false;
+    private LaunchCallback pendingCallback;
+    public static final String ACTION_LAUNCH_RESULT = "com.onecore.sdk.LAUNCH_RESULT";
+
+    public interface LaunchCallback {
+        void onLaunchSuccess();
+        void onLaunchFailed(String reason);
+    }
 
     private VirtualContainer() {}
 
@@ -41,15 +50,32 @@ public class VirtualContainer {
         this.virtualMode = mode;
     }
 
-    public boolean launch(Context context, String packageName) {
+    public boolean launch(Context context, String packageName, LaunchCallback callback) {
         if (context == null || packageName == null) {
             Logger.e(TAG, "Launch failed: Null context or package name.");
+            if (callback != null) callback.onLaunchFailed("Invalid Parameters");
             return false;
         }
         
+        this.pendingCallback = callback;
+        context.registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                boolean success = intent.getBooleanExtra("success", false);
+                String error = intent.getStringExtra("error");
+                
+                if (pendingCallback != null) {
+                    if (success) pendingCallback.onLaunchSuccess();
+                    else pendingCallback.onLaunchFailed(error);
+                }
+                try { context.unregisterReceiver(this); } catch (Exception ignored) {}
+            }
+        }, new IntentFilter(ACTION_LAUNCH_RESULT));
+
         if (!SDKLicense.getInstance().isLicensed()) {
             Logger.e(TAG, "Launch failed: SDK not licensed.");
             SDKLicense.getInstance().showExpiryDialog();
+            if (callback != null) callback.onLaunchFailed("License Invalid");
             return false;
         }
 
@@ -61,6 +87,7 @@ public class VirtualContainer {
             boolean prepared = CloneManager.getInstance().prepareClone(context, packageName);
             if (!prepared) {
                 Logger.e(TAG, "Clone Preparation Failed: App not found or inaccessible.");
+                if (callback != null) callback.onLaunchFailed("Preparation Failed");
                 return false;
             }
 
@@ -78,6 +105,7 @@ public class VirtualContainer {
         } catch (Throwable e) {
             Logger.e(TAG, "CRITICAL: VirtualContainer launch exception intercepted", e);
             fallbackLaunch(context, packageName);
+            if (callback != null) callback.onLaunchFailed(e.getMessage());
             return false;
         }
     }
