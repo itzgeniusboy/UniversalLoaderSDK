@@ -69,10 +69,10 @@ public class StatusActivity extends Activity {
         boolean s = PermissionsHelper.hasStoragePermission(this);
         boolean o = PermissionsHelper.hasOverlayPermission(this);
 
-        permStorage.setText((s ? "✅" : "⚠️") + " Storage Access");
+        permStorage.setText((s ? "GRANTED:" : "DENIED:") + " Storage Access");
         permStorage.setTextColor(s ? Color.GREEN : Color.YELLOW);
 
-        permOverlay.setText((o ? "✅" : "⚠️") + " Overlay / Floating Window");
+        permOverlay.setText((o ? "GRANTED:" : "DENIED:") + " Overlay / Floating Window");
         permOverlay.setTextColor(o ? Color.GREEN : Color.YELLOW);
 
         if (!o) overlayBtn.setVisibility(View.VISIBLE);
@@ -101,8 +101,8 @@ public class StatusActivity extends Activity {
                         public void onProcessDetected(int pid) {
                             pidText.setText("Status: VIRTUAL_PROCESS_ACTIVE");
                             pidText.setTextColor(Color.GREEN);
-                            injectionStatus.setText("✅ Injection Successful (BlackBox Mode)");
-                            Toast.makeText(StatusActivity.this, "Game Launched in Virtual Space", Toast.LENGTH_SHORT).show();
+                            injectionStatus.setText("SUCCESS: Injection Successful (BlackBox)");
+                            Toast.makeText(StatusActivity.this, "Session Initialized", Toast.LENGTH_SHORT).show();
                         }
 
                         @Override
@@ -122,7 +122,7 @@ public class StatusActivity extends Activity {
             } catch (Exception e) {
                 Logger.e(TAG, "Process failed", e);
                 mainHandler.post(() -> {
-                    cloneStatus.setText("❌ Error: " + e.getMessage());
+                    cloneStatus.setText("ERROR: " + e.getMessage());
                     cloneStatus.setTextColor(Color.RED);
                 });
             }
@@ -148,7 +148,7 @@ public class StatusActivity extends Activity {
         updateCloneStatus("Verifying Environment Integrity...", 90);
         Thread.sleep(500);
         
-        updateCloneStatus("✅ Cloning Completed Successfully!", 100);
+        updateCloneStatus("COMPLETED: Virtualization successful", 100);
         Logger.i(TAG, "Virtual Space Clone sequence finished.");
     }
 
@@ -167,7 +167,7 @@ public class StatusActivity extends Activity {
                 mainHandler.post(() -> {
                     downloadBar.setIndeterminate(false);
                     downloadBar.setProgress(100);
-                    downloadStatus.setText("✅ Library Extracted: libbgmi.so");
+                    downloadStatus.setText("SUCCESS: Binary Data Extracted");
                 });
                 done[0] = true;
             }
@@ -193,14 +193,14 @@ public class StatusActivity extends Activity {
 
     private void performInjection() throws Exception {
         mainHandler.post(() -> {
-            injectionStatus.setText("🔄 Linking Library to Sandbox Namespace...");
+            injectionStatus.setText("SYSTEM: Linking Library to Sandbox Namespace...");
         });
         
         // This actually happens inside SandboxActivity, we are just showing the "intent" here
         Thread.sleep(1000);
         
         mainHandler.post(() -> {
-            injectionStatus.setText("✅ Injection Queued!");
+            injectionStatus.setText("SUCCESS: Injection Queue Initialized");
             pidText.setText("Status: Ready for Same-Process Linking");
         });
     }

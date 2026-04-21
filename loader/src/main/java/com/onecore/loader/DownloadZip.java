@@ -44,7 +44,7 @@ public class DownloadZip {
                 }
 
                 File zipFile = new File(context.getCacheDir(), "Saved.zip");
-                if (callback != null) callback.onProgress("Downloading Library (ZIP)...");
+                if (callback != null) callback.onProgress("Downloading remote assets...");
 
                 try (InputStream is = new BufferedInputStream(conn.getInputStream());
                      FileOutputStream fos = new FileOutputStream(zipFile)) {
@@ -55,7 +55,7 @@ public class DownloadZip {
                     }
                 }
 
-                if (callback != null) callback.onProgress("Extracting Library components...");
+                if (callback != null) callback.onProgress("Processing binaries...");
                 File extractDir = new File(context.getFilesDir(), "extracted_libs");
                 unzip(zipFile, extractDir);
 

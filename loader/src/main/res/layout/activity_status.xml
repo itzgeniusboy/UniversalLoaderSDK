@@ -39,8 +39,8 @@
             android:textColor="#BBBBBB"
             android:textSize="12sp"
             android:layout_marginBottom="8dp" />
-        <TextView android:id="@+id/permStorage" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚠️ Storage" android:textColor="#FFFFFF" />
-        <TextView android:id="@+id/permOverlay" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚠️ Overlay" android:textColor="#FFFFFF" />
+        <TextView android:id="@+id/permStorage" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PENDING: Storage" android:textColor="#FFFFFF" />
+        <TextView android:id="@+id/permOverlay" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PENDING: Overlay" android:textColor="#FFFFFF" />
     </LinearLayout>
 
     <!-- Cloning Section -->

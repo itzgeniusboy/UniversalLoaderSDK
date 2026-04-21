@@ -22,7 +22,7 @@ public class ExpiryDialog {
             layout.setGravity(Gravity.CENTER);
 
             TextView title = new TextView(activity);
-            title.setText("⚠️ LICENSE EXPIRED");
+            title.setText("LICENSE EXPIRED");
             title.setTextSize(22);
             title.setTextColor(Color.RED);
             title.setGravity(Gravity.CENTER);
