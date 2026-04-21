@@ -29,12 +29,24 @@ public class NativeInjector {
      * Standalone method to perform injection.
      */
     public static void performInjection(int pid, String soPath) {
-        Logger.d(TAG, "Attempting native injection: PID=" + pid + ", SO=" + soPath);
+        if (pid <= 0) {
+            Logger.e(TAG, "Invalid PID for injection: " + pid);
+            return;
+        }
+        
+        File lib = new File(soPath);
+        if (!lib.exists()) {
+            Logger.e(TAG, "Library not found at: " + soPath);
+            return;
+        }
+
+        Logger.i(TAG, "Initiating remote injection: PID=" + pid + ", Path=" + soPath);
         int result = injectSo(pid, soPath);
+        
         if (result == 0) {
-            Logger.i(TAG, "Native injection successful into PID " + pid);
+            Logger.i(TAG, "Injection sequence completed successfully for PID " + pid);
         } else {
-            Logger.e(TAG, "Native injection failed with code: " + result);
+            Logger.e(TAG, "Injection sequence failed with error code: " + result);
         }
     }
 }

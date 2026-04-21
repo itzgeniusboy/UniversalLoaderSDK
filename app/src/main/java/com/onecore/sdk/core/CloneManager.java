@@ -32,22 +32,67 @@ public class CloneManager {
             PackageManager pm = context.getPackageManager();
             PackageInfo info = pm.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES | PackageManager.GET_SERVICES | PackageManager.GET_PROVIDERS);
             
-            // Apply Fake Identity Metadata
-            info.packageName = "com.onecore.cloned." + packageName.substring(packageName.lastIndexOf('.') + 1);
-            info.applicationInfo.packageName = info.packageName;
-            info.applicationInfo.dataDir = context.getFilesDir().getAbsolutePath() + "/sandbox/" + packageName;
+            // 1. Generate Virtual Identity
+            String virtualPkg = "com.onecore.cloned." + packageName.substring(packageName.lastIndexOf('.') + 1);
+            info.packageName = virtualPkg;
+            info.applicationInfo.packageName = virtualPkg;
+            
+            // 2. Define Isolated Sandbox Paths
+            String sandboxRoot = context.getFilesDir().getAbsolutePath() + "/sandbox/" + packageName;
+            info.applicationInfo.dataDir = sandboxRoot;
+            info.applicationInfo.nativeLibraryDir = sandboxRoot + "/lib";
             
             cache.put(packageName, info);
             
-            // Initialize Physical Sandbox Directories
-            File dataDir = new File(info.applicationInfo.dataDir);
-            if (!dataDir.exists()) dataDir.mkdirs();
+            // 3. Initialize Physical Sandbox Directories
+            File dataDir = new File(sandboxRoot);
+            if (!dataDir.exists()) {
+                dataDir.mkdirs();
+                new File(sandboxRoot, "files").mkdirs();
+                new File(sandboxRoot, "cache").mkdirs();
+                new File(sandboxRoot, "lib").mkdirs();
+            }
             
-            Logger.i(TAG, "Clone Ready: Original=" + packageName + " -> Fake=" + info.packageName);
+            // 4. Setup Virtual Environment (Standard for OneCore Engine)
+            setupVirtualEnv(context, packageName, info.applicationInfo);
+            
+            Logger.i(TAG, "Deep Clone Prepared: " + packageName + " -> " + virtualPkg);
             return true;
         } catch (Exception e) {
-            Logger.e(TAG, "Failed to prepare CloneManager metadata", e);
+            Logger.e(TAG, "Clone Preparation Error", e);
             return false;
+        }
+    }
+
+    private void setupVirtualEnv(Context context, String originalPkg, ApplicationInfo virtualApp) {
+        // Here we map the real APK resources to the virtual context
+        // In a real implementation, we would symlink native libraries from the source APK
+        try {
+            PackageManager pm = context.getPackageManager();
+            ApplicationInfo originalApp = pm.getApplicationInfo(originalPkg, 0);
+            
+            File sourceLibDir = new File(originalApp.nativeLibraryDir);
+            File virtualLibDir = new File(virtualApp.nativeLibraryDir);
+            
+            if (sourceLibDir.exists() && sourceLibDir.isDirectory()) {
+                File[] libs = sourceLibDir.listFiles();
+                if (libs != null) {
+                    for (File lib : libs) {
+                        // Create symlinks to avoid copying massive game binaries
+                        Os.symlink(lib.getAbsolutePath(), virtualLibDir.getAbsolutePath() + "/" + lib.getName());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Logger.w(TAG, "Virtual Lib Mapping Warning: " + e.getMessage());
+        }
+    }
+
+    private static class Os {
+        // Helper to avoid directly using android.system.Os for older API compatibility
+        public static void symlink(String oldPath, String newPath) throws Exception {
+            Class<?> osClass = Class.forName("android.system.Os");
+            osClass.getMethod("symlink", String.class, String.class).invoke(null, oldPath, newPath);
         }
     }
 
