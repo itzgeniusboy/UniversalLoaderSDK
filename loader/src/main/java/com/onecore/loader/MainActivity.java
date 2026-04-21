@@ -104,24 +104,30 @@ public class MainActivity extends Activity {
     }
 
     private void launchGame() {
-        Logger.i(TAG, "User started game.");
+        Logger.i(TAG, "VERIFIED: START GAME button clicked. Calling virtualization engine.");
         startGameBtn.setEnabled(false);
         startGameBtn.setText("OPENING...");
+        Toast.makeText(this, "BOOTING VIRTUAL CONTAINER", Toast.LENGTH_SHORT).show();
         
         // Final handoff to GameLauncher for actual process management
         GameLauncher.start(this, new GameLauncher.LaunchCallback() {
             @Override
             public void onProcessDetected(int pid) {
+                Logger.i(TAG, "VirtualSession successfully established with host process.");
                 runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "GAME INITIALIZED", Toast.LENGTH_SHORT).show();
-                    // Optional: Close loader or keep background
+                    Toast.makeText(MainActivity.this, "BGMI LOADED IN SANDBOX", Toast.LENGTH_SHORT).show();
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        startGameBtn.setEnabled(true);
+                        startGameBtn.setText("START GAME");
+                    }, 2000);
                 });
             }
 
             @Override
             public void onFailed(String reason) {
+                Logger.e(TAG, "Virtualization failure: " + reason);
                 runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "START FAILED: " + reason, Toast.LENGTH_LONG).show();
+                    Toast.makeText(MainActivity.this, "LAUNCH FAILED: " + reason, Toast.LENGTH_LONG).show();
                     startGameBtn.setEnabled(true);
                     startGameBtn.setText("START GAME");
                 });
@@ -129,7 +135,7 @@ public class MainActivity extends Activity {
 
             @Override
             public void onProgress(String message) {
-                Logger.d(TAG, "Game Status: " + message);
+                Logger.d(TAG, "System Kernel: " + message);
             }
         });
     }

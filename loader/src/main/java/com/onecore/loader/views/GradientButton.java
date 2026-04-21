@@ -29,6 +29,7 @@ public class GradientButton extends AppCompatButton {
         paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         rectF = new RectF();
         setBackground(null); // Custom drawing
+        setGravity(android.view.Gravity.CENTER);
     }
 
     @Override

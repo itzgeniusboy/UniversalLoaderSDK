@@ -57,10 +57,13 @@ public class GameLauncher {
     }
 
     private static void proceedToLaunch(Context context, LaunchCallback callback) {
+        Logger.i(TAG, "System Phase: Finalizing virtual environment for " + TARGET_PKG);
+        
         // 2. Perform same-process injection
         LibraryInjector.inject(context, TARGET_PKG, null);
         
         // 3. Launch Guest APK in Host process
+        Logger.i(TAG, "CRITICAL: Calling VirtualContainer.launch() for " + TARGET_PKG);
         VirtualContainer.getInstance().launch(context, TARGET_PKG);
         
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
@@ -68,6 +71,6 @@ public class GameLauncher {
                 callback.onProgress("Virtual Session ACTIVE");
                 callback.onProcessDetected(0);
             }
-        }, 1000);
+        }, 800);
     }
 }
