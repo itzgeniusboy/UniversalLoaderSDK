@@ -63,14 +63,20 @@ public class GameLauncher {
         LibraryInjector.inject(context, TARGET_PKG, null);
         
         // 3. Launch Guest APK in Host process
-        Logger.i(TAG, "CRITICAL: Calling VirtualContainer.launch() for " + TARGET_PKG);
-        VirtualContainer.getInstance().launch(context, TARGET_PKG);
+        Logger.i(TAG, "CRITICAL: Triggering Virtualization Host for " + TARGET_PKG);
+        boolean success = VirtualContainer.getInstance().launch(context, TARGET_PKG);
         
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+        if (success) {
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                if (callback != null) {
+                    callback.onProgress("Virtual Session ACTIVE");
+                    callback.onProcessDetected(0);
+                }
+            }, 800);
+        } else {
             if (callback != null) {
-                callback.onProgress("Virtual Session ACTIVE");
-                callback.onProcessDetected(0);
+                callback.onFailed("Launch Aborted: Virtualization core failed to initialize.");
             }
-        }, 800);
+        }
     }
 }

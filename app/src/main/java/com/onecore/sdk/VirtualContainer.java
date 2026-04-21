@@ -43,14 +43,14 @@ public class VirtualContainer {
 
     /**
      * Launches a package inside the virtual environment.
-     * Implements "REAL CLONING" - intercepting IDs and isolating code.
+     * Returns true if the sandbox boot initiated.
      */
-    public void launch(Context context, String packageName) {
-        if (context == null || packageName == null) return;
+    public boolean launch(Context context, String packageName) {
+        if (context == null || packageName == null) return false;
         
         if (!SDKLicense.getInstance().isLicensed()) {
             SDKLicense.getInstance().showExpiryDialog();
-            return;
+            return false;
         }
 
         try {
@@ -60,8 +60,8 @@ public class VirtualContainer {
             // 1. Prepare Metadata and Sandbox (Deep Clone)
             boolean prepared = CloneManager.getInstance().prepareClone(context, packageName);
             if (!prepared) {
-                Logger.e(TAG, "Clone Preparation Failed.");
-                return;
+                Logger.e(TAG, "Clone Preparation Failed: App not found or inaccessible.");
+                return false;
             }
 
             // 2. Bypass restrictions
@@ -72,10 +72,12 @@ public class VirtualContainer {
             
             // 4. Sandbox Launch (Host Process)
             launchInVirtualSandbox(context, packageName);
+            return true;
             
         } catch (Exception e) {
             Logger.e(TAG, "VirtualContainer launch failed", e);
             fallbackLaunch(context, packageName);
+            return false;
         }
     }
 
