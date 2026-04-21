@@ -17,6 +17,7 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application
+        android:name=".BoxApplication"
         android:allowBackup="true"
         android:icon="@android:drawable/sym_def_app_icon"
         android:label="OneCore Loader"

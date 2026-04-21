@@ -13,6 +13,10 @@ public class OneCoreSDK {
     private static boolean isInitialized = false;
     private static Context appContext;
 
+    public static boolean isInitialized() {
+        return isInitialized;
+    }
+
     /**
      * Initializes the SDK with the provided context and customer key.
      * @param context The application context.
@@ -38,20 +42,13 @@ public class OneCoreSDK {
                 System.exit(10);
             });
 
-            // Lazy initialization for sub-components via background thread
-            new Thread(() -> {
-                try {
-                    Logger.init(true);
-                    SecurityManager.init(appContext);
-                    CrashHandler.getInstance().init(appContext);
-                    SDKLicense.getInstance().init(appContext, customerKey);
-                    Logger.d(TAG, "Sub-components initialized in background.");
-                } catch (Exception e) {
-                    Logger.e(TAG, "Lazy initialization failed", e);
-                }
-            }).start();
+            // Initialize sub-components synchronously for production stability
+            Logger.init(true);
+            SecurityManager.init(appContext);
+            CrashHandler.getInstance().init(appContext);
+            SDKLicense.getInstance().init(appContext, customerKey);
             
-            Logger.d(TAG, "SDK Shell Initialized.");
+            Logger.d(TAG, "SDK Shell and sub-components Initialized.");
             isInitialized = true;
         } catch (Exception e) {
             Logger.e(TAG, "SDK Initialization failed", e);

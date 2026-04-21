@@ -40,6 +40,15 @@ public class MainActivity extends Activity {
         launchProgressBar = findViewById(R.id.launchProgressBar);
         launchStepText = findViewById(R.id.launchStepText);
 
+        // Verify SDK Engine is initialized at boot
+        if (!OneCoreSDK.isInitialized()) {
+            Toast.makeText(this, "CORE ENGINE BOOT ERROR", Toast.LENGTH_LONG).show();
+            Logger.e(TAG, "FATAL: OneCoreSDK failed to initialize at Application level.");
+        } else if (!OneCoreSDK.isLicenseValid()) {
+            Toast.makeText(this, "LICENSE VERIFICATION PENDING", Toast.LENGTH_SHORT).show();
+            Logger.w(TAG, "SDK License check in progress or failed.");
+        }
+
         // Start premium pulse animation
         launchBtn.startPulse();
         
@@ -104,6 +113,13 @@ public class MainActivity extends Activity {
     }
 
     private void launchGame() {
+        // Strict verification: Ensure SDK is initialized and licensed
+        if (!OneCoreSDK.isInitialized() || !OneCoreSDK.isLicenseValid()) {
+            Logger.e(TAG, "Launch Aborted: Core Engine not ready or License invalid.");
+            Toast.makeText(this, "ERROR: VIRTUALIZATION CORE NOT INITIALIZED", Toast.LENGTH_LONG).show();
+            return;
+        }
+
         Logger.i(TAG, "VERIFIED: START GAME button clicked. Calling virtualization engine.");
         startGameBtn.setEnabled(false);
         startGameBtn.setText("OPENING...");
