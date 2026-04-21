@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Base App Palette (Fixing missing resources) -->
+    <color name="primary">#39FF14</color>
+    <color name="primary_dark">#0A0A0A</color>
+    <color name="accent">#39FF14</color>
+    <color name="background">#0A0A0A</color>
+    
     <!-- Core Theme Colors -->
     <color name="bg_dark">#0A0A0A</color>
     <color name="bg_card">#1A1A1A</color>
     <color name="neon_green">#39FF14</color>
     <color name="text_primary">#FFFFFF</color>
     <color name="text_secondary">#8E8E93</color>
+    <color name="text_main">#FFFFFF</color>
+    <color name="text_muted">#888888</color>
+    <color name="card_bg">#1A1A1A</color>
     
     <!-- Accent & State Colors -->
     <color name="accent_neon">#39FF14</color>
@@ -14,13 +23,22 @@
     <color name="active_white">#FFFFFF</color>
     <color name="inactive_grey">#333333</color>
 
-    <!-- Legacy / Compatibility Mappings -->
+    <!-- Premium iOS Custom Palette -->
     <color name="premium_bg">#0A0A0A</color>
     <color name="premium_glass">#1AFFFFFF</color>
     <color name="premium_glass_stroke">#33FFFFFF</color>
     <color name="premium_gold">#39FF14</color>
     <color name="premium_neon">#39FF14</color>
+    <color name="premium_neon_glow">#4D39FF14</color>
     <color name="premium_text_p">#FFFFFF</color>
     <color name="premium_text_s">#8E8E93</color>
+    <color name="premium_success">#39FF14</color>
+
+    <!-- iOS System Colors -->
     <color name="ios_bg_dark">#0A0A0A</color>
+    <color name="ios_text_primary">#FFFFFF</color>
+    <color name="ios_text_secondary">#8E8E93</color>
+    <color name="ios_accent">#39FF14</color>
+    <color name="ios_card_bg">#1C1C1E</color>
+    <color name="ios_success">#39FF14</color>
 </resources>
