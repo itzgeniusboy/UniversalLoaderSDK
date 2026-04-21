@@ -4,14 +4,17 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Vibrator;
 import android.view.View;
-import android.view.animation.AlphaAnimation;
+import android.widget.Toast;
 import com.onecore.loader.views.GradientButton;
 import com.onecore.sdk.utils.Logger;
 
 /**
  * Premium iOS-style Dashboard for OneCore Loader.
+ * Fixed: Now properly triggers GameLauncher to start BGMI.
  */
 public class MainActivity extends Activity {
     private static final String TAG = "MainActivity";
@@ -31,7 +34,8 @@ public class MainActivity extends Activity {
         
         launchBtn.setOnClickListener(v -> {
             provideHapticFeedback();
-            v.animate().scaleX(0.95f).scaleY(0.95f).setDuration(100).withEndAction(() -> {
+            // Premium tap animation
+            v.animate().scaleX(0.92f).scaleY(0.92f).setDuration(100).withEndAction(() -> {
                 v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start();
                 initiateLaunch();
             }).start();
@@ -39,14 +43,39 @@ public class MainActivity extends Activity {
     }
 
     private void initiateLaunch() {
-        try {
-            Logger.i(TAG, "Initiating Premium Launch Sequence...");
-            Intent intent = new Intent(this, StatusActivity.class);
-            startActivity(intent);
-            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-        } catch (Exception e) {
-            Logger.e(TAG, "Launch failed", e);
-        }
+        Logger.i(TAG, "User triggered launch sequence from Dashboard.");
+        
+        // Show status feedback
+        launchBtn.setText("LAUNCHING...");
+        launchBtn.setEnabled(false);
+        Toast.makeText(this, "INITIALIZING VIRTUAL SESSION", Toast.LENGTH_SHORT).show();
+
+        // Trigger the actual launch through GameLauncher (handles check + injection + launch)
+        GameLauncher.start(this, new GameLauncher.LaunchCallback() {
+            @Override
+            public void onProcessDetected(int pid) {
+                Logger.i(TAG, "Virtualization Success: BGMI process is now active.");
+                runOnUiThread(() -> {
+                    launchBtn.setText("LAUNCH CLONE");
+                    launchBtn.setEnabled(true);
+                });
+            }
+
+            @Override
+            public void onFailed(String reason) {
+                Logger.e(TAG, "Launch process failed: " + reason);
+                runOnUiThread(() -> {
+                    Toast.makeText(MainActivity.this, "FAILED: " + reason, Toast.LENGTH_LONG).show();
+                    launchBtn.setText("LAUNCH CLONE");
+                    launchBtn.setEnabled(true);
+                });
+            }
+
+            @Override
+            public void onProgress(String message) {
+                Logger.d(TAG, "Launch Status: " + message);
+            }
+        });
     }
 
     private void provideHapticFeedback() {
@@ -54,10 +83,8 @@ public class MainActivity extends Activity {
             if (vibrator != null && vibrator.hasVibrator()) {
                 vibrator.vibrate(50);
             }
-        } catch (SecurityException se) {
-            Logger.e(TAG, "Vibrate permission missing at runtime.");
         } catch (Exception e) {
-            Logger.e(TAG, "Haptic feedback failed", e);
+            Logger.e(TAG, "Haptic feedback error", e);
         }
     }
 }
