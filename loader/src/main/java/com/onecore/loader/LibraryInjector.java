@@ -20,9 +20,14 @@ public class LibraryInjector {
             return;
         }
 
-        Logger.i("Injector", "Injecting into PID " + pid + " for package " + packageName);
+        Logger.i("Injector", "Linking SO to PID: " + pid + " [Target: " + packageName + "]");
         
-        // Use NativeInjector via VirtualContainer to perform ptrace injection into the running PID
-        VirtualContainer.getInstance().injectLibrary(context, packageName, libFile.getAbsolutePath());
+        try {
+            // Use NativeInjector via VirtualContainer to perform ptrace injection into the running PID
+            VirtualContainer.getInstance().injectLibrary(context, packageName, libFile.getAbsolutePath());
+            Logger.d("Injector", "Linker Command Dispatched Success.");
+        } catch (Exception e) {
+            Logger.e("Injector", "Failed to dispatch linker command", e);
+        }
     }
 }
