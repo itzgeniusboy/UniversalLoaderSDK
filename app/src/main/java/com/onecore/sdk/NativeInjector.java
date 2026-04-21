@@ -1,6 +1,7 @@
 package com.onecore.sdk;
 
 import com.onecore.sdk.utils.Logger;
+import java.io.File;
 
 /**
  * Native Library (.so) Injection Wrapper for OneCore SDK Engine.
