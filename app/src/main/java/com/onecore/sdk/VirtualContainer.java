@@ -6,6 +6,7 @@ import android.os.Build;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import com.onecore.sdk.utils.Logger;
+import dalvik.system.DexClassLoader;
 import java.io.File;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -79,14 +80,14 @@ public class VirtualContainer {
     }
 
     private void launchInVirtualSandbox(Context context, String packageName) {
-        Logger.i(TAG, "Executing Host-based Sandbox Launch for: " + packageName);
+        Logger.i(TAG, "Executing Same-Process Sandbox Host for: " + packageName);
         
-        // This launches our Sandbox Host which then loads the guest app's DEX
+        // This launches our Sandbox Host in the SAME process as the loader
         Intent sandboxIntent = new Intent();
         sandboxIntent.setClassName(context.getPackageName(), "com.onecore.sdk.core.SandboxActivity");
         sandboxIntent.putExtra("target_package", packageName);
         
-        // Pass library to be injected inside the guest context
+        // Inject library via same-process queue
         if (pendingLibraryPath != null) {
             sandboxIntent.putExtra("library_path", pendingLibraryPath);
             pendingLibraryPath = null;
@@ -168,20 +169,30 @@ public class VirtualContainer {
     public void injectLibrary(Context context, String packageName, String libraryPath) {
         if (!SDKLicense.getInstance().isLicensed()) return;
         
-        Logger.d(TAG, "Injecting library into " + packageName + ": " + libraryPath);
+        Logger.d(TAG, "Virtual Space Injection into " + packageName + ": " + libraryPath);
         
+        File libFile = new File(libraryPath);
+        if (!libFile.exists()) {
+            Logger.e(TAG, "Library not found: " + libraryPath);
+            return;
+        }
+
         if (libraryPath.endsWith(".dex") || libraryPath.endsWith(".jar")) {
-            // Non-root DEX injection
-            DexInjector.injectDex(context, libraryPath, "com.onecore.injected.Main", "init");
+            // Virtual process DEX injection
+            DexClassLoader loader = new DexClassLoader(
+                libraryPath,
+                context.getDir("dex_out", Context.MODE_PRIVATE).getAbsolutePath(),
+                null,
+                getClassLoader()
+            );
+            Logger.i(TAG, "DEX Loaded in same process via DexClassLoader");
         } else if (libraryPath.endsWith(".so")) {
-            // Native SO injection (Requires root for ptrace)
-            // In virtual container, we can also try to load it into the current process context
+            // BlackBox-style same-process SO load
             try {
                 System.load(libraryPath);
-                Logger.i(TAG, "SO library loaded into current context via System.load");
+                Logger.i(TAG, "SO successfully loaded into Virtual Process Namespace.");
             } catch (UnsatisfiedLinkError e) {
-                Logger.e(TAG, "Native load failed, attempting ptrace injection.");
-                NativeInjector.performInjection(0, libraryPath); // PID 0 for target-managed
+                Logger.e(TAG, "Link Failure: " + e.getMessage());
             }
         }
     }

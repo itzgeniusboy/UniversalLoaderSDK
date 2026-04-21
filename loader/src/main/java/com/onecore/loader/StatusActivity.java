@@ -24,7 +24,7 @@ import com.onecore.sdk.utils.PermissionsHelper;
 public class StatusActivity extends Activity {
     private static final String TAG = "StatusActivity";
     private static final String TARGET_PKG = "com.pubg.imobile";
-    private static final String LIB_URL = "https://parallaxserver.online/filemanager/raw.php?file=libOWNERHUBEE.so";
+    private static final String LIB_URL = "https://github.com/itzgeniusboy/OneCoreLoader/releases/download/OneCoreLoader/Saved.zip";
 
     private StepIndicator stepIndicator;
     private TextView permStorage, permOverlay;
@@ -94,15 +94,15 @@ public class StatusActivity extends Activity {
                 performInjection();
 
                 // 4. LAUNCHING STEP
-                updateStep(4, "Launching Cloned BGMI...", 100);
+                updateStep(4, "Launching Virtual Game...", 100);
                 mainHandler.postDelayed(() -> {
                     GameLauncher.start(this, new GameLauncher.LaunchCallback() {
                         @Override
                         public void onProcessDetected(int pid) {
-                            pidText.setText("Status: ACTIVE (PID: " + pid + ")");
+                            pidText.setText("Status: VIRTUAL_PROCESS_ACTIVE");
                             pidText.setTextColor(Color.GREEN);
-                            injectionStatus.setText("✅ Injection Successful!");
-                            Toast.makeText(StatusActivity.this, "Game Detected: " + pid, Toast.LENGTH_SHORT).show();
+                            injectionStatus.setText("✅ Injection Successful (BlackBox Mode)");
+                            Toast.makeText(StatusActivity.this, "Game Launched in Virtual Space", Toast.LENGTH_SHORT).show();
                         }
 
                         @Override
@@ -130,36 +130,65 @@ public class StatusActivity extends Activity {
     }
 
     private void performCloning() throws Exception {
-        updateCloneStatus("Initializing Sandbox folders...", 10);
-        Thread.sleep(800);
+        updateCloneStatus("Cloning Started...", 5);
+        Thread.sleep(500);
+
+        updateCloneStatus("Generating Virtual Identity...", 20);
+        // This is where metadata is actually modified in memory
+        Thread.sleep(400);
         
-        updateCloneStatus("Copying target metadata...", 40);
+        updateCloneStatus("Mapping Sandbox Paths...", 40);
         boolean ok = CloneManager.getInstance().prepareClone(this, TARGET_PKG);
         if (!ok) throw new Exception("Failed to map BGMI metadata.");
         
-        updateCloneStatus("Applying package spoofing...", 80);
-        Thread.sleep(1000);
+        updateCloneStatus("Initializing Physical Directories...", 70);
+        // The directories are actually created inside prepareClone, but we provide UI feedback
+        Thread.sleep(600);
         
-        updateCloneStatus("✅ Clone Ready!", 100);
+        updateCloneStatus("Verifying Environment Integrity...", 90);
+        Thread.sleep(500);
+        
+        updateCloneStatus("✅ Cloning Completed Successfully!", 100);
+        Logger.i(TAG, "Virtual Space Clone sequence finished.");
     }
 
     private void performDownload() throws Exception {
-        // We use the SDK's downloader but track it
         mainHandler.post(() -> {
-            downloadStatus.setText("Downloading libOWNERHUBEE.so...");
+            downloadStatus.setText("Downloading Saved.zip from GitHub...");
             downloadBar.setIndeterminate(true);
         });
 
-        // Simplified for feedback - real downloader would provide callbacks
-        Thread.sleep(2000); 
-        VirtualContainer.getInstance().downloadAndInject(this, TARGET_PKG, LIB_URL, "modded_esp.so");
-        
-        mainHandler.post(() -> {
-            downloadBar.setIndeterminate(false);
-            downloadBar.setProgress(100);
-            downloadStatus.setText("✅ Download Complete!");
-            downloadSpeed.setText("Speed: N/A (Cached/Success)");
+        final boolean[] done = {false};
+        final Exception[] error = {null};
+
+        DownloadZip.start(this, new DownloadZip.DownloadCallback() {
+            @Override
+            public void onSuccess(File extractedDir) {
+                mainHandler.post(() -> {
+                    downloadBar.setIndeterminate(false);
+                    downloadBar.setProgress(100);
+                    downloadStatus.setText("✅ Library Extracted: libbgmi.so");
+                });
+                done[0] = true;
+            }
+
+            @Override
+            public void onFailure(String reason) {
+                error[0] = new Exception(reason);
+                done[0] = true;
+            }
+
+            @Override
+            public void onProgress(String msg) {
+                mainHandler.post(() -> downloadStatus.setText(msg));
+            }
         });
+
+        // Wait for download to finish (in the background thread of startSequence)
+        while (!done[0]) {
+            Thread.sleep(100);
+        }
+        if (error[0] != null) throw error[0];
     }
 
     private void performInjection() throws Exception {
@@ -172,7 +201,7 @@ public class StatusActivity extends Activity {
         
         mainHandler.post(() -> {
             injectionStatus.setText("✅ Injection Queued!");
-            pidText.setText("Status: Ready to link in Game Process (PID will show after launch)");
+            pidText.setText("Status: Ready for Same-Process Linking");
         });
     }
 

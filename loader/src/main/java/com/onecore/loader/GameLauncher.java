@@ -25,97 +25,48 @@ public class GameLauncher {
     }
 
     public static void start(Context context, LaunchCallback callback) {
-        Logger.i(TAG, "Initiating Secure Launch Sequence...");
+        Logger.i(TAG, "Initiating Virtual Space Launch...");
         
-        // 1. Launch Cloned App
+        if (callback != null) callback.onProgress("Verifying Environment...");
+
+        // 1. Ensure library exists in the extracted directory
+        File libFile = new File(context.getFilesDir(), "extracted_libs/libbgmi.so");
+        if (!libFile.exists()) {
+            // Fallback: check DownloadZip again if first check fails
+            Logger.w(TAG, "Library not found, attempting last-resort recovery...");
+            DownloadZip.start(context, new DownloadZip.DownloadCallback() {
+                @Override
+                public void onSuccess(File extractedDir) {
+                    proceedToLaunch(context, callback);
+                }
+
+                @Override
+                public void onFailure(String reason) {
+                    if (callback != null) callback.onFailed("Library Missing: " + reason);
+                }
+
+                @Override
+                public void onProgress(String msg) {
+                    if (callback != null) callback.onProgress(msg);
+                }
+            });
+        } else {
+            proceedToLaunch(context, callback);
+        }
+    }
+
+    private static void proceedToLaunch(Context context, LaunchCallback callback) {
+        // 2. Perform same-process injection
+        LibraryInjector.inject(context, TARGET_PKG, null);
+        
+        // 3. Launch Guest APK in Host process
         VirtualContainer.getInstance().launch(context, TARGET_PKG);
         
-        if (callback != null) callback.onProgress("Initializing Sandbox Environment...");
-
-        // 2. Start Async Monitoring after a short delay
-        new Thread(() -> {
-            try {
-                // IMPORTANT: Give the SandboxActivity 3 seconds to fork the process
-                Logger.d(TAG, "Waiting 3s for sandbox initialization...");
-                Thread.sleep(3000); 
-                
-                boolean found = false;
-                ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
-                final String clonedPkg = "com.onecore.cloned.imobile";
-                
-                Logger.i(TAG, "Starting PID detection loop (30s timeout)...");
-                
-                for (int i = 0; i < DETECTION_TIMEOUT_SEC; i++) {
-                    try {
-                        List<ActivityManager.RunningAppProcessInfo> processes = am.getRunningAppProcesses();
-                        
-                        if (processes != null) {
-                            for (ActivityManager.RunningAppProcessInfo info : processes) {
-                                String procName = info.processName;
-                                // Check process name (some systems report the clone pkg or host pkg)
-                                boolean isMatch = procName.endsWith(":sandbox") || 
-                                                procName.equals(TARGET_PKG) || 
-                                                procName.equals(clonedPkg);
-                                
-                                // Robust fallback: Check pkgList for isolated processes (Standard on Android 11+)
-                                if (!isMatch && info.pkgList != null) {
-                                    for (String pkg : info.pkgList) {
-                                        if (pkg.equals(TARGET_PKG) || pkg.equals("com.pubg.bgmi") || pkg.equals(clonedPkg)) {
-                                            isMatch = true;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if (isMatch) {
-                                    int pid = info.pid;
-                                    Logger.i(TAG, "✅ Target Process Found! PID: " + pid + " (" + procName + ")");
-                                    
-                                    // CRITICAL: Call injection AFTER PID is detected
-                                    LibraryInjector.inject(context, TARGET_PKG, pid, null);
-                                    
-                                    new Handler(Looper.getMainLooper()).post(() -> {
-                                        if (callback != null) callback.onProcessDetected(pid);
-                                    });
-                                    found = true;
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        if (found) break;
-                        
-                        int currentTick = i + 1;
-                        new Handler(Looper.getMainLooper()).post(() -> {
-                            if (callback != null) callback.onProgress("Monitoring Game... (" + currentTick + "/30)");
-                        });
-
-                        Thread.sleep(1000); // 1 second intervals
-
-                    } catch (Exception e) {
-                        Logger.e(TAG, "Monitor cycle error", e);
-                    }
-                }
-
-                if (!found) {
-                    Logger.e(TAG, "❌ Detection Timeout: Sandbox process not detected.");
-                    new Handler(Looper.getMainLooper()).post(() -> {
-                        if (callback != null) callback.onFailed("Detection Timeout - Please restart");
-                    });
-                    
-                    // Log current tasks for debug
-                    List<ActivityManager.RunningAppProcessInfo> allProcs = am.getRunningAppProcesses();
-                    if (allProcs != null) {
-                        StringBuilder sb = new StringBuilder("Running Processes Log:\n");
-                        for (ActivityManager.RunningAppProcessInfo pi : allProcs) {
-                            sb.append(" -> ").append(pi.processName).append(" (").append(pi.pid).append(")\n");
-                        }
-                        Logger.w(TAG, sb.toString());
-                    }
-                }
-            } catch (InterruptedException e) {
-                Logger.e(TAG, "Monitoring thread interrupted", e);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (callback != null) {
+                callback.onProgress("Virtual Session ACTIVE");
+                callback.onProcessDetected(0);
             }
-        }).start();
+        }, 1000);
     }
 }

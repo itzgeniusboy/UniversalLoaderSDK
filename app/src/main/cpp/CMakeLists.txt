@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.22.1)
 project("onecore-native")
 
 add_library(onecore_injector SHARED
-        native_injector.cpp
         native_hook.cpp
         memory.cpp)
 
