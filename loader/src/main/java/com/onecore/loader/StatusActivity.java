@@ -96,80 +96,34 @@ public class StatusActivity extends Activity {
                 // 4. LAUNCHING STEP
                 updateStep(4, "Launching Cloned BGMI...", 100);
                 mainHandler.postDelayed(() -> {
-                    VirtualContainer.getInstance().launch(this, TARGET_PKG);
-                    startMonitoring();
-                }, 1500);
+                    GameLauncher.start(this, new GameLauncher.LaunchCallback() {
+                        @Override
+                        public void onProcessDetected(int pid) {
+                            pidText.setText("Status: ACTIVE (PID: " + pid + ")");
+                            pidText.setTextColor(Color.GREEN);
+                            injectionStatus.setText("✅ Injection Successful!");
+                            Toast.makeText(StatusActivity.this, "Game Detected: " + pid, Toast.LENGTH_SHORT).show();
+                        }
+
+                        @Override
+                        public void onFailed(String reason) {
+                            pidText.setText("Status: FAILED (" + reason + ")");
+                            pidText.setTextColor(Color.RED);
+                            Toast.makeText(StatusActivity.this, "Error: " + reason, Toast.LENGTH_LONG).show();
+                        }
+
+                        @Override
+                        public void onProgress(String message) {
+                            pidText.setText(message);
+                        }
+                    });
+                }, 1000);
 
             } catch (Exception e) {
                 Logger.e(TAG, "Process failed", e);
                 mainHandler.post(() -> {
                     cloneStatus.setText("❌ Error: " + e.getMessage());
                     cloneStatus.setTextColor(Color.RED);
-                });
-            }
-        }).start();
-    }
-
-    private void startMonitoring() {
-        new Thread(() -> {
-            boolean found = false;
-            final String clonedPkg = "com.onecore.cloned.imobile";
-            
-            for (int i = 0; i < 30; i++) { // Extended retry to 30 seconds
-                try {
-                    Thread.sleep(1000);
-                    android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-                    java.util.List<android.app.ActivityManager.RunningAppProcessInfo> runningProcesses = am.getRunningAppProcesses();
-                    
-                    if (runningProcesses != null) {
-                        for (android.app.ActivityManager.RunningAppProcessInfo processInfo : runningProcesses) {
-                            String procName = processInfo.processName;
-                            // Check for multiple variants of the game process
-                            if (procName.equals(TARGET_PKG) || 
-                                procName.equals(clonedPkg) || 
-                                procName.endsWith(":sandbox")) {
-                                
-                                int pid = processInfo.pid;
-                                mainHandler.post(() -> {
-                                    pidText.setText("Status: ACTIVE (PID: " + pid + ")");
-                                    pidText.setTextColor(Color.GREEN);
-                                    injectionStatus.setText("✅ Injection Successful!");
-                                    Toast.makeText(StatusActivity.this, "PID Found: " + pid, Toast.LENGTH_SHORT).show();
-                                });
-                                // Trigger actual library injection AFTER PID is found
-                                LibraryInjector.inject(this, TARGET_PKG, pid, null);
-                                found = true;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (found) break;
-
-                    int finalI = i;
-                    mainHandler.post(() -> pidText.setText("Monitor: Searching Process... (" + (finalI + 1) + "/30)"));
-                    
-                } catch (Exception e) {
-                    Logger.e(TAG, "Monitor loop error", e);
-                }
-            }
-            
-            if (!found) {
-                // Fallback: Debug all running processes to find out why it failed
-                android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-                java.util.List<android.app.ActivityManager.RunningAppProcessInfo> processes = am.getRunningAppProcesses();
-                StringBuilder sb = new StringBuilder("FAILURE_LOG:\n");
-                if (processes != null) {
-                    for (android.app.ActivityManager.RunningAppProcessInfo pi : processes) {
-                        sb.append(pi.processName).append(" (").append(pi.pid).append(")\n");
-                    }
-                }
-                Logger.w(TAG, sb.toString()); // Print all processes to Logcat for analysis
-
-                mainHandler.post(() -> {
-                    pidText.setText("Status: FAILED TO DETECT PID (See Logs)");
-                    pidText.setTextColor(Color.RED);
-                    Toast.makeText(StatusActivity.this, "Detection Error: Process not found", Toast.LENGTH_LONG).show();
                 });
             }
         }).start();
