@@ -11,10 +11,15 @@
 #include <dirent.h>
 #include <dlfcn.h>
 #include <android/log.h>
+#include <elf.h>
 
 #define TAG "OneCoreInjector"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+
+#ifndef NT_PRSTATUS
+#define NT_PRSTATUS 1
+#endif
 
 /**
  * Ptrace-based Native Injection for OneCore SDK.
