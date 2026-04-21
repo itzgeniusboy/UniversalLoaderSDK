@@ -93,7 +93,10 @@ public class StatusActivity extends Activity {
 
                 // 4. LAUNCHING STEP
                 updateStep(4, "Launching Cloned BGMI...", 100);
-                mainHandler.postDelayed(() -> VirtualContainer.getInstance().launch(this, TARGET_PKG), 2000);
+                mainHandler.postDelayed(() -> {
+                    VirtualContainer.getInstance().launch(this, TARGET_PKG);
+                    startMonitoring();
+                }, 1500);
 
             } catch (Exception e) {
                 Logger.e(TAG, "Process failed", e);
@@ -102,6 +105,41 @@ public class StatusActivity extends Activity {
                     cloneStatus.setTextColor(Color.RED);
                 });
             }
+        }).start();
+    }
+
+    private void startMonitoring() {
+        new Thread(() -> {
+            for (int i = 0; i < 20; i++) { // Retry for 20 seconds
+                try {
+                    Thread.sleep(1000);
+                    android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                    java.util.List<android.app.ActivityManager.RunningAppProcessInfo> runningProcesses = am.getRunningAppProcesses();
+                    
+                    if (runningProcesses != null) {
+                        for (android.app.ActivityManager.RunningAppProcessInfo processInfo : runningProcesses) {
+                            if (processInfo.processName.endsWith(":sandbox")) {
+                                int pid = processInfo.pid;
+                                mainHandler.post(() -> {
+                                    pidText.setText("Status: ACTIVE (PID: " + pid + ")");
+                                    pidText.setTextColor(Color.GREEN);
+                                    injectionStatus.setText("✅ Injection Successful!");
+                                });
+                                // Trigger actual library injection AFTER PID is found
+                                LibraryInjector.inject(this, TARGET_PKG, pid);
+                                return;
+                            }
+                        }
+                    }
+                    int finalI = i;
+                    mainHandler.post(() -> pidText.setText("Monitor: Waiting for Game... (" + finalI + "/20)"));
+                } catch (Exception ignored) {}
+            }
+            
+            mainHandler.post(() -> {
+                pidText.setText("Status: FAILED TO DETECT PID");
+                pidText.setTextColor(Color.RED);
+            });
         }).start();
     }
 

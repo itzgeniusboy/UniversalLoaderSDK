@@ -10,17 +10,18 @@ import java.io.File;
  * Simply queues the library for delivery to the Sandbox Context.
  */
 public class LibraryInjector {
-    private static final String TAG = "LibraryInjector";
+    private static final String LIB_NAME = "modded_esp.so";
 
-    public static void inject(Context context, String packageName, String libPath) {
-        if (libPath == null || !new File(libPath).exists()) {
-            Logger.e(TAG, "Library file missing at: " + libPath);
+    public static void inject(Context context, String packageName, int pid) {
+        File libFile = new File(context.getFilesDir(), LIB_NAME);
+        if (!libFile.exists()) {
+            Logger.e("Injector", "Library not found at: " + libFile.getAbsolutePath());
             return;
         }
 
-        Logger.i(TAG, "Injecting modded library (ESP/Aimbot) into " + packageName);
+        Logger.i("Injector", "Injecting into PID " + pid + " for package " + packageName);
         
-        // Pass to VirtualContainer for Sandbox Process Delivery
-        VirtualContainer.getInstance().injectToVirtualSpace(context, packageName, libPath);
+        // Use NativeInjector via VirtualContainer to perform ptrace injection into the running PID
+        VirtualContainer.getInstance().injectLibrary(context, packageName, libFile.getAbsolutePath());
     }
 }

@@ -73,13 +73,39 @@ public class SandboxActivity extends Activity {
     }
 
     private void launchGuest() throws Exception {
-        String mainActivity = guestInfo.activities[0].name;
+        // Find Launch Activity with MAIN/LAUNCHER intent filters
+        String mainActivity = null;
+        if (guestInfo.activities != null) {
+            // First pass: try to find common entry point names
+            for (android.content.pm.ActivityInfo ai : guestInfo.activities) {
+                if (ai.name.toLowerCase().contains("splash") || ai.name.toLowerCase().contains("launcher")) {
+                    mainActivity = ai.name;
+                    break;
+                }
+            }
+            
+            // Fallback: Use the first activity if nothing found
+            if (mainActivity == null && guestInfo.activities.length > 0) {
+                mainActivity = guestInfo.activities[0].name;
+            }
+        }
+        
+        if (mainActivity == null) throw new Exception("No launchable activity found in guest APK.");
+        
         Logger.d(TAG, "Starting Guest Entry: " + mainActivity);
         
         Class<?> clazz = guestClassLoader.loadClass(mainActivity);
         Intent intent = new Intent(this, clazz);
+        
+        // CRITICAL: Escape the Sandbox host stack
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); 
+        
+        // Ensure guest app thinks it is running as itself
+        intent.setPackage(guestInfo.packageName);
         intent.putExtras(getIntent());
         startActivity(intent);
+        
+        Logger.i(TAG, "Guest successfully triggered in Sandbox context.");
     }
 
     @Override
