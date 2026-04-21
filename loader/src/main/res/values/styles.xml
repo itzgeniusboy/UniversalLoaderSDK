@@ -8,7 +8,7 @@
     </style>
 
     <style name="PremiumBadge">
-        <item name="android:textColor">@color/premium_success</item>
+        <item name="android:textColor">@color/premium_neon</item>
         <item name="android:textSize">12sp</item>
         <item name="android:textStyle">bold</item>
         <item name="android:background">@drawable/bg_badge_success</item>

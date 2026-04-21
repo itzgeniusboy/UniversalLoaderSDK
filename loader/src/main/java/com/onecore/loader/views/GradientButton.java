@@ -36,7 +36,7 @@ public class GradientButton extends AppCompatButton {
         rectF.set(0, 0, getWidth(), getHeight());
         
         LinearGradient gradient = new LinearGradient(0, 0, getWidth(), getHeight(),
-                0xFFD4AF37, 0xFF8B4513, Shader.TileMode.CLAMP);
+                0xFF39FF14, 0xFF006400, Shader.TileMode.CLAMP);
         paint.setShader(gradient);
         
         canvas.drawRoundRect(rectF, 80, 80, paint);

@@ -17,13 +17,13 @@
     <color name="ios_card_bg">#1C1C1E</color>
     <color name="ios_success">#34C759</color>
 
-    <!-- Premium iOS Custom Palette -->
+    <!-- Premium iOS Custom Palette (Neon Green Edition) -->
     <color name="premium_bg">#050505</color>
     <color name="premium_glass">#1AFFFFFF</color>
     <color name="premium_glass_stroke">#33FFFFFF</color>
-    <color name="premium_gold">#D4AF37</color>
-    <color name="premium_gold_glow">#66D4AF37</color>
+    <color name="premium_neon">#39FF14</color>
+    <color name="premium_neon_glow">#4D39FF14</color>
     <color name="premium_text_p">#FFFFFF</color>
     <color name="premium_text_s">#ACACAC</color>
-    <color name="premium_success">#2ECC71</color>
+    <color name="premium_success">#39FF14</color>
 </resources>

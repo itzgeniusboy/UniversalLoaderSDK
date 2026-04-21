@@ -47,6 +47,50 @@
             android:textSize="16sp"
             android:elevation="8dp" />
 
+        <!-- Progress HUD (Initially Hidden) -->
+        <LinearLayout
+            android:id="@+id/progressHud"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone"
+            android:layout_marginTop="16dp">
+
+            <ProgressBar
+                android:id="@+id/launchProgressBar"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="200dp"
+                android:layout_height="6dp"
+                android:progressDrawable="@android:drawable/progress_horizontal"
+                android:progressTint="@color/premium_neon"
+                android:max="100" />
+
+            <TextView
+                android:id="@+id/launchStepText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Initializing..."
+                android:textColor="@color/premium_neon"
+                android:textSize="12sp"
+                android:layout_marginTop="12dp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1" />
+
+        </LinearLayout>
+
+        <!-- Final START GAME Button (Initially Hidden) -->
+        <com.onecore.loader.views.GradientButton
+            android:id="@+id/startGameBtn"
+            android:layout_width="240dp"
+            android:layout_height="72dp"
+            android:text="START GAME"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:textSize="20sp"
+            android:visibility="gone"
+            android:elevation="12dp" />
+
         <!-- Status Badges -->
         <LinearLayout
             android:layout_width="wrap_content"

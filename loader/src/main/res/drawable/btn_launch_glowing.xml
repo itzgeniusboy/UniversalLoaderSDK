@@ -3,7 +3,7 @@
     <!-- Glow layer -->
     <item>
         <shape>
-            <solid android:color="@color/premium_gold_glow" />
+            <solid android:color="@color/premium_neon_glow" />
             <corners android:radius="30dp" />
         </shape>
     </item>
@@ -12,8 +12,8 @@
         <shape>
             <gradient
                 android:angle="45"
-                android:endColor="@color/premium_gold"
-                android:startColor="#B8860B" />
+                android:endColor="@color/premium_neon"
+                android:startColor="#006400" />
             <corners android:radius="30dp" />
         </shape>
     </item>
