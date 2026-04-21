@@ -26,57 +26,35 @@ public class GameLauncher {
     }
 
     public static void start(Context context, LaunchCallback callback) {
-        Logger.i(TAG, "Initiating Virtual Space Launch...");
-        
-        if (callback != null) callback.onProgress("Verifying Environment...");
+        try {
+            Logger.i(TAG, "Initiating Virtual Space Launch for " + TARGET_PKG);
+            
+            if (callback != null) callback.onProgress("Verifying Environment...");
 
-        // 1. Ensure library exists in the extracted directory
-        File libFile = new File(context.getFilesDir(), "extracted_libs/libbgmi.so");
-        if (!libFile.exists()) {
-            // Fallback: check DownloadZip again if first check fails
-            Logger.w(TAG, "Library not found, attempting last-resort recovery...");
-            DownloadZip.start(context, new DownloadZip.DownloadCallback() {
-                @Override
-                public void onSuccess(File extractedDir) {
-                    proceedToLaunch(context, callback);
-                }
-
-                @Override
-                public void onFailure(String reason) {
-                    if (callback != null) callback.onFailed("Library Missing: " + reason);
-                }
-
-                @Override
-                public void onProgress(String msg) {
-                    if (callback != null) callback.onProgress(msg);
-                }
-            });
-        } else {
-            proceedToLaunch(context, callback);
-        }
-    }
-
-    private static void proceedToLaunch(Context context, LaunchCallback callback) {
-        Logger.i(TAG, "System Phase: Finalizing virtual environment for " + TARGET_PKG);
-        
-        // 2. Perform same-process injection
-        LibraryInjector.inject(context, TARGET_PKG, null);
-        
-        // 3. Launch Guest APK in Host process
-        Logger.i(TAG, "CRITICAL: Triggering Virtualization Host for " + TARGET_PKG);
-        boolean success = VirtualContainer.getInstance().launch(context, TARGET_PKG);
-        
-        if (success) {
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            // 1. Ensure virtualization engine starts
+            Logger.i(TAG, "CRITICAL: Triggering Virtualization Host...");
+            boolean success = VirtualContainer.getInstance().launch(context, TARGET_PKG);
+            
+            if (success) {
                 if (callback != null) {
                     callback.onProgress("Virtual Session ACTIVE");
                     callback.onProcessDetected(0);
                 }
-            }, 800);
-        } else {
+            } else {
+                Logger.e(TAG, "VirtualContainer reported launch failure.");
+                if (callback != null) {
+                    callback.onFailed("Engine denied launch. Check logs or License.");
+                }
+            }
+        } catch (Throwable t) {
+            Logger.e(TAG, "FATAL: Uncaught exception in GameLauncher.start", t);
             if (callback != null) {
-                callback.onFailed("Launch Aborted: Virtualization core failed to initialize.");
+                callback.onFailed("System Error: " + t.getMessage());
             }
         }
+    }
+
+    private static void proceedToLaunch(Context context, LaunchCallback callback) {
+        start(context, callback);
     }
 }

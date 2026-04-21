@@ -41,14 +41,14 @@ public class VirtualContainer {
         this.virtualMode = mode;
     }
 
-    /**
-     * Launches a package inside the virtual environment.
-     * Returns true if the sandbox boot initiated.
-     */
     public boolean launch(Context context, String packageName) {
-        if (context == null || packageName == null) return false;
+        if (context == null || packageName == null) {
+            Logger.e(TAG, "Launch failed: Null context or package name.");
+            return false;
+        }
         
         if (!SDKLicense.getInstance().isLicensed()) {
+            Logger.e(TAG, "Launch failed: SDK not licensed.");
             SDKLicense.getInstance().showExpiryDialog();
             return false;
         }
@@ -72,10 +72,11 @@ public class VirtualContainer {
             
             // 4. Sandbox Launch (Host Process)
             launchInVirtualSandbox(context, packageName);
+            Logger.i(TAG, "Sandbox boot command SENT successfully.");
             return true;
             
-        } catch (Exception e) {
-            Logger.e(TAG, "VirtualContainer launch failed", e);
+        } catch (Throwable e) {
+            Logger.e(TAG, "CRITICAL: VirtualContainer launch exception intercepted", e);
             fallbackLaunch(context, packageName);
             return false;
         }

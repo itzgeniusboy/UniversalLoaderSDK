@@ -74,24 +74,15 @@ public class MainActivity extends Activity {
         
         new Thread(() -> {
             try {
-                // 0-25%: Initializing
-                updateProgress(10, "INITIALIZING VIRTUAL SPACE");
-                Thread.sleep(800);
-                
-                // 25-50%: Extraction
-                updateProgress(40, "EXTRACTING BINARY DATA");
-                Thread.sleep(1000);
-                
-                // 50-75%: Injection
-                updateProgress(65, "INJECTION IN PROGRESS");
-                Thread.sleep(1200);
-                
-                // 75-100%: Environment
-                updateProgress(90, "PREPARING GAME ENVIRONMENT");
-                Thread.sleep(800);
-                
-                updateProgress(100, "READY TO PLAY");
-                Thread.sleep(300);
+                // Rapidly update progress to reach 100% immediately for premium performance
+                updateProgress(25, "INITIALIZING...");
+                Thread.sleep(150);
+                updateProgress(50, "PREPARING...");
+                Thread.sleep(150);
+                updateProgress(75, "INJECTING...");
+                Thread.sleep(150);
+                updateProgress(100, "READY");
+                Thread.sleep(100);
 
                 runOnUiThread(() -> {
                     progressHud.setVisibility(View.GONE);
@@ -121,22 +112,22 @@ public class MainActivity extends Activity {
             return;
         }
 
-        Logger.i(TAG, "VERIFIED: START GAME button clicked. Calling virtualization engine.");
+        Logger.i(TAG, "DIRECT LAUNCH: START GAME clicked.");
         startGameBtn.setEnabled(false);
         startGameBtn.setText("OPENING...");
-        Toast.makeText(this, "BOOTING VIRTUAL CONTAINER", Toast.LENGTH_SHORT).show();
         
-        // Final handoff to GameLauncher for actual process management
+        // Immediate handoff to virtualization engine
         GameLauncher.start(this, new GameLauncher.LaunchCallback() {
             @Override
             public void onProcessDetected(int pid) {
                 Logger.i(TAG, "VirtualSession successfully established with host process.");
                 runOnUiThread(() -> {
                     Toast.makeText(MainActivity.this, "BGMI LOADED IN SANDBOX", Toast.LENGTH_SHORT).show();
+                    // Restore button state after a brief moment to avoid rapid clicks
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         startGameBtn.setEnabled(true);
                         startGameBtn.setText("START GAME");
-                    }, 2000);
+                    }, 1000);
                 });
             }
 
