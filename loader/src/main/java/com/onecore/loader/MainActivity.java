@@ -13,6 +13,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.onecore.loader.views.GradientButton;
+import com.onecore.sdk.OneCoreSDK;
 import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.Logger;
 
