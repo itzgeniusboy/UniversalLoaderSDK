@@ -14,6 +14,6 @@ public class UniversalInjector {
 
     public static void performInjection(Context context, String packageName, int pid, String libPath) {
         // Delegate to the modern BlackBox-style LibraryInjector
-        LibraryInjector.inject(context, packageName, pid, libPath);
+        LibraryInjector.inject(context, packageName, libPath);
     }
 }

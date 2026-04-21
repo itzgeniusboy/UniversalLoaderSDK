@@ -8,6 +8,7 @@ import android.widget.Toast;
 import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.Logger;
 import java.util.List;
+import java.io.File;
 
 /**
  * Handles the final sequence of Injection -> Cloned Launch.
