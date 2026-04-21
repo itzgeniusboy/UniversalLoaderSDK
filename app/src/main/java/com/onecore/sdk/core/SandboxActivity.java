@@ -63,8 +63,8 @@ public class SandboxActivity extends Activity {
                 Logger.d(TAG, "ESP Library linked successfully.");
             }
 
-            // 5. Jump to Guest Entry Point
-            launchGuest();
+            // 5. Jump to Guest Entry Point via STUB REDIRECTION
+            launchGuestViaStub();
 
         } catch (Exception e) {
             Logger.e(TAG, "Sandbox Boot Failure", e);
@@ -72,19 +72,16 @@ public class SandboxActivity extends Activity {
         }
     }
 
-    private void launchGuest() throws Exception {
+    private void launchGuestViaStub() throws Exception {
         // Find Launch Activity with MAIN/LAUNCHER intent filters
         String mainActivity = null;
         if (guestInfo.activities != null) {
-            // First pass: try to find common entry point names
             for (android.content.pm.ActivityInfo ai : guestInfo.activities) {
-                if (ai.name.toLowerCase().contains("splash") || ai.name.toLowerCase().contains("launcher")) {
+                if (ai.name.toLowerCase().contains("splash") || ai.name.toLowerCase().contains("launcher") || ai.name.toLowerCase().contains("main")) {
                     mainActivity = ai.name;
                     break;
                 }
             }
-            
-            // Fallback: Use the first activity if nothing found
             if (mainActivity == null && guestInfo.activities.length > 0) {
                 mainActivity = guestInfo.activities[0].name;
             }
@@ -92,20 +89,19 @@ public class SandboxActivity extends Activity {
         
         if (mainActivity == null) throw new Exception("No launchable activity found in guest APK.");
         
-        Logger.d(TAG, "Starting Guest Entry: " + mainActivity);
+        Logger.d(TAG, "Relaying to StubHost for: " + mainActivity);
         
-        Class<?> clazz = guestClassLoader.loadClass(mainActivity);
-        Intent intent = new Intent(this, clazz);
+        // CRITICAL FIX: We launch the StubActivity which IS in our manifest,
+        // but we pass the target guest class name to it.
+        Intent stubIntent = new Intent(this, StubActivity.class);
+        stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        stubIntent.putExtra("target_activity", mainActivity);
+        stubIntent.putExtra("target_package", guestInfo.packageName);
         
-        // CRITICAL: Escape the Sandbox host stack
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); 
+        startActivity(stubIntent);
         
-        // Ensure guest app thinks it is running as itself
-        intent.setPackage(guestInfo.packageName);
-        intent.putExtras(getIntent());
-        startActivity(intent);
-        
-        Logger.i(TAG, "Guest successfully triggered in Sandbox context.");
+        Logger.i(TAG, "Redirected to Stub Process. Closing Host Shell.");
+        finish(); // Close the shell activity
     }
 
     @Override

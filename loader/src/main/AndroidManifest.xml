@@ -42,7 +42,14 @@
         <activity android:name=".LicenseActivity" android:screenOrientation="portrait" />
 
         <activity android:name="com.onecore.sdk.core.SandboxActivity" 
-                  android:screenOrientation="portrait" />
+                  android:screenOrientation="portrait" 
+                  android:process=":sandbox" />
+
+        <activity android:name="com.onecore.sdk.core.StubActivity"
+                  android:screenOrientation="portrait"
+                  android:process=":sandbox"
+                  android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+                  android:configChanges="orientation|screenSize|keyboardHidden" />
 
     </application>
 

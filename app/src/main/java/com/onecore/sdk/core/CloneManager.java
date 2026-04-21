@@ -34,6 +34,8 @@ public class CloneManager {
             
             // 1. Generate Virtual Identity
             String virtualPkg = "com.onecore.cloned." + packageName.substring(packageName.lastIndexOf('.') + 1);
+            
+            // CRITICAL: Preserve original sourceDir for ClassLoader
             info.packageName = virtualPkg;
             info.applicationInfo.packageName = virtualPkg;
             
