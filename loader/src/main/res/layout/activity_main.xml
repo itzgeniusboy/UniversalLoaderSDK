@@ -35,54 +35,39 @@
                 android:textSize="17sp"
                 android:layout_marginBottom="32dp" />
 
-            <!-- Game Card -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:background="@drawable/ios_glass_bg"
-                android:padding="20dp"
-                android:layout_marginBottom="24dp">
+                android:padding="24dp">
 
-                <RelativeLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="BGMI Mobile"
-                        android:textColor="@color/ios_text_primary"
-                        android:textSize="22sp"
-                        android:textStyle="bold" />
-                    <TextView
-                        android:layout_alignParentRight="true"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="ONLINE"
-                        android:textColor="@color/ios_success"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-                </RelativeLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="BGMI Mobile"
+                    android:textColor="#FFFFFF"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Version 3.2.0 • Global"
-                    android:textColor="@color/ios_text_secondary"
+                    android:textColor="#8E8E93"
                     android:layout_marginTop="4dp"
-                    android:layout_marginBottom="20dp" />
+                    android:layout_marginBottom="24dp" />
 
                 <com.onecore.loader.views.GradientButton
                     android:id="@+id/launchBtn"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="60dp"
                     android:text="LAUNCH CLONE"
                     android:textColor="#FFFFFF"
                     android:textStyle="bold"
-                    android:textSize="17sp"
+                    android:textSize="18sp"
                     android:gravity="center"
-                    android:paddingTop="0dp"
-                    android:paddingBottom="0dp" />
+                    android:padding="0dp" />
             </LinearLayout>
 
             <!-- Feature Cards (Skeleton/Status) -->

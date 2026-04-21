@@ -64,8 +64,14 @@ public class MainActivity extends Activity {
     }
 
     private void provideHapticFeedback() {
-        if (vibrator != null) {
-            vibrator.vibrate(50); // Light haptic tap
+        try {
+            if (vibrator != null && vibrator.hasVibrator()) {
+                vibrator.vibrate(50);
+            }
+        } catch (SecurityException se) {
+            Logger.e(TAG, "Vibrate permission missing at runtime.");
+        } catch (Exception e) {
+            Logger.e(TAG, "Haptic feedback failed", e);
         }
     }
 }
