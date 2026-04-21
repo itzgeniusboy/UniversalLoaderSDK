@@ -4,134 +4,80 @@
     android:layout_height="match_parent"
     android:background="@color/ios_bg_dark">
 
-    <ScrollView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="20dp"
-        android:clipToPadding="false"
-        android:layout_above="@+id/bottomNav">
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
+        <!-- Centered Game Icon Space -->
+        <View
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:background="@drawable/ios_glass_bg"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:text="BGMI MOBILE"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:textColor="@color/premium_text_p"
+            android:letterSpacing="0.05" />
 
-            <!-- Premium Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="VERSION 3.2.0"
+            android:textSize="12sp"
+            android:textColor="@color/premium_text_s"
+            android:layout_marginBottom="40dp"
+            android:letterSpacing="0.1" />
+
+        <!-- Centered Glowing Launch Button -->
+        <com.onecore.loader.views.GradientButton
+            android:id="@+id/launchBtn"
+            android:layout_width="220dp"
+            android:layout_height="64dp"
+            android:text="LAUNCH CLONE"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:elevation="8dp" />
+
+        <!-- Status Badges -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="48dp"
+            android:gravity="center">
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="OneCore Premium"
-                android:textSize="34sp"
-                android:textStyle="bold"
-                android:textColor="@color/ios_text_primary"
-                android:layout_marginTop="40dp"
-                android:layout_marginBottom="4dp" />
+                android:text="CLONE READY"
+                style="@style/PremiumBadge"
+                android:layout_marginEnd="8dp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Virtual Space Engine active"
-                android:textColor="@color/ios_text_secondary"
-                android:textSize="17sp"
-                android:layout_marginBottom="32dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/ios_glass_bg"
-                android:padding="24dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="BGMI Mobile"
-                    android:textColor="#FFFFFF"
-                    android:textSize="22sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Version 3.2.0 • Global"
-                    android:textColor="#8E8E93"
-                    android:layout_marginTop="4dp"
-                    android:layout_marginBottom="24dp" />
-
-                <com.onecore.loader.views.GradientButton
-                    android:id="@+id/launchBtn"
-                    android:layout_width="match_parent"
-                    android:layout_height="60dp"
-                    android:text="LAUNCH CLONE"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold"
-                    android:textSize="18sp"
-                    android:gravity="center"
-                    android:padding="0dp" />
-            </LinearLayout>
-
-            <!-- Feature Cards (Skeleton/Status) -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="ENGINE STATUS"
-                android:textColor="@color/ios_text_secondary"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="12dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="100dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/ios_glass_bg"
-                    android:layout_marginRight="8dp"
-                    android:gravity="center"
-                    android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Clone" android:textColor="@color/ios_text_secondary"/>
-                    <TextView android:id="@+id/cloneStat" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ready" android:textColor="@color/ios_success" android:textStyle="bold"/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="100dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/ios_glass_bg"
-                    android:layout_marginLeft="8dp"
-                    android:gravity="center"
-                    android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Engine" android:textColor="@color/ios_text_secondary"/>
-                    <TextView android:id="@+id/engineStat" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Active" android:textColor="@color/ios_success" android:textStyle="bold"/>
-                </LinearLayout>
-            </LinearLayout>
+                android:text="ENGINE ACTIVE"
+                style="@style/PremiumBadge" />
 
         </LinearLayout>
-    </ScrollView>
 
-    <!-- iOS style Bottom Nav -->
-    <LinearLayout
-        android:id="@+id/bottomNav"
-        android:layout_width="match_parent"
-        android:layout_height="80dp"
-        android:layout_alignParentBottom="true"
-        android:background="#E61C1C1E"
-        android:orientation="horizontal"
-        android:paddingTop="12dp">
-
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-            <View android:layout_width="24dp" android:layout_height="24dp" android:background="@color/ios_accent"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Home" android:textColor="@color/ios_accent" android:textSize="10sp"/>
-        </LinearLayout>
-
-        <LinearLayout android:id="@+id/navSettings" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-            <View android:layout_width="24dp" android:layout_height="24dp" android:background="@color/ios_text_secondary"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Settings" android:textColor="@color/ios_text_secondary" android:textSize="10sp"/>
-        </LinearLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="VIRTUAL ENVIRONMENT SECURE"
+            android:textSize="10sp"
+            android:textColor="@color/premium_text_s"
+            android:layout_marginTop="24dp"
+            android:alpha="0.5" />
 
     </LinearLayout>
 

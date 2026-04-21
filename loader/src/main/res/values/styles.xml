@@ -1,19 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.OneCore" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/ios_bg_dark</item>
-        <item name="android:statusBarColor">@color/ios_bg_dark</item>
+    <style name="Theme.OneCore" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/premium_bg</item>
+        <item name="android:statusBarColor">@color/premium_bg</item>
         <item name="android:windowTranslucentStatus">true</item>
-        <item name="android:colorAccent">@color/ios_accent</item>
+        <item name="android:colorAccent">@color/premium_gold</item>
     </style>
 
-    <style name="IOSText">
-        <item name="android:textColor">@color/ios_text_primary</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
+    <style name="PremiumBadge">
+        <item name="android:textColor">@color/premium_success</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:background">@drawable/bg_badge_success</item>
+        <item name="android:paddingLeft">8dp</item>
+        <item name="android:paddingRight">8dp</item>
+        <item name="android:paddingTop">2dp</item>
+        <item name="android:paddingBottom">2dp</item>
     </style>
 
-    <style name="IOSCard">
+    <style name="PremiumCard">
         <item name="android:background">@drawable/ios_glass_bg</item>
-        <item name="android:padding">16dp</item>
+        <item name="android:padding">20dp</item>
     </style>
 </resources>

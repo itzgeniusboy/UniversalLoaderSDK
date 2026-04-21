@@ -26,41 +26,27 @@ public class MainActivity extends Activity {
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         launchBtn = findViewById(R.id.launchBtn);
 
-        // Start premium animations
+        // Start premium pulse animation
         launchBtn.startPulse();
-        applyEntranceAnimation(findViewById(android.R.id.content));
-
+        
         launchBtn.setOnClickListener(v -> {
-            try {
-                provideHapticFeedback();
-                Logger.i(TAG, "Initiating Sandbox Launch Sequence...");
-                // Move to StatusActivity for detailed progress
-                Intent intent = new Intent(this, StatusActivity.class);
-                startActivity(intent);
-                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-            } catch (Exception e) {
-                Logger.e(TAG, "Launch sequence failed", e);
-                android.widget.Toast.makeText(this, "Launch Error: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
-            }
-        });
-
-        findViewById(R.id.navSettings).setOnClickListener(v -> {
-            try {
-                provideHapticFeedback();
-                Intent intent = new Intent(this, SettingsActivity.class);
-                startActivity(intent);
-                overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right);
-            } catch (Exception e) {
-                Logger.e(TAG, "Settings navigation failed", e);
-                android.widget.Toast.makeText(this, "Navigation Error: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
-            }
+            provideHapticFeedback();
+            v.animate().scaleX(0.95f).scaleY(0.95f).setDuration(100).withEndAction(() -> {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start();
+                initiateLaunch();
+            }).start();
         });
     }
 
-    private void applyEntranceAnimation(View view) {
-        AlphaAnimation fadeIn = new AlphaAnimation(0.0f, 1.0f);
-        fadeIn.setDuration(1000);
-        view.startAnimation(fadeIn);
+    private void initiateLaunch() {
+        try {
+            Logger.i(TAG, "Initiating Premium Launch Sequence...");
+            Intent intent = new Intent(this, StatusActivity.class);
+            startActivity(intent);
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        } catch (Exception e) {
+            Logger.e(TAG, "Launch failed", e);
+        }
     }
 
     private void provideHapticFeedback() {

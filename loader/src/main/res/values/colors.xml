@@ -8,10 +8,13 @@
     <color name="text_muted">#888888</color>
     <color name="card_bg">#2A2A2A</color>
 
-    <!-- iOS Palette mapping (backwards compatibility) -->
-    <color name="ios_bg_dark">#000000</color>
-    <color name="ios_text_primary">#FFFFFF</color>
-    <color name="ios_text_secondary">#8E8E93</color>
-    <color name="ios_accent">#007AFF</color>
-    <color name="ios_success">#34C759</color>
+    <!-- Premium iOS Palette -->
+    <color name="premium_bg">#050505</color>
+    <color name="premium_glass">#1AFFFFFF</color>
+    <color name="premium_glass_stroke">#33FFFFFF</color>
+    <color name="premium_gold">#D4AF37</color>
+    <color name="premium_gold_glow">#66D4AF37</color>
+    <color name="premium_text_p">#FFFFFF</color>
+    <color name="premium_text_s">#ACACAC</color>
+    <color name="premium_success">#2ECC71</color>
 </resources>
