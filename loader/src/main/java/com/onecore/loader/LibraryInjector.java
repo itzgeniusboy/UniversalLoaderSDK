@@ -12,8 +12,9 @@ import java.io.File;
 public class LibraryInjector {
     private static final String LIB_NAME = "modded_esp.so";
 
-    public static void inject(Context context, String packageName, int pid) {
-        File libFile = new File(context.getFilesDir(), LIB_NAME);
+    public static void inject(Context context, String packageName, int pid, String libPath) {
+        String finalPath = (libPath != null) ? libPath : new File(context.getFilesDir(), LIB_NAME).getAbsolutePath();
+        File libFile = new File(finalPath);
         if (!libFile.exists()) {
             Logger.e("Injector", "Library not found at: " + libFile.getAbsolutePath());
             return;

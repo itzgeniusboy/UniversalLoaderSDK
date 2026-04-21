@@ -1,6 +1,7 @@
 package com.onecore.loader;
 
 import android.app.Activity;
+import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
@@ -126,7 +127,7 @@ public class StatusActivity extends Activity {
                                     injectionStatus.setText("✅ Injection Successful!");
                                 });
                                 // Trigger actual library injection AFTER PID is found
-                                LibraryInjector.inject(this, TARGET_PKG, pid);
+                                LibraryInjector.inject(this, TARGET_PKG, pid, null);
                                 return;
                             }
                         }

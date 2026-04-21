@@ -12,8 +12,8 @@ import com.onecore.sdk.utils.Logger;
 public class UniversalInjector {
     private static final String TAG = "UniversalInjector";
 
-    public static void performInjection(Context context, String packageName, String libPath) {
+    public static void performInjection(Context context, String packageName, int pid, String libPath) {
         // Delegate to the modern BlackBox-style LibraryInjector
-        LibraryInjector.inject(context, packageName, libPath);
+        LibraryInjector.inject(context, packageName, pid, libPath);
     }
 }
