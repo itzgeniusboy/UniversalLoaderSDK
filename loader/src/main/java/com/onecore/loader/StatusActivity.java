@@ -10,6 +10,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 import com.onecore.loader.views.StepIndicator;
 import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.core.CloneManager;
@@ -111,7 +112,10 @@ public class StatusActivity extends Activity {
 
     private void startMonitoring() {
         new Thread(() -> {
-            for (int i = 0; i < 20; i++) { // Retry for 20 seconds
+            boolean found = false;
+            final String clonedPkg = "com.onecore.cloned.imobile";
+            
+            for (int i = 0; i < 30; i++) { // Extended retry to 30 seconds
                 try {
                     Thread.sleep(1000);
                     android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
@@ -119,28 +123,55 @@ public class StatusActivity extends Activity {
                     
                     if (runningProcesses != null) {
                         for (android.app.ActivityManager.RunningAppProcessInfo processInfo : runningProcesses) {
-                            if (processInfo.processName.endsWith(":sandbox")) {
+                            String procName = processInfo.processName;
+                            // Check for multiple variants of the game process
+                            if (procName.equals(TARGET_PKG) || 
+                                procName.equals(clonedPkg) || 
+                                procName.endsWith(":sandbox")) {
+                                
                                 int pid = processInfo.pid;
                                 mainHandler.post(() -> {
                                     pidText.setText("Status: ACTIVE (PID: " + pid + ")");
                                     pidText.setTextColor(Color.GREEN);
                                     injectionStatus.setText("✅ Injection Successful!");
+                                    Toast.makeText(StatusActivity.this, "PID Found: " + pid, Toast.LENGTH_SHORT).show();
                                 });
                                 // Trigger actual library injection AFTER PID is found
                                 LibraryInjector.inject(this, TARGET_PKG, pid, null);
-                                return;
+                                found = true;
+                                break;
                             }
                         }
                     }
+                    
+                    if (found) break;
+
                     int finalI = i;
-                    mainHandler.post(() -> pidText.setText("Monitor: Waiting for Game... (" + finalI + "/20)"));
-                } catch (Exception ignored) {}
+                    mainHandler.post(() -> pidText.setText("Monitor: Searching Process... (" + (finalI + 1) + "/30)"));
+                    
+                } catch (Exception e) {
+                    Logger.e(TAG, "Monitor loop error", e);
+                }
             }
             
-            mainHandler.post(() -> {
-                pidText.setText("Status: FAILED TO DETECT PID");
-                pidText.setTextColor(Color.RED);
-            });
+            if (!found) {
+                // Fallback: Debug all running processes to find out why it failed
+                android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                java.util.List<android.app.ActivityManager.RunningAppProcessInfo> processes = am.getRunningAppProcesses();
+                StringBuilder sb = new StringBuilder("FAILURE_LOG:\n");
+                if (processes != null) {
+                    for (android.app.ActivityManager.RunningAppProcessInfo pi : processes) {
+                        sb.append(pi.processName).append(" (").append(pi.pid).append(")\n");
+                    }
+                }
+                Logger.w(TAG, sb.toString()); // Print all processes to Logcat for analysis
+
+                mainHandler.post(() -> {
+                    pidText.setText("Status: FAILED TO DETECT PID (See Logs)");
+                    pidText.setTextColor(Color.RED);
+                    Toast.makeText(StatusActivity.this, "Detection Error: Process not found", Toast.LENGTH_LONG).show();
+                });
+            }
         }).start();
     }
 
