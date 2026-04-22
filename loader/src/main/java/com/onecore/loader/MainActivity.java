@@ -7,6 +7,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Vibrator;
+import android.provider.Settings;
+import android.net.Uri;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -63,9 +65,29 @@ public class MainActivity extends Activity {
         });
 
         startGameBtn.setOnClickListener(v -> {
+            if (!checkOverlayPermission()) {
+                requestOverlayPermission();
+                return;
+            }
             provideHapticFeedback();
             launchGame();
         });
+    }
+
+    private boolean checkOverlayPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            return Settings.canDrawOverlays(this);
+        }
+        return true;
+    }
+
+    private void requestOverlayPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName()));
+            startActivityForResult(intent, 1234);
+            Toast.makeText(this, "PLEASE ALLOW OVERLAY PERMISSION", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void startProgressSequence() {
