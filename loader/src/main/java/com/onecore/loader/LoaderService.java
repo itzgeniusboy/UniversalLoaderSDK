@@ -41,22 +41,29 @@ public class LoaderService extends Service {
             Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
             if (intent == null) return;
             
-            // Target virtual display (critical for sandbox isolation)
-            if (virtualDisplay != null && Build.VERSION.SDK_INT >= 26) {
-                // Corrected: VirtualDisplay -> getDisplay() -> getDisplayId()
-                intent.setLaunchDisplayId(virtualDisplay.getDisplay().getDisplayId());
-            }
-            
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
             intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             
-            // Execute start in sandbox namespace
-            if (sandboxContext != null) {
-                sandboxContext.startActivity(intent);
+            // Target virtual display (critical for sandbox isolation) using ActivityOptions
+            if (virtualDisplay != null && Build.VERSION.SDK_INT >= 26) {
+                android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic();
+                // Set the display ID where the activity should launch
+                options.setLaunchDisplayId(virtualDisplay.getDisplay().getDisplayId());
+                
+                if (sandboxContext != null) {
+                    sandboxContext.startActivity(intent, options.toBundle());
+                } else {
+                    startActivity(intent, options.toBundle());
+                }
             } else {
-                startActivity(intent); // fallback to host process
+                // Fallback for older APIs or if virtual display is missing
+                if (sandboxContext != null) {
+                    sandboxContext.startActivity(intent);
+                } else {
+                    startActivity(intent);
+                }
             }
             
             Logger.i(TAG, "Sandbox Start Triggered for: " + packageName);
