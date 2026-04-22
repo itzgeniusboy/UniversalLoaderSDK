@@ -2,50 +2,65 @@
 #include <string>
 #include <android/log.h>
 #include <unistd.h>
-#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <dlfcn.h>
 
-#define TAG "OneCore-NativeHook"
+#define TAG "OneCore-Native"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+
+static std::string g_virtualRoot;
+static std::string g_packageName;
+
+// Original function character pointers
+static int (*orig_open)(const char *pathname, int flags, mode_t mode) = nullptr;
+static int (*orig_stat)(const char *pathname, struct stat *buf) = nullptr;
 
 /**
- * Future Android 17-18 Native Hook Engine.
- * Features: Seccomp Bypass, W^X Handling, Trampoline Patching.
+ * Android 14+ IO Redirection Logic.
+ * Captures file access and redirects to sandbox.
  */
-
-// Placeholder for an Inline Hook function (Equivalent to Dobby or Substrate)
-extern "C" void* hook_function(void* target, void* replace) {
-    // In Android 17, memory is strictly W^X (Write XOR Execute).
-    // To patch code, we must use complex FD-based mapping or specialized kernel hooks.
-    LOGI("Attempting to hook function at %p", target);
+const char* redirect_path(const char* path) {
+    if (path == nullptr) return nullptr;
     
-    // 1. Check if ptrace is restricted (Android 17+ default)
-    if (getppid() == 1) { // Running in a constrained isolated process
-        LOGE("Hooking blocked by isolated process environment.");
+    std::string s_path(path);
+    std::string target = "/data/data/" + g_packageName;
+    
+    if (s_path.find(target) == 0) {
+        static std::string redirected;
+        redirected = g_virtualRoot + "/data" + s_path.substr(target.length());
+        return redirected.c_str();
     }
-
-    return nullptr;
+    
+    return path;
 }
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_onecore_sdk_NativeHookEngine_initHook(JNIEnv* env, jobject thiz, jint api_level) {
-    LOGI("Initializing Native Hook Engine for API %d", api_level);
+// Hooked Functions
+int hooked_open(const char *pathname, int flags, mode_t mode) {
+    const char* newPath = redirect_path(pathname);
+    return orig_open(newPath, flags, mode);
+}
 
-    if (api_level >= 37) {
-        LOGI("Enabling Android 17 Native Bypass Shields...");
-        // Bypassing seccomp by using direct syscall trampolines
-    }
-
-    if (api_level >= 38) {
-        LOGI("Enabling Android 18 SELinux Hardened Hooks...");
-        // Applying shadow memory patches
-    }
-
-    return JNI_TRUE;
+int hooked_stat(const char *pathname, struct stat *buf) {
+    const char* newPath = redirect_path(pathname);
+    return orig_stat(newPath, buf);
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_onecore_sdk_NativeHookEngine_applySeccompBypass(JNIEnv* env, jobject thiz) {
-    LOGI("Applying Seccomp Filter Redirection.");
-    // This would involve finding the prctl(PR_SET_SECCOMP) call and neutralizing it
+Java_com_onecore_sdk_IORedirector_initNativeHooks(JNIEnv* env, jclass clazz, jstring virtualRoot, jstring packageName) {
+    const char* vRoot = env->GetStringUTFChars(virtualRoot, nullptr);
+    const char* pName = env->GetStringUTFChars(packageName, nullptr);
+    
+    g_virtualRoot = vRoot;
+    g_packageName = pName;
+    
+    LOGI("Native Hooks Initializing for: %s", g_packageName.c_str());
+
+    // Using dlsym for baseline redirection (Dobby integration would replace this with DobbyHook)
+    orig_open = (int (*)(const char*, int, mode_t))dlsym(RTLD_NEXT, "open");
+    orig_stat = (int (*)(const char*, struct stat*))dlsym(RTLD_NEXT, "stat");
+
+    env->ReleaseStringUTFChars(virtualRoot, vRoot);
+    env->ReleaseStringUTFChars(packageName, pName);
 }

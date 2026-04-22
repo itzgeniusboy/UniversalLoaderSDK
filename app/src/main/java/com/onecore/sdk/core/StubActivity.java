@@ -2,136 +2,77 @@ package com.onecore.sdk.core;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.view.Window;
 import android.view.WindowManager;
 import com.onecore.sdk.utils.Logger;
-import java.io.File;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
+import android.app.ActivityOptions;
+import android.os.Build;
 
 /**
- * The Component Host. 
- * Acts as a proxy to execute Guest Activity lifecycle in a system-registered container.
+ * Android 14+ Sandbox StubActivity.
+ * Acts as the entry point for guest applications within the virtual display.
  */
 public class StubActivity extends Activity {
-    private static final String TAG = "StubActivity";
-    private Activity guestActivity;
+    private static final String TAG = "OneCore-Stub";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
+        // 1. Setup UI for target container
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         
-        String targetActivity = getIntent().getStringExtra("target_activity");
         String targetPackage = getIntent().getStringExtra("target_package");
+        
+        if (targetPackage == null) {
+            Logger.e(TAG, "No target package specified. Finishing stub.");
+            finish();
+            return;
+        }
 
+        Logger.i(TAG, "Stub initializing virtualization for: " + targetPackage);
+
+        // 2. Launch the real game intent
+        launchInSandbox(targetPackage);
+    }
+
+    private void launchInSandbox(String packageName) {
         try {
-            Logger.d(TAG, "Proxying Guest Activity: " + targetActivity);
-            
-            // 1. Load the guest class using the Sandbox ClassLoader
-            Class<?> guestClass = null;
-            try {
-                guestClass = getClassLoader().loadClass(targetActivity);
-            } catch (ClassNotFoundException e) {
-                Logger.e(TAG, "Guest class not found: " + targetActivity + ". Attempting direct launch fallback.");
-                launchDirectly(targetPackage, targetActivity);
+            Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
+            if (intent == null) {
+                Logger.e(TAG, "Could not find launch intent for " + packageName);
+                finish();
                 return;
             }
 
-            Constructor<?> constructor = guestClass.getConstructor();
-            guestActivity = (Activity) constructor.newInstance();
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+            intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT);
 
-            // 2. Relay the Lifecycle (Manual Injection)
-            // In a production SDK this is handled via Instrumentation hooks, 
-            // but here we manually trigger onCreate with Stub context.
-            Method setIntent = Activity.class.getDeclaredMethod("setIntent", Intent.class);
-            setIntent.setAccessible(true);
-            setIntent.invoke(guestActivity, getIntent());
-
-            // 3. Trigger Guest onCreate
-            Method onCreate = Activity.class.getDeclaredMethod("onCreate", Bundle.class);
-            onCreate.setAccessible(true);
-            onCreate.invoke(guestActivity, savedInstanceState);
-            
-            // 4. Load library in Guest context
-            String libPath = getIntent().getStringExtra("library_path");
-            if (libPath != null && new File(libPath).exists()) {
-                try {
-                    System.load(libPath);
-                    Logger.i(TAG, "ESP Library linked in STUB context: " + libPath);
-                } catch (Throwable t) {
-                    Logger.e(TAG, "Failed to load ESP library: " + t.getMessage());
+            // Android 14 Virtual Display Handoff
+            if (Build.VERSION.SDK_INT >= 26) {
+                int displayId = getIntent().getIntExtra("display_id", 0);
+                if (displayId > 0) {
+                    ActivityOptions options = ActivityOptions.makeBasic();
+                    options.setLaunchDisplayId(displayId);
+                    startActivity(intent, options.toBundle());
+                    Logger.d(TAG, "Handoff to Virtual Display ID: " + displayId);
+                } else {
+                    startActivity(intent);
                 }
-            }
-
-            Logger.i(TAG, "Guest Activity Lifecycle ATTACHED to Stub.");
-
-        } catch (Exception e) {
-            Logger.e(TAG, "Failed to proxy guest activity. Jumping to Direct Launch.", e);
-            launchDirectly(targetPackage, targetActivity);
-        }
-    }
-
-    private void launchDirectly(String packageName, String activityName) {
-        try {
-            Logger.i(TAG, "Executing DIRECT LAUNCH for " + packageName + "/" + activityName);
-            Intent intent = null;
-            if (activityName != null) {
-                intent = new Intent();
-                intent.setClassName(packageName, activityName);
             } else {
-                intent = getPackageManager().getLaunchIntentForPackage(packageName);
-            }
-
-            if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                 startActivity(intent);
-                Logger.d(TAG, "StartActivity() called successfully with NEW_TASK & CLEAR_TOP flags.");
-                finish();
-            } else {
-                Logger.e(TAG, "Could not create launch intent for " + packageName);
             }
+
+            // Keep stub alive in background as container host or finish
+            finish(); 
+            
         } catch (Exception e) {
-            Logger.e(TAG, "Direct launch fatal error", e);
+            Logger.e(TAG, "Sandbox launch fatal error", e);
             finish();
         }
-    }
-
-    @Override
-    public ClassLoader getClassLoader() {
-        ClassLoader loader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
-        return loader != null ? loader : super.getClassLoader();
-    }
-
-    @Override
-    public android.content.res.Resources getResources() {
-        // In a real implementation, we would extract this from the guest context 
-        // similar to SandboxActivity, but for now we relay to host if not set.
-        return super.getResources();
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        if (guestActivity != null) try {
-            Method m = Activity.class.getDeclaredMethod("onStart");
-            m.setAccessible(true);
-            m.invoke(guestActivity);
-        } catch (Exception ignored) {}
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (guestActivity != null) try {
-            Method m = Activity.class.getDeclaredMethod("onResume");
-            m.setAccessible(true);
-            m.invoke(guestActivity);
-        } catch (Exception ignored) {}
     }
 }

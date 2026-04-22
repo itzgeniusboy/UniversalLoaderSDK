@@ -38,35 +38,28 @@ public class LoaderService extends Service {
 
     public void launchApp(String packageName) {
         try {
-            Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
-            if (intent == null) return;
+            // Updated for Android 14: Use StubActivity as the container host
+            Intent stubIntent = new Intent(this, com.onecore.sdk.core.StubActivity.class);
+            stubIntent.putExtra("target_package", packageName);
             
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
-            intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            
+            int displayId = 0;
+            if (virtualDisplay != null) {
+                displayId = virtualDisplay.getDisplay().getDisplayId();
+            }
+            stubIntent.putExtra("display_id", displayId);
+            stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+
             // Target virtual display (critical for sandbox isolation) using ActivityOptions
             if (virtualDisplay != null && Build.VERSION.SDK_INT >= 26) {
                 android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic();
-                // Set the display ID where the activity should launch
-                options.setLaunchDisplayId(virtualDisplay.getDisplay().getDisplayId());
+                options.setLaunchDisplayId(displayId);
                 
-                if (sandboxContext != null) {
-                    sandboxContext.startActivity(intent, options.toBundle());
-                } else {
-                    startActivity(intent, options.toBundle());
-                }
+                startActivity(stubIntent, options.toBundle());
             } else {
-                // Fallback for older APIs or if virtual display is missing
-                if (sandboxContext != null) {
-                    sandboxContext.startActivity(intent);
-                } else {
-                    startActivity(intent);
-                }
+                startActivity(stubIntent);
             }
             
-            Logger.i(TAG, "Sandbox Start Triggered for: " + packageName);
+            Logger.i(TAG, "Virtual Stub Launch Triggered for: " + packageName);
             
         } catch (Exception e) {
             Log.e(TAG, "Virtual Launch Intercept Failure: " + e.getMessage());
