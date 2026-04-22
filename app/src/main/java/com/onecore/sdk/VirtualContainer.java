@@ -68,7 +68,8 @@ public class VirtualContainer {
         }
         
         this.pendingCallback = callback;
-        context.registerReceiver(new BroadcastReceiver() {
+        IntentFilter filter = new IntentFilter(ACTION_LAUNCH_RESULT);
+        BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 boolean success = intent.getBooleanExtra("success", false);
@@ -80,7 +81,13 @@ public class VirtualContainer {
                 }
                 try { context.unregisterReceiver(this); } catch (Exception ignored) {}
             }
-        }, new IntentFilter(ACTION_LAUNCH_RESULT));
+        };
+
+        if (Build.VERSION.SDK_INT >= 34) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            context.registerReceiver(receiver, filter);
+        }
 
         if (!SDKLicense.getInstance().isLicensed()) {
             Logger.e(TAG, "Launch failed: SDK not licensed.");
