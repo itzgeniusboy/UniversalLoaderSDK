@@ -103,6 +103,19 @@ public class StubActivity extends Activity {
     }
 
     @Override
+    public ClassLoader getClassLoader() {
+        ClassLoader loader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
+        return loader != null ? loader : super.getClassLoader();
+    }
+
+    @Override
+    public android.content.res.Resources getResources() {
+        // In a real implementation, we would extract this from the guest context 
+        // similar to SandboxActivity, but for now we relay to host if not set.
+        return super.getResources();
+    }
+
+    @Override
     protected void onStart() {
         super.onStart();
         if (guestActivity != null) try {

@@ -27,6 +27,7 @@ public class VirtualContainer {
     private static VirtualContainer instance;
     private boolean virtualMode = false;
     private LaunchCallback pendingCallback;
+    private ClassLoader guestClassLoader;
     public static final String ACTION_LAUNCH_RESULT = "com.onecore.sdk.LAUNCH_RESULT";
 
     public interface LaunchCallback {
@@ -41,6 +42,14 @@ public class VirtualContainer {
             instance = new VirtualContainer();
         }
         return instance;
+    }
+
+    public ClassLoader getGuestClassLoader() {
+        return guestClassLoader;
+    }
+
+    public void setGuestClassLoader(ClassLoader loader) {
+        this.guestClassLoader = loader;
     }
 
     public boolean isVirtualMode() {

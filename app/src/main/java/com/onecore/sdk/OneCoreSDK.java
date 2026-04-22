@@ -96,6 +96,12 @@ public class OneCoreSDK {
                 AntiFingerprint.getInstance().preventTracking();
                 NetworkCapture.getInstance().startCapture();
                 
+                // Load Sandbox Config from Assets
+                loadSandboxConfig();
+                
+                // Critical: Specialized BGMI Hooks
+                BGMIHooks.initHooks();
+                
                 if (callback != null) callback.onProgress(100, "Installation Complete");
                 Thread.sleep(300);
 
@@ -288,5 +294,20 @@ public class OneCoreSDK {
     public static void enableSignatureBypass(boolean enable) {
         if (!SDKLicense.getInstance().isLicensed()) return;
         SignatureBypass.apply(enable);
+    }
+
+    private static void loadSandboxConfig() {
+        try {
+            Logger.i(TAG, "Loading sandbox_config.json from assets...");
+            String json = com.onecore.sdk.utils.IOUtils.readAssetFile(appContext, "sandbox_config.json");
+            if (json != null) {
+                Logger.d(TAG, "Sandbox Config Loaded: " + json.substring(0, Math.min(json.length(), 50)) + "...");
+                // In a production app, we would parse this into a model
+            } else {
+                Logger.w(TAG, "sandbox_config.json NOT found in assets.");
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, "Failed to load sandbox config", e);
+        }
     }
 }

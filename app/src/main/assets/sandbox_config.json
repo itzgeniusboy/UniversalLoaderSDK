@@ -1,0 +1,23 @@
+{
+  "apps": [
+    {
+      "packageName": "com.pubg.imobile",
+      "appName": "BGMI",
+      "entryPoint": "com.epicgames.ue4.GameActivity",
+      "hooksEnabled": true,
+      "isolatedFilesystem": true
+    },
+    {
+      "packageName": "com.pubg.bgmi",
+      "appName": "BGMI Global",
+      "entryPoint": "com.epicgames.ue4.GameActivity",
+      "hooksEnabled": true,
+      "isolatedFilesystem": true
+    }
+  ],
+  "sandbox": {
+    "version": "1.0.4",
+    "debuggable": false,
+    "forceIsolatedProcess": true
+  }
+}

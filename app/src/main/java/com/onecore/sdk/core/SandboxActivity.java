@@ -71,6 +71,7 @@ public class SandboxActivity extends Activity {
                     guestInfo.applicationInfo.nativeLibraryDir,
                     getClassLoader()
             );
+            VirtualContainer.getInstance().setGuestClassLoader(guestClassLoader);
 
             // 3. APPLY GLOBAL HOOKS (System Identity Fake)
             EnvironmentHooker.apply(this, guestInfo.packageName);
