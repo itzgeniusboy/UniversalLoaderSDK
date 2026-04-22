@@ -128,6 +128,7 @@ public class SandboxActivity extends Activity {
         if (mainActivity == null) throw new Exception("No launchable activity found in guest APK.");
         
         Logger.d(TAG, "Relaying to StubHost for: " + mainActivity);
+        Logger.i(TAG, "Final Launch Intent Configuration: PKG=" + guestInfo.packageName + " ACT=" + mainActivity);
         
         // CRITICAL FIX: We launch the StubActivity which IS in our manifest,
         // but we pass the target guest class name to it.

@@ -34,7 +34,15 @@ public class StubActivity extends Activity {
             Logger.d(TAG, "Proxying Guest Activity: " + targetActivity);
             
             // 1. Load the guest class using the Sandbox ClassLoader
-            Class<?> guestClass = getClassLoader().loadClass(targetActivity);
+            Class<?> guestClass = null;
+            try {
+                guestClass = getClassLoader().loadClass(targetActivity);
+            } catch (ClassNotFoundException e) {
+                Logger.e(TAG, "Guest class not found: " + targetActivity + ". Attempting direct launch fallback.");
+                launchDirectly(targetPackage, targetActivity);
+                return;
+            }
+
             Constructor<?> constructor = guestClass.getConstructor();
             guestActivity = (Activity) constructor.newInstance();
 
@@ -53,14 +61,43 @@ public class StubActivity extends Activity {
             // 4. Load library in Guest context
             String libPath = getIntent().getStringExtra("library_path");
             if (libPath != null && new File(libPath).exists()) {
-                System.load(libPath);
-                Logger.i(TAG, "ESP Library linked in STUB context.");
+                try {
+                    System.load(libPath);
+                    Logger.i(TAG, "ESP Library linked in STUB context: " + libPath);
+                } catch (Throwable t) {
+                    Logger.e(TAG, "Failed to load ESP library: " + t.getMessage());
+                }
             }
 
             Logger.i(TAG, "Guest Activity Lifecycle ATTACHED to Stub.");
 
         } catch (Exception e) {
-            Logger.e(TAG, "Failed to proxy guest activity", e);
+            Logger.e(TAG, "Failed to proxy guest activity. Jumping to Direct Launch.", e);
+            launchDirectly(targetPackage, targetActivity);
+        }
+    }
+
+    private void launchDirectly(String packageName, String activityName) {
+        try {
+            Logger.i(TAG, "Executing DIRECT LAUNCH for " + packageName + "/" + activityName);
+            Intent intent = null;
+            if (activityName != null) {
+                intent = new Intent();
+                intent.setClassName(packageName, activityName);
+            } else {
+                intent = getPackageManager().getLaunchIntentForPackage(packageName);
+            }
+
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+                Logger.d(TAG, "StartActivity() called successfully.");
+                finish();
+            } else {
+                Logger.e(TAG, "Could not create launch intent for " + packageName);
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, "Direct launch fatal error", e);
             finish();
         }
     }
