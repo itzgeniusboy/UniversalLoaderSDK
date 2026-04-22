@@ -22,6 +22,15 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
+    - name: Bootstrap Gradle Wrapper
+      run: |
+        mkdir -p gradle/wrapper
+        if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+          echo "Downloading gradle-wrapper.jar..."
+          curl -L https://raw.githubusercontent.com/gradle/gradle/v8.7.0/gradle/wrapper/gradle-wrapper.jar -o gradle/wrapper/gradle-wrapper.jar
+        fi
+        chmod +x gradlew
+
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
