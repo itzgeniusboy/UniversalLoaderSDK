@@ -16,7 +16,7 @@ public class IORedirector {
     /**
      * Prepares the virtual environment directories and triggers native hooks.
      */
-    public static void setup(Context context, String packageName) {
+    public static void startRedirection(Context context, String packageName) {
         String virtualRoot = context.getFilesDir().getAbsolutePath() + "/virtual/" + packageName;
         
         java.io.File dataDir = new java.io.File(virtualRoot, "data");

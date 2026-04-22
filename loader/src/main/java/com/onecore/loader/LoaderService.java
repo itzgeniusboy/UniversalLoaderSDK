@@ -32,7 +32,7 @@ public class LoaderService extends Service {
 
         // Initialize virtual display for the sandbox via SDK component
         VirtualDisplayManager vdm = VirtualDisplayManager.getInstance(this);
-        virtualDisplay = vdm.createVirtualDisplay("SandboxDisplay", 1080, 1920, 480, null);
+        virtualDisplay = vdm.createSecureDisplay(this, "SandboxDisplay", 1080, 1920, 480, null);
         
         // Use service context as sandbox context
         this.sandboxContext = this; 
