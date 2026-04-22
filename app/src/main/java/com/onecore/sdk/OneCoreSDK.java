@@ -104,6 +104,10 @@ public class OneCoreSDK {
                 AntiFingerprint.getInstance().preventTracking();
                 NetworkCapture.getInstance().startCapture();
                 
+                // Android 17-18 Future Proofing
+                IORedirector.setupFusePassthrough(appContext);
+                BinderHookManager.optimizeTransactionSize();
+                
                 // Load Sandbox Config from Assets
                 loadSandboxConfig();
                 
