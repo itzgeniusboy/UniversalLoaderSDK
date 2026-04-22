@@ -4,13 +4,13 @@ plugins {
 
 android {
     namespace 'com.onecore.sdk'
-    compileSdk 38
+    compileSdk 34
 
     defaultConfig {
         minSdk 26
-        targetSdk 38
-        versionCode 2
-        versionName "2.0-API38-READY"
+        targetSdk 34
+        versionCode 3
+        versionName "2.1-CI-STABLE"
         
         // Renaming output
         setProperty("archivesBaseName", "onecore")
