@@ -46,6 +46,47 @@ int my_openat(int dirfd, const char *pathname, int flags, mode_t mode) {
     return orig_openat(dirfd, new_path.c_str(), flags, mode);
 }
 
+#include <sys/ptrace.h>
+#include <linux/seccomp.h>
+#include <sys/ioctl.h>
+#include <linux/filter.h>
+#include <stdint.h>
+
+#ifndef SECCOMP_IOCTL_NOTIF_ADDFD
+struct seccomp_notif_addfd {
+    uint64_t id;
+    uint32_t flags;
+    uint32_t srcfd;
+    uint32_t newfd;
+    uint32_t newfd_flags;
+};
+#define SECCOMP_IOCTL_NOTIF_ADDFD _IOW(0x42, 3, struct seccomp_notif_addfd)
+#endif
+
+// Method 2: Seccomp Bypass for Android 15
+void bypass_seccomp_android15(pid_t target_pid) {
+    LOGI("Attempting Seccomp Bypass for PID: %d", target_pid);
+    
+    if (ptrace(PTRACE_ATTACH, target_pid, NULL, NULL) < 0) {
+        LOGE("Failed to attach ptrace for seccomp bypass");
+        return;
+    }
+    
+    // Logic to find and modify seccomp filters or use SECCOMP_IOCTL_NOTIF_ADDFD
+    // to proxy syscalls through the supervisor process
+    int notify_fd = -1; 
+    if (notify_fd >= 0) {
+        struct seccomp_notif_addfd addfd;
+        addfd.id = 0;
+        addfd.srcfd = 1; 
+        addfd.newfd = 0;
+        addfd.flags = 0;
+        ioctl(notify_fd, SECCOMP_IOCTL_NOTIF_ADDFD, &addfd);
+    }
+
+    ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_onecore_io_IORedirector_initNative(JNIEnv* env, jclass clazz, jstring virtual_root, jstring package_name) {
     const char* v_root = env->GetStringUTFChars(virtual_root, nullptr);

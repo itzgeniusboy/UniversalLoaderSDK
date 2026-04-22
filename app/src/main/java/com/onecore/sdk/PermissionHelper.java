@@ -53,11 +53,19 @@ public class PermissionHelper {
     }
 
     /**
-     * Placeholder for Shizuku Binder call to grant permission.
-     * This requires the Shizuku API library.
+     * Method 5: User-Friendly Permission Grant Flow.
+     * Shows a dialog (simulated via Log/Toast) with ADB command or Shizuku option.
      */
-    public static void grantWithShizuku(Context context) {
-        Log.d(TAG, "Attempting Shizuku-based permission elevation...");
-        // Logic would involve ShizukuBinderWrapper to call 'pm grant'
+    public static void showAdvancedPermissionDialog(Context context) {
+        String packageName = context.getPackageName();
+        String adbCmd = "adb shell pm grant " + packageName + " " + AVF_PERMISSION;
+        
+        Log.i(TAG, "==== ANDROID 15 PERMISSION GUIDE ====");
+        Log.i(TAG, "Step 1: Enable Wireless Debugging in Settings");
+        Log.i(TAG, "Step 2: Run Command: " + adbCmd);
+        Log.i(TAG, "Step 3: Restart Application");
+        Log.i(TAG, "OR: Install Shizuku and grant auto-access via SDK Settings.");
+        
+        // In production, this would inflate a custom UI view with 'Copy Command' button
     }
 }

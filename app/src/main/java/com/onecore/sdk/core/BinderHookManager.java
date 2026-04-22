@@ -64,4 +64,29 @@ public class BinderHookManager {
     public static void bypassProcessRestrictions() {
         Log.d(TAG, "Applying background process priority bypass.");
     }
+
+    private static long lastTransactionTime = 0;
+    private static int transactionCount = 0;
+    private static final int MAX_TPS = 100;
+
+    /**
+     * Method 3: Binder Transaction Rate Limiting for Android 15.
+     * Prevents detection via transaction frequency analysis.
+     */
+    public static synchronized void throttleTransaction() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastTransactionTime < 1000) {
+            transactionCount++;
+            if (transactionCount > MAX_TPS) {
+                try {
+                    // Small delay to stay within limits
+                    Thread.sleep(10); 
+                    Log.d(TAG, "Binder Rate Limit reached. Throttling...");
+                } catch (InterruptedException ignored) {}
+            }
+        } else {
+            lastTransactionTime = currentTime;
+            transactionCount = 1;
+        }
+    }
 }

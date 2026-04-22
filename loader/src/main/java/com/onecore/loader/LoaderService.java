@@ -24,6 +24,9 @@ public class LoaderService extends Service {
     public void onCreate() {
         super.onCreate();
         
+        // Method 4: Device-specific optimizations
+        com.onecore.sdk.utils.DeviceHandler.applyDeviceOptimizations();
+        
         // Android 15 Virtualization Setup
         Android15Handler.prepareEnvironment(this);
 
@@ -44,12 +47,32 @@ public class LoaderService extends Service {
         try {
             Logger.i(TAG, "Preparing sandbox launch for: " + packageName);
             
-            // 1. Initialize IO Redirection for the target app
-            com.onecore.io.IORedirector.startRedirection(this, packageName);
+            // Method 1: Android 15+ AVF Detection + Fallback
+            boolean useAVF = false;
+            if (Build.VERSION.SDK_INT >= 35) {
+                try {
+                    Object vmManager = getSystemService("virtualization");
+                    int perm = checkSelfPermission("android.permission.MANAGE_VIRTUAL_MACHINE");
+                    if (vmManager != null && perm == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        useAVF = true;
+                        Logger.i(TAG, "Android 15 AVF detected and authorized. Using Kernel Sandbox.");
+                    } else {
+                        Logger.w(TAG, "Android 15 detected but AVF not authorized. Falling back to Legacy.");
+                    }
+                } catch (Exception e) {
+                    Logger.e(TAG, "AVF Detection Failed", e);
+                }
+            }
+
+            if (!useAVF) {
+                // 1. Initialize IO Redirection for the target app (Legacy Method)
+                com.onecore.io.IORedirector.startRedirection(this, packageName);
+            }
 
             // 2. Prepare StubActivity Intent
             Intent stubIntent = new Intent(this, com.onecore.sdk.core.StubActivity.class);
             stubIntent.putExtra("target_package", packageName);
+            stubIntent.putExtra("use_avf", useAVF);
             
             int displayId = 0;
             if (virtualDisplay != null) {
