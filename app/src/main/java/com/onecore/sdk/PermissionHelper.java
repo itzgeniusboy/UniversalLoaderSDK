@@ -68,4 +68,8 @@ public class PermissionHelper {
         
         // In production, this would inflate a custom UI view with 'Copy Command' button
     }
+
+    public static boolean hasAVFPermission() {
+        return AVFDetector.hasVirtualMachinePermission(OneCoreSDK.getContext());
+    }
 }

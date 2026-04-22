@@ -23,23 +23,23 @@ public class AVFDetector {
      * Checks if AVF (Android Virtualization Framework) is available on the device.
      */
     public static boolean isAVFAvailable(Context context) {
-        if (!isAndroid15Plus()) return false;
-        
+        if (Build.VERSION.SDK_INT < 35) return false;
         try {
-            // Check for System Feature or attempt to load VirtualMachineManager
             return context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_VIRTUALIZATION_FRAMEWORK);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to detect AVF system feature", e);
             return false;
         }
+    }
+
+    public static boolean isAVFAvailable() {
+        return isAVFAvailable(OneCoreSDK.getContext());
     }
 
     /**
      * Checks if the app has the MANAGE_VIRTUAL_MACHINE permission.
      */
     public static boolean hasVirtualMachinePermission(Context context) {
-        if (!isAndroid15Plus()) return false;
-        
+        if (Build.VERSION.SDK_INT < 35) return false;
         int result = context.checkSelfPermission("android.permission.MANAGE_VIRTUAL_MACHINE");
         return result == PackageManager.PERMISSION_GRANTED;
     }

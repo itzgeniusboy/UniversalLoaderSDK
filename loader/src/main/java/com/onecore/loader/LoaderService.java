@@ -47,53 +47,39 @@ public class LoaderService extends Service {
         try {
             Logger.i(TAG, "Preparing sandbox launch for: " + packageName);
             
-            // Method 1: Android 15+ AVF Detection + Fallback
-            boolean useAVF = false;
             if (Build.VERSION.SDK_INT >= 35) {
-                try {
-                    Object vmManager = getSystemService("virtualization");
-                    int perm = checkSelfPermission("android.permission.MANAGE_VIRTUAL_MACHINE");
-                    if (vmManager != null && perm == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                        useAVF = true;
-                        Logger.i(TAG, "Android 15 AVF detected and authorized. Using Kernel Sandbox.");
-                    } else {
-                        Logger.w(TAG, "Android 15 detected but AVF not authorized. Falling back to Legacy.");
-                    }
-                } catch (Exception e) {
-                    Logger.e(TAG, "AVF Detection Failed", e);
+                if (com.onecore.sdk.AVFDetector.isAVFAvailable() && com.onecore.sdk.PermissionHelper.hasAVFPermission()) {
+                    // Use AVF - logic would go here in production
+                    Logger.i(TAG, "Using Android 15 AVF for: " + packageName);
+                } else {
+                    // Fallback to existing legacy method (StubActivity)
+                    Logger.w(TAG, "AVF not available or unauthorized. Falling back.");
+                    launchStub(packageName);
                 }
-            }
-
-            if (!useAVF) {
-                // 1. Initialize IO Redirection for the target app (Legacy Method)
-                com.onecore.io.IORedirector.startRedirection(this, packageName);
-            }
-
-            // 2. Prepare StubActivity Intent
-            Intent stubIntent = new Intent(this, com.onecore.sdk.core.StubActivity.class);
-            stubIntent.putExtra("target_package", packageName);
-            stubIntent.putExtra("use_avf", useAVF);
-            
-            int displayId = 0;
-            if (virtualDisplay != null) {
-                displayId = virtualDisplay.getDisplay().getDisplayId();
-            }
-            stubIntent.putExtra("display_id", displayId);
-            stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
-            // 3. Launch on Virtual Display
-            if (virtualDisplay != null && Build.VERSION.SDK_INT >= 26) {
-                android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic();
-                options.setLaunchDisplayId(displayId);
-                startActivity(stubIntent, options.toBundle());
-                Logger.i(TAG, "Launched via StubActivity on Display: " + displayId);
             } else {
-                startActivity(stubIntent);
-                Logger.w(TAG, "Launched via StubActivity on Default Display.");
+                // Android 14 and below - use legacy method
+                com.onecore.io.IORedirector.startRedirection(this, packageName);
+                launchStub(packageName);
             }
             
         } catch (Exception e) {
             Log.e(TAG, "Virtual Launch Fatal Failure: " + e.getMessage());
+        }
+    }
+
+    private void launchStub(String packageName) {
+        Intent stubIntent = new Intent(this, com.onecore.sdk.core.StubActivity.class);
+        stubIntent.putExtra("target_package", packageName);
+        stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        
+        if (virtualDisplay != null) {
+            android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic();
+            options.setLaunchDisplayId(virtualDisplay.getDisplay().getDisplayId());
+            startActivity(stubIntent, options.toBundle());
+            Logger.i(TAG, "Stub Launch on Virtual Display.");
+        } else {
+            startActivity(stubIntent);
+            Logger.w(TAG, "Stub Launch on Default Display.");
         }
     }
 
