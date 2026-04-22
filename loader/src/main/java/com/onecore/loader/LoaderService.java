@@ -23,6 +23,10 @@ public class LoaderService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        
+        // Android 15 Virtualization Setup
+        Android15Handler.prepareEnvironment(this);
+
         // Initialize virtual display for the sandbox via SDK component
         VirtualDisplayManager vdm = VirtualDisplayManager.getInstance(this);
         virtualDisplay = vdm.createVirtualDisplay("SandboxDisplay", 1080, 1920, 480, null);

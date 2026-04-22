@@ -1,52 +1,33 @@
 package com.onecore.io;
 
-import java.io.File;
 import android.content.Context;
-import android.os.Build;
-import android.util.Log;
+import com.onecore.sdk.utils.Logger;
 
 /**
- * Android 14 IO Redirection Bridge.
- * Dedicated to redirecting BGMI 4.3.0 file paths to virtual sandbox.
+ * Handles IO Redirection between the Guest and the Virtual Host.
+ * Maps guest data paths to managed sandbox subdirectories.
  */
 public class IORedirector {
-    private static final String TAG = "OneCore-IO";
+    private static final String TAG = "IORedirector";
 
-    static {
-        try {
-            System.loadLibrary("onecore");
-            Log.i(TAG, "Native IO Engine (onecore) loaded successfully.");
-        } catch (UnsatisfiedLinkError e) {
-            Log.e(TAG, "Native library 'onecore' missing. Hooks will not be applied.");
-        }
-    }
+    // Native method to initialize syscall hooks
+    public static native void initNative(String virtualRoot, String packageName);
 
     /**
-     * Native hook initialization for syscall interception.
+     * Prepares the virtual environment directories and triggers native hooks.
      */
-    public static native void initHooks(String virtualPath, String targetPackage);
-
-    /**
-     * Prepares the sandbox directory and triggers native hooks.
-     */
-    public static void startRedirection(Context context, String packageName) {
-        File virtualDir = new File(context.getFilesDir(), "virtual/" + packageName);
-        if (!virtualDir.exists()) {
-            virtualDir.mkdirs();
-        }
+    public static void setup(Context context, String packageName) {
+        String virtualRoot = context.getFilesDir().getAbsolutePath() + "/virtual/" + packageName;
         
-        // Prepare data structure
-        new File(virtualDir, "data").mkdirs();
-        new File(virtualDir, "obb").mkdirs();
+        java.io.File dataDir = new java.io.File(virtualRoot, "data");
+        if (!dataDir.exists()) dataDir.mkdirs();
         
-        String virtualPath = virtualDir.getAbsolutePath();
-        Log.i(TAG, "Starting native redirection at: " + virtualPath);
+        Logger.i(TAG, "Setting up IO Redirection for " + packageName + " at " + virtualRoot);
         
-        // Connect to Native C++ Engine
         try {
-            initHooks(virtualPath, packageName);
+            initNative(virtualRoot, packageName);
         } catch (UnsatisfiedLinkError e) {
-            Log.e(TAG, "Native method initHooks not found. Ensure CMake is configured correctly.");
+            Logger.e(TAG, "Failed to initialize native hooks: " + e.getMessage());
         }
     }
 }

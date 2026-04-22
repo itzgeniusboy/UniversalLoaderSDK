@@ -18,6 +18,9 @@
     <uses-permission android:name="android.permission.VIRTUAL_DISPLAY" />
     <uses-permission android:name="android.permission.INTERCEPT_SYSTEM_CALLS" />
     <uses-permission android:name="android.permission.MANAGE_VIRTUAL_DEVICE" />
+    
+    <!-- Android 15 AVF Permission -->
+    <uses-permission android:name="android.permission.MANAGE_VIRTUAL_MACHINE" />
 
     <application
         android:label="OneCore SDK">

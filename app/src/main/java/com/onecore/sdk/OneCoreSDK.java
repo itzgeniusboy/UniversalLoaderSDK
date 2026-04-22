@@ -13,6 +13,14 @@ public class OneCoreSDK {
     private static boolean isInitialized = false;
     private static Context appContext;
 
+    static {
+        try {
+            System.loadLibrary("onecore_native");
+        } catch (UnsatisfiedLinkError e) {
+            android.util.Log.e(TAG, "Native library onecore_native failed to load", e);
+        }
+    }
+
     public static boolean isInitialized() {
         return isInitialized;
     }

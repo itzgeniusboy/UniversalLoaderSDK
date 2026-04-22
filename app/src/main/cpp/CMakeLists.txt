@@ -1,21 +1,22 @@
 cmake_minimum_required(VERSION 3.22.1)
 
-project("onecore-native")
+project("onecore_native")
 
-# Set the C++ standard to 17
+# Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Library name matches System.loadLibrary("onecore")
-add_library(onecore SHARED
+# Library name matches System.loadLibrary("onecore_native")
+add_library(onecore_native SHARED
         native_hook.cpp
-        memory.cpp)
+        dobby.c
+)
 
-# Include directories (Standard JNI + Local)
-include_directories(SYSTEM ${ANDROID_NDK}/sysroot/usr/include)
-
-# Standard Android Logging library
 find_library(log-lib log)
+find_library(android-lib android)
 
-# Link the library
-target_link_libraries(onecore
-        ${log-lib})
+target_link_libraries(onecore_native
+        ${log-lib}
+        ${android-lib}
+        dl
+)

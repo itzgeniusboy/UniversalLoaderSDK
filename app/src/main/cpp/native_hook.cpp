@@ -2,90 +2,74 @@
 #include <string>
 #include <android/log.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dlfcn.h>
+#include "dobby.h"
 
-// Dobby framework would be included here in a real build
-// #include "dobby.h"
-
-#define TAG "OneCore-Native"
+#define TAG "OneCoreNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
-static std::string g_virtualPath;
-static std::string g_targetPackage;
+static std::string g_virtual_root;
+static std::string g_package_name;
 
-/**
- * Android 14 Path Redirection Logic.
- */
-std::string get_redirected_path(const char* original) {
-    if (!original) return "";
-    
-    std::string path(original);
-    std::string targetData = "/data/data/" + g_targetPackage;
-    std::string targetObb = "/storage/emulated/0/Android/obb/" + g_targetPackage;
-
-    if (path.find(targetData) == 0) {
-        return g_virtualPath + "/data" + path.substr(targetData.length());
-    }
-    
-    if (path.find(targetObb) == 0) {
-        return g_virtualPath + "/obb" + path.substr(targetObb.length());
-    }
-
-    return path;
-}
-
-// Function Pointers for Original Syscalls
+// Function pointers for original syscalls
+static int (*orig_open)(const char *pathname, int flags, mode_t mode) = nullptr;
 static int (*orig_openat)(int dirfd, const char *pathname, int flags, mode_t mode) = nullptr;
-static int (*orig_access)(const char *pathname, int mode) = nullptr;
 
 /**
- * Hooked openat syscall (Modern Android use openat instead of open).
+ * Path redirection logic for sandbox isolation.
  */
-int hooked_openat(int dirfd, const char *pathname, int flags, mode_t mode) {
-    std::string newPath = get_redirected_path(pathname);
-    if (!newPath.empty() && newPath != pathname) {
-        LOGI("Redirecting openat: %s -> %s", pathname, newPath.c_str());
-        return orig_openat(dirfd, newPath.c_str(), flags, mode);
+static std::string redirect_path(const char* path) {
+    if (!path || g_virtual_root.empty()) return path ? path : "";
+    
+    std::string s_path(path);
+    std::string target = "/data/data/" + g_package_name;
+    
+    if (s_path.find(target) == 0) {
+        return g_virtual_root + "/data" + s_path.substr(target.length());
     }
-    return orig_openat(dirfd, pathname, flags, mode);
+    
+    return s_path;
 }
 
-/**
- * Hooked access syscall to prevent detections.
- */
-int hooked_access(const char *pathname, int mode) {
-    std::string newPath = get_redirected_path(pathname);
-    if (!newPath.empty() && newPath != pathname) {
-        return orig_access(newPath.c_str(), mode);
-    }
-    return orig_access(pathname, mode);
+// Hooked functions
+int my_open(const char *pathname, int flags, mode_t mode) {
+    std::string new_path = redirect_path(pathname);
+    return orig_open(new_path.c_str(), flags, mode);
+}
+
+int my_openat(int dirfd, const char *pathname, int flags, mode_t mode) {
+    std::string new_path = redirect_path(pathname);
+    return orig_openat(dirfd, new_path.c_str(), flags, mode);
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_onecore_io_IORedirector_initHooks(JNIEnv* env, jclass clazz, jstring virtualPath, jstring targetPackage) {
-    const char* vPath = env->GetStringUTFChars(virtualPath, nullptr);
-    const char* tPkg = env->GetStringUTFChars(targetPackage, nullptr);
+Java_com_onecore_io_IORedirector_initNative(JNIEnv* env, jclass clazz, jstring virtual_root, jstring package_name) {
+    const char* v_root = env->GetStringUTFChars(virtual_root, nullptr);
+    const char* p_name = env->GetStringUTFChars(package_name, nullptr);
     
-    g_virtualPath = vPath;
-    g_targetPackage = tPkg;
+    g_virtual_root = v_root;
+    g_package_name = p_name;
     
-    LOGI("Bypassing Android 14 Restrictions for: %s", g_targetPackage.c_str());
+    LOGI("Initializing Native Hooks for: %s", g_package_name.c_str());
 
-    /**
-     * Dobby Integration Pattern:
-     * DobbyHook((void *)openat, (void *)hooked_openat, (void **)&orig_openat);
-     * DobbyHook((void *)access, (void *)hooked_access, (void **)&orig_access);
-     */
+    // Applying hooks via Dobby
+    void* open_addr = dlsym(RTLD_DEFAULT, "open");
+    void* openat_addr = dlsym(RTLD_DEFAULT, "openat");
+
+    if (open_addr) {
+        DobbyHook(open_addr, (void*)my_open, (void**)&orig_open);
+        LOGI("Hooked open at %p", open_addr);
+    }
     
-    // Fallback using dlsym for basic redirection if Dobby not linked
-    orig_openat = (int (*)(int, const char*, int, mode_t))dlsym(RTLD_NEXT, "openat");
-    orig_access = (int (*)(const char*, int))dlsym(RTLD_NEXT, "access");
+    if (openat_addr) {
+        DobbyHook(openat_addr, (void*)my_openat, (void**)&orig_openat);
+        LOGI("Hooked openat at %p", openat_addr);
+    }
 
-    LOGI("Native IO Hooks Applied. Logic: Redirection.");
-
-    env->ReleaseStringUTFChars(virtualPath, vPath);
-    env->ReleaseStringUTFChars(targetPackage, tPkg);
+    env->ReleaseStringUTFChars(virtual_root, v_root);
+    env->ReleaseStringUTFChars(package_name, p_name);
 }
