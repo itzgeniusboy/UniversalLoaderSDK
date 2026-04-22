@@ -53,12 +53,15 @@ public class GameLauncher {
             boolean initiated = VirtualContainer.getInstance().launch(context, finalPkg, new VirtualContainer.LaunchCallback() {
                 @Override
                 public void onLaunchSuccess() {
-                    handler.removeCallbacks(timeoutTask);
-                    Logger.i(TAG, "Launch confirmed by Kernel.");
-                    if (callback != null) {
-                        callback.onProgress("Virtual Session ACTIVE");
-                        callback.onProcessDetected(0);
-                    }
+                    // Added: Brief delay to ensure Sandbox -> Stub -> Game transition is visually stable
+                    handler.postDelayed(() -> {
+                        handler.removeCallbacks(timeoutTask);
+                        Logger.i(TAG, "Launch confirmed by Kernel (Deep Sync).");
+                        if (callback != null) {
+                            callback.onProgress("Virtual Session ACTIVE");
+                            callback.onProcessDetected(0);
+                        }
+                    }, 500);
                 }
 
                 @Override

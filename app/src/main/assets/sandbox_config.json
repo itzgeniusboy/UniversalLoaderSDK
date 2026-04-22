@@ -1,23 +1,16 @@
 {
-  "apps": [
+  "version": "4.3.0",
+  "configs": [
     {
       "packageName": "com.pubg.imobile",
-      "appName": "BGMI",
       "entryPoint": "com.epicgames.ue4.GameActivity",
-      "hooksEnabled": true,
-      "isolatedFilesystem": true
-    },
-    {
-      "packageName": "com.pubg.bgmi",
-      "appName": "BGMI Global",
-      "entryPoint": "com.epicgames.ue4.GameActivity",
-      "hooksEnabled": true,
-      "isolatedFilesystem": true
+      "altEntryPoint": "com.epicgames.ue4.SplashActivity",
+      "cloneMode": "FULL_SANDBOX",
+      "hooks": {
+        "antiCheatBypass": true,
+        "pathNormalization": true,
+        "memoryProtection": true
+      }
     }
-  ],
-  "sandbox": {
-    "version": "1.0.4",
-    "debuggable": false,
-    "forceIsolatedProcess": true
-  }
+  ]
 }

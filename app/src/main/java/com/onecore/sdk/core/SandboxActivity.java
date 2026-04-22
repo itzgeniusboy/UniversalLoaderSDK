@@ -109,9 +109,15 @@ public class SandboxActivity extends Activity {
         // Find Launch Activity with MAIN/LAUNCHER intent filters
         String mainActivity = null;
         
-        // HIGHLIGHT: Prioritize known BGMI/Unreal Engine entry points
+        // HIGHLIGHT: Prioritize known BGMI/Unreal Engine entry points for 4.3.0
         if (guestInfo.packageName.contains("pubg") || guestInfo.packageName.contains("imobile")) {
-            mainActivity = "com.epicgames.ue4.GameActivity";
+            // New 4.3.0 Splash Activity if present
+            mainActivity = "com.epicgames.ue4.SplashActivity"; 
+            try {
+                getClassLoader().loadClass(mainActivity);
+            } catch (Exception e) {
+                mainActivity = "com.epicgames.ue4.GameActivity";
+            }
         }
         
         if (mainActivity == null && guestInfo.activities != null) {

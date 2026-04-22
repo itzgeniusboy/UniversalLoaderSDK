@@ -89,9 +89,9 @@ public class StubActivity extends Activity {
             }
 
             if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
                 startActivity(intent);
-                Logger.d(TAG, "StartActivity() called successfully.");
+                Logger.d(TAG, "StartActivity() called successfully with NEW_TASK flags.");
                 finish();
             } else {
                 Logger.e(TAG, "Could not create launch intent for " + packageName);
