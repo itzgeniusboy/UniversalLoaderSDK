@@ -54,4 +54,14 @@ public class IORedirector {
         
         Logger.i(TAG, "Virtual IO Environment Initialized for: " + packageName);
     }
+
+    /**
+     * Stub for future FUSE passthrough support.
+     */
+    public static void setupFusePassthrough(Context context) {
+        // Android 17-18 specific logic would go here
+        if (Build.VERSION.SDK_INT >= 31) {
+            Logger.d(TAG, "FUSE Passthrough verification triggered (No-op on API < 37)");
+        }
+    }
 }

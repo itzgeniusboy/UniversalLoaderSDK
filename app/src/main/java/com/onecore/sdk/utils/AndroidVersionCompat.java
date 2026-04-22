@@ -16,7 +16,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
  */
 public class AndroidVersionCompat {
 
-    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    @ChecksSdkIntAtLeast(api = 35)
     public static boolean isAndroid15() {
         return Build.VERSION.SDK_INT >= 35;
     }
@@ -46,7 +46,7 @@ public class AndroidVersionCompat {
         Window window = activity.getWindow();
         
         // Android 15+ enforcement: Edge-to-edge is default but we should explicitly manage it
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (Build.VERSION.SDK_INT >= 35) {
             WindowCompat.setDecorFitsSystemWindows(window, false);
             window.setStatusBarColor(Color.TRANSPARENT);
             window.setNavigationBarColor(Color.TRANSPARENT);

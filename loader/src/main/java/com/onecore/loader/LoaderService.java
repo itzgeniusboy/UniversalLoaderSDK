@@ -38,7 +38,12 @@ public class LoaderService extends Service {
 
     public void launchApp(String packageName) {
         try {
-            // Updated for Android 14: Use StubActivity as the container host
+            Logger.i(TAG, "Preparing sandbox launch for: " + packageName);
+            
+            // 1. Initialize IO Redirection for the target app
+            com.onecore.io.IORedirector.startRedirection(this, packageName);
+
+            // 2. Prepare StubActivity Intent
             Intent stubIntent = new Intent(this, com.onecore.sdk.core.StubActivity.class);
             stubIntent.putExtra("target_package", packageName);
             
@@ -47,22 +52,21 @@ public class LoaderService extends Service {
                 displayId = virtualDisplay.getDisplay().getDisplayId();
             }
             stubIntent.putExtra("display_id", displayId);
-            stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+            stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
-            // Target virtual display (critical for sandbox isolation) using ActivityOptions
+            // 3. Launch on Virtual Display
             if (virtualDisplay != null && Build.VERSION.SDK_INT >= 26) {
                 android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic();
                 options.setLaunchDisplayId(displayId);
-                
                 startActivity(stubIntent, options.toBundle());
+                Logger.i(TAG, "Launched via StubActivity on Display: " + displayId);
             } else {
                 startActivity(stubIntent);
+                Logger.w(TAG, "Launched via StubActivity on Default Display.");
             }
             
-            Logger.i(TAG, "Virtual Stub Launch Triggered for: " + packageName);
-            
         } catch (Exception e) {
-            Log.e(TAG, "Virtual Launch Intercept Failure: " + e.getMessage());
+            Log.e(TAG, "Virtual Launch Fatal Failure: " + e.getMessage());
         }
     }
 

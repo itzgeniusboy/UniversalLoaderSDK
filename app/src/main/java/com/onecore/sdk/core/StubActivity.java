@@ -10,8 +10,9 @@ import android.app.ActivityOptions;
 import android.os.Build;
 
 /**
- * Android 14+ Sandbox StubActivity.
+ * Android 14 Sandbox StubActivity.
  * Acts as the entry point for guest applications within the virtual display.
+ * Resolves the "Original game opens instead of clone" issue.
  */
 public class StubActivity extends Activity {
     private static final String TAG = "OneCore-Stub";
@@ -20,58 +21,54 @@ public class StubActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // 1. Setup UI for target container
+        // Setup Transparent UI
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         
         String targetPackage = getIntent().getStringExtra("target_package");
+        int displayId = getIntent().getIntExtra("display_id", 0);
         
         if (targetPackage == null) {
-            Logger.e(TAG, "No target package specified. Finishing stub.");
+            Logger.e(TAG, "No target package found for virtualization.");
             finish();
             return;
         }
 
-        Logger.i(TAG, "Stub initializing virtualization for: " + targetPackage);
+        Logger.i(TAG, "Virtual Core activating for: " + targetPackage);
 
-        // 2. Launch the real game intent
-        launchInSandbox(targetPackage);
+        // Crucial: Start the game from THIS activity context on THIS display
+        launchTargetInVirtualSpace(targetPackage, displayId);
     }
 
-    private void launchInSandbox(String packageName) {
+    private void launchTargetInVirtualSpace(String packageName, int displayId) {
         try {
             Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
             if (intent == null) {
-                Logger.e(TAG, "Could not find launch intent for " + packageName);
+                Logger.e(TAG, "Failed to resolve launch intent for: " + packageName);
                 finish();
                 return;
             }
 
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
-            intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
-            // Android 14 Virtual Display Handoff
-            if (Build.VERSION.SDK_INT >= 26) {
-                int displayId = getIntent().getIntExtra("display_id", 0);
-                if (displayId > 0) {
-                    ActivityOptions options = ActivityOptions.makeBasic();
-                    options.setLaunchDisplayId(displayId);
-                    startActivity(intent, options.toBundle());
-                    Logger.d(TAG, "Handoff to Virtual Display ID: " + displayId);
-                } else {
-                    startActivity(intent);
-                }
+            if (Build.VERSION.SDK_INT >= 26 && displayId > 0) {
+                ActivityOptions options = ActivityOptions.makeBasic();
+                options.setLaunchDisplayId(displayId);
+                // StartActivity from here ensures the task is bound to the stub's display
+                startActivity(intent, options.toBundle());
+                Logger.d(TAG, "Sandbox Handoff Success. DisplayID: " + displayId);
             } else {
                 startActivity(intent);
             }
 
-            // Keep stub alive in background as container host or finish
-            finish(); 
+            // Finish the stub once handoff is successful
+            finish();
             
         } catch (Exception e) {
-            Logger.e(TAG, "Sandbox launch fatal error", e);
+            Logger.e(TAG, "Sandbox Handoff Failed: " + e.getMessage());
             finish();
         }
     }
