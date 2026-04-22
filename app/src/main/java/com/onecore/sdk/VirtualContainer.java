@@ -113,10 +113,18 @@ public class VirtualContainer {
     private void launchInVirtualSandbox(Context context, String packageName) {
         Logger.i(TAG, "Executing Same-Process Sandbox Host for: " + packageName);
         
+        PackageInfo info = CloneManager.getInstance().getClonedPackage(packageName);
+        
         // This launches our Sandbox Host in the SAME process as the loader
         Intent sandboxIntent = new Intent();
         sandboxIntent.setClassName(context.getPackageName(), "com.onecore.sdk.core.SandboxActivity");
         sandboxIntent.putExtra("target_package", packageName);
+        
+        if (info != null && info.applicationInfo != null) {
+            sandboxIntent.putExtra("source_dir", info.applicationInfo.sourceDir);
+            sandboxIntent.putExtra("data_dir", info.applicationInfo.dataDir);
+            sandboxIntent.putExtra("native_lib_dir", info.applicationInfo.nativeLibraryDir);
+        }
         
         // Inject library via same-process queue
         if (pendingLibraryPath != null) {

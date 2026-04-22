@@ -33,7 +33,26 @@ public class SandboxActivity extends Activity {
 
         try {
             guestInfo = CloneManager.getInstance().getClonedPackage(originalPkg);
-            if (guestInfo == null) throw new Exception("Metadata not found for " + originalPkg);
+            
+            // FALLBACK: If CloneManager cache is empty (due to separate process), use Intent Data
+            if (guestInfo == null) {
+                Logger.w(TAG, "Metadata cache empty in sandbox process. Using Intent Data fallback.");
+                String sourceDir = getIntent().getStringExtra("source_dir");
+                if (sourceDir != null) {
+                    guestInfo = new PackageInfo();
+                    guestInfo.packageName = originalPkg;
+                    guestInfo.applicationInfo = new ApplicationInfo();
+                    guestInfo.applicationInfo.packageName = originalPkg;
+                    guestInfo.applicationInfo.sourceDir = sourceDir;
+                    guestInfo.applicationInfo.dataDir = getIntent().getStringExtra("data_dir");
+                    guestInfo.applicationInfo.nativeLibraryDir = getIntent().getStringExtra("native_lib_dir");
+                }
+            }
+
+            if (guestInfo == null) {
+                // LAST RESORT: Try to find common BGMI entry points directly
+                throw new Exception("Metadata not found for " + originalPkg);
+            }
 
             Logger.i(TAG, "Booting Sandbox Process for: " + guestInfo.packageName);
 
@@ -88,7 +107,13 @@ public class SandboxActivity extends Activity {
     private void launchGuestViaStub() throws Exception {
         // Find Launch Activity with MAIN/LAUNCHER intent filters
         String mainActivity = null;
-        if (guestInfo.activities != null) {
+        
+        // HIGHLIGHT: Prioritize known BGMI/Unreal Engine entry points
+        if (guestInfo.packageName.contains("pubg") || guestInfo.packageName.contains("imobile")) {
+            mainActivity = "com.epicgames.ue4.GameActivity";
+        }
+        
+        if (mainActivity == null && guestInfo.activities != null) {
             for (android.content.pm.ActivityInfo ai : guestInfo.activities) {
                 if (ai.name.toLowerCase().contains("splash") || ai.name.toLowerCase().contains("launcher") || ai.name.toLowerCase().contains("main")) {
                     mainActivity = ai.name;

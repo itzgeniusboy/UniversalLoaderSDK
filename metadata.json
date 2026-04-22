@@ -2,5 +2,19 @@
   "name": "OneCore SDK Engine",
   "description": "OneCore SDK Engine - Advanced Android Virtualization & Hooking Framework",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [],
+  "cloningMetadata": [
+    {
+      "packageName": "com.pubg.imobile",
+      "version": "4.3.0",
+      "entryPoint": "com.epicgames.ue4.GameActivity",
+      "cloneMode": "FULL_CLONE"
+    },
+    {
+      "packageName": "com.pubg.bgmi",
+      "version": "4.3.0",
+      "entryPoint": "com.epicgames.ue4.GameActivity",
+      "cloneMode": "FULL_CLONE"
+    }
+  ]
 }
