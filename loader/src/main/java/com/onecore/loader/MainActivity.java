@@ -72,29 +72,33 @@ public class MainActivity extends Activity {
         launchBtn.setVisibility(View.GONE);
         progressHud.setVisibility(View.VISIBLE);
         
-        new Thread(() -> {
-            try {
-                // Rapidly update progress to reach 100% immediately for premium performance
-                updateProgress(25, "INITIALIZING...");
-                Thread.sleep(150);
-                updateProgress(50, "PREPARING...");
-                Thread.sleep(150);
-                updateProgress(75, "INJECTING...");
-                Thread.sleep(150);
-                updateProgress(100, "READY");
-                Thread.sleep(100);
+        // Use real LaunchManager to sequentialize: Init -> License -> Install
+        LaunchManager.getInstance(this).start("ONECORE-PREMIUM-X782-99", new LaunchManager.LaunchListener() {
+            @Override
+            public void onProgress(int progress, String message) {
+                updateProgress(progress, message);
+            }
 
+            @Override
+            public void onReady() {
                 runOnUiThread(() -> {
                     progressHud.setVisibility(View.GONE);
                     startGameBtn.setVisibility(View.VISIBLE);
                     startGameBtn.startPulse();
                     Toast.makeText(MainActivity.this, "ALL SYSTEMS READY", Toast.LENGTH_SHORT).show();
                 });
-
-            } catch (InterruptedException e) {
-                Logger.e(TAG, "Progress interrupted", e);
             }
-        }).start();
+
+            @Override
+            public void onFailed(String reason) {
+                runOnUiThread(() -> {
+                    progressHud.setVisibility(View.GONE);
+                    launchBtn.setVisibility(View.VISIBLE);
+                    Toast.makeText(MainActivity.this, "LAUNCH ABORTED: " + reason, Toast.LENGTH_LONG).show();
+                    Logger.e(TAG, "Sequential Launch Failed: " + reason);
+                });
+            }
+        });
     }
 
     private void updateProgress(int progress, String text) {

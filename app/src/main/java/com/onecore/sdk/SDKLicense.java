@@ -45,6 +45,12 @@ public class SDKLicense {
         return instance;
     }
 
+    public interface VerificationCallback {
+        void onResult(boolean valid, String expiry, String reason);
+    }
+
+    private VerificationCallback pendingCallback;
+
     public void init(Context context, String customerKey) {
         this.context = context.getApplicationContext();
         this.customerKey = customerKey;
@@ -98,16 +104,31 @@ public class SDKLicense {
         return (System.currentTimeMillis() - lastCheck) > CACHE_DURATION;
     }
 
+    public void setVerificationCallback(VerificationCallback callback) {
+        this.pendingCallback = callback;
+        // If already checked, notify immediately
+        if (isLicensed) {
+            callback.onResult(true, expiryDate, null);
+        }
+    }
+
     private void verifyWithServer() {
         executor.execute(() -> {
             try {
                 String devId = LicenseProtector.getDeviceId(context);
-                // Updated to new external panel
                 URL url = new URL("https://darkdevel.dynamicflash.xyz/connect?key=" + customerKey + "&hwid=" + devId);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(10000);
                 
+                int responseCode = conn.getResponseCode();
+                if (responseCode != 200) {
+                     mainHandler.post(() -> {
+                         if (pendingCallback != null) pendingCallback.onResult(false, null, "Server Error: " + responseCode);
+                     });
+                     return;
+                }
+
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 StringBuilder response = new StringBuilder();
                 String line;
@@ -118,12 +139,11 @@ public class SDKLicense {
 
                 String result = response.toString().toLowerCase();
                 boolean valid = false;
-                String expiry = "2099-12-31"; // Default for external panels if not specified
+                String expiry = "2099-12-31";
 
-                // Robust parsing for different response formats
                 if (result.startsWith("{")) {
                     JSONObject json = new JSONObject(result);
-                    valid = json.optBoolean("valid", json.optString("status").contains("success"));
+                    valid = json.optBoolean("valid", result.contains("success"));
                     expiry = json.optString("expiry", expiry);
                 } else {
                     valid = result.contains("true") || result.contains("success") || result.contains("valid") || result.contains("1");
@@ -131,12 +151,22 @@ public class SDKLicense {
 
                 boolean finalValid = valid;
                 String finalExpiry = expiry;
-                mainHandler.post(() -> updateStatus(finalValid, finalExpiry));
+                mainHandler.post(() -> {
+                    updateStatus(finalValid, finalExpiry);
+                    if (pendingCallback != null) {
+                        pendingCallback.onResult(finalValid, finalExpiry, finalValid ? null : "Key Rejected by Server");
+                    }
+                });
                 
             } catch (Exception e) {
                 Logger.e(TAG, "Server verification failed: " + e.getMessage());
-                // Fallback to local check if server is down but we have cache
-                checkLocalExpiry();
+                mainHandler.post(() -> {
+                    checkLocalExpiry();
+                    if (pendingCallback != null) {
+                        if (isLicensed) pendingCallback.onResult(true, expiryDate, null);
+                        else pendingCallback.onResult(false, null, "Connection Error: " + e.getMessage());
+                    }
+                });
             }
         });
     }

@@ -55,26 +55,63 @@ public class OneCoreSDK {
         }
     }
 
+    public interface InstallCallback {
+        void onProgress(int progress, String message);
+        void onSuccess();
+        void onFailure(String reason);
+    }
+
     /**
-     * Installs the hook engine and spoofer.
+     * Installs the hook engine and spoofer with a callback.
      */
-    public static void install() {
+    public static void install(InstallCallback callback) {
         if (!isInitialized) {
-            throw new IllegalStateException("SDK must be initialized before installation.");
+            if (callback != null) callback.onFailure("SDK not initialized.");
+            return;
         }
         
         if (!SDKLicense.getInstance().isLicensed()) {
             SDKLicense.getInstance().showExpiryDialog();
+            if (callback != null) callback.onFailure("License invalid or expired.");
             return;
         }
         
-        Logger.d(TAG, "Installing SDK components...");
-        DeviceSpoofer.getInstance().init(appContext);
-        HookEngine.getInstance().init();
-        
-        // Initialize Advanced Stealth Features
-        AntiFingerprint.getInstance().preventTracking();
-        NetworkCapture.getInstance().startCapture();
+        new Thread(() -> {
+            try {
+                if (callback != null) callback.onProgress(10, "Mounting Filesystem...");
+                Thread.sleep(500);
+
+                Logger.d(TAG, "Installing SDK components...");
+                DeviceSpoofer.getInstance().init(appContext);
+                
+                if (callback != null) callback.onProgress(40, "Initializing Spoofer...");
+                Thread.sleep(500);
+
+                HookEngine.getInstance().init();
+                
+                if (callback != null) callback.onProgress(70, "Applying Kernel Hooks...");
+                Thread.sleep(800);
+
+                // Initialize Advanced Stealth Features
+                AntiFingerprint.getInstance().preventTracking();
+                NetworkCapture.getInstance().startCapture();
+                
+                if (callback != null) callback.onProgress(100, "Installation Complete");
+                Thread.sleep(300);
+
+                if (callback != null) callback.onSuccess();
+            } catch (Exception e) {
+                Logger.e(TAG, "Installation failed", e);
+                if (callback != null) callback.onFailure(e.getMessage());
+            }
+        }).start();
+    }
+
+    /**
+     * Legacy install method for compatibility.
+     */
+    public static void install() {
+        install(null);
     }
 
     // Advanced Stealth Methods
