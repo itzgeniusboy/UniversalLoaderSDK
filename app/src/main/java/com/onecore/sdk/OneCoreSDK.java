@@ -91,8 +91,9 @@ public class OneCoreSDK {
     /**
      * Launches an app within the virtual container.
      * @param packageName The package name of the app to launch.
+     * @param callback Confirmation callback.
      */
-    public static void launchApp(String packageName) {
+    public static void launchApp(String packageName, VirtualContainer.LaunchCallback callback) {
         if (!isInitialized) {
             throw new IllegalStateException("SDK must be initialized before launching apps.");
         }
@@ -103,7 +104,7 @@ public class OneCoreSDK {
         }
         
         Logger.d(TAG, "Launching app: " + packageName);
-        VirtualContainer.getInstance().launch(appContext, packageName);
+        VirtualContainer.getInstance().launch(appContext, packageName, callback);
     }
 
     public static Context getContext() {

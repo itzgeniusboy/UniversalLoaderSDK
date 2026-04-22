@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.view.Window;
 import android.view.WindowManager;
 import com.onecore.sdk.utils.Logger;
+import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 
