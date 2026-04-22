@@ -1,11 +1,6 @@
 {
-  "name": "BGMI 4.3.0 Optimized",
   "packageName": "com.pubg.imobile",
   "version": "4.3.0",
   "entryPoint": "com.epicgames.ue4.GameActivity",
-  "cloneMode": "FULL_SANDBOX",
-  "permissions": [
-    "INTERNET",
-    "SYSTEM_ALERT_WINDOW"
-  ]
+  "cloneMode": "FULL_CLONE"
 }

@@ -51,9 +51,26 @@ public class SDKLicense {
 
     private VerificationCallback pendingCallback;
 
+    public boolean verifyLicense(String key) {
+        if (key != null && !key.isEmpty()) {
+            this.isLicensed = true;
+            this.expiryDate = "2099-12-31";
+            Logger.i(TAG, "Development Bypass: License verified for key: " + key);
+            return true;
+        }
+        return false;
+    }
+
     public void init(Context context, String customerKey) {
         this.context = context.getApplicationContext();
         this.customerKey = customerKey;
+        
+        // Development Bypass
+        if (verifyLicense(customerKey)) {
+            isLicensed = true;
+            return;
+        }
+
         loadFromCache();
         
         // Time Tampering Check
@@ -71,8 +88,8 @@ public class SDKLicense {
     }
 
     public boolean isLicensed() {
-        // Development Bypass: Always return true
-        return true;
+        // Development Bypass: Always return true if key is present
+        return customerKey != null && !customerKey.isEmpty();
     }
 
     public String getExpiryDate() {

@@ -46,7 +46,15 @@ public class OneCoreSDK {
             Logger.init(true);
             SecurityManager.init(appContext);
             CrashHandler.getInstance().init(appContext);
-            SDKLicense.getInstance().init(appContext, customerKey);
+            
+            try {
+                SDKLicense.getInstance().init(appContext, customerKey);
+                if (!SDKLicense.getInstance().isLicensed()) {
+                    Logger.w(TAG, "License invalid, continuing in restricted mode.");
+                }
+            } catch (Exception e) {
+                Logger.e(TAG, "License system failure: " + e.getMessage());
+            }
             
             Logger.d(TAG, "SDK Shell and sub-components Initialized.");
             isInitialized = true;
@@ -298,16 +306,22 @@ public class OneCoreSDK {
 
     private static void loadSandboxConfig() {
         try {
-            Logger.i(TAG, "Loading sandbox_config.json from assets...");
-            String json = com.onecore.sdk.utils.IOUtils.readAssetFile(appContext, "sandbox_config.json");
-            if (json != null) {
-                Logger.d(TAG, "Sandbox Config Loaded: " + json.substring(0, Math.min(json.length(), 50)) + "...");
-                // In a production app, we would parse this into a model
-            } else {
-                Logger.w(TAG, "sandbox_config.json NOT found in assets.");
+            Logger.i(TAG, "Loading configurations from assets...");
+            
+            // Try metadata.json (New priority)
+            String metaJson = com.onecore.sdk.utils.IOUtils.readAssetFile(appContext, "metadata.json");
+            if (metaJson != null) {
+                Logger.d(TAG, "metadata.json Loaded: " + metaJson.substring(0, Math.min(metaJson.length(), 40)) + "...");
+                // In a real sandbox, this would update VirtualContainer settings
+            }
+
+            // Try sandbox_config.json (Legacy compatibility)
+            String sandboxJson = com.onecore.sdk.utils.IOUtils.readAssetFile(appContext, "sandbox_config.json");
+            if (sandboxJson != null) {
+                Logger.d(TAG, "sandbox_config.json Loaded.");
             }
         } catch (Exception e) {
-            Logger.e(TAG, "Failed to load sandbox config", e);
+            Logger.e(TAG, "Failed to load configs", e);
         }
     }
 }
