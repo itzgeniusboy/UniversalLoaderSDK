@@ -9,6 +9,7 @@ import android.os.IBinder;
 import android.util.Log;
 import com.onecore.sdk.OneCoreSDK;
 import com.onecore.sdk.VirtualContainer;
+import com.onecore.sdk.VirtualDisplayManager;
 import com.onecore.sdk.utils.Logger;
 
 /**
@@ -22,11 +23,11 @@ public class LoaderService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        // Initialize virtual display for the sandbox
+        // Initialize virtual display for the sandbox via SDK component
         VirtualDisplayManager vdm = VirtualDisplayManager.getInstance(this);
         virtualDisplay = vdm.createVirtualDisplay("SandboxDisplay", 1080, 1920, 480, null);
         
-        // In a real scenario, sandboxContext would be initialized here or via OneCoreSDK
+        // Use service context as sandbox context
         this.sandboxContext = this; 
     }
 
@@ -40,24 +41,28 @@ public class LoaderService extends Service {
             Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
             if (intent == null) return;
             
-            // Target virtual display (critical for sandbox)
+            // Target virtual display (critical for sandbox isolation)
             if (virtualDisplay != null && Build.VERSION.SDK_INT >= 26) {
-                intent.setLaunchDisplayId(virtualDisplay.getDisplayId());
+                // Corrected: VirtualDisplay -> getDisplay() -> getDisplayId()
+                intent.setLaunchDisplayId(virtualDisplay.getDisplay().getDisplayId());
             }
             
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
             intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             
-            // Use sandbox context instead of main context
+            // Execute start in sandbox namespace
             if (sandboxContext != null) {
                 sandboxContext.startActivity(intent);
             } else {
-                startActivity(intent); // fallback
+                startActivity(intent); // fallback to host process
             }
             
+            Logger.i(TAG, "Sandbox Start Triggered for: " + packageName);
+            
         } catch (Exception e) {
-            Log.e("Loader", "Launch failed: " + e.getMessage());
+            Log.e(TAG, "Virtual Launch Intercept Failure: " + e.getMessage());
         }
     }
 

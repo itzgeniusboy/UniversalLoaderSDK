@@ -1,4 +1,4 @@
-package com.onecore.loader;
+package com.onecore.sdk;
 
 import android.content.Context;
 import android.hardware.display.DisplayManager;
@@ -35,17 +35,16 @@ public class VirtualDisplayManager {
                 | DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION;
 
         // FIX: Add VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY to isolate content
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
-            flags |= DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY;
-        }
+        // This prevents the sandbox output from leaking onto the main screen
+        flags |= DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY;
 
         try {
             virtualDisplay = displayManager.createVirtualDisplay(
                     name, width, height, density, surface, flags);
-            Log.i(TAG, "Virtual display created: " + name);
+            Log.i(TAG, "Virtual display initialized for BGMI 4.3.0 Sandbox.");
             return virtualDisplay;
         } catch (Exception e) {
-            Log.e(TAG, "Failed to create virtual display: " + e.getMessage());
+            Log.e(TAG, "Failure creating virtual sandbox display: " + e.getMessage());
             return null;
         }
     }
