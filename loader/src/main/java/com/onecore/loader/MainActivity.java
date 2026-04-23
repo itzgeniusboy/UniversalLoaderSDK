@@ -65,8 +65,14 @@ public class MainActivity extends Activity {
         });
 
         startGameBtn.setOnClickListener(v -> {
-            if (!checkOverlayPermission()) {
-                requestOverlayPermission();
+            if (!PermissionsHelper.hasOverlayPermission(this)) {
+                Toast.makeText(this, "PLEASE ALLOW OVERLAY PERMISSION", Toast.LENGTH_SHORT).show();
+                PermissionsHelper.requestSpecialPermissions(this);
+                return;
+            }
+            if (!PermissionsHelper.hasStoragePermission(this)) {
+                Toast.makeText(this, "PLEASE ALLOW ALL FILES ACCESS", Toast.LENGTH_SHORT).show();
+                PermissionsHelper.requestSpecialPermissions(this);
                 return;
             }
             provideHapticFeedback();
@@ -74,23 +80,13 @@ public class MainActivity extends Activity {
         });
     }
 
-    private boolean checkOverlayPermission() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            return Settings.canDrawOverlays(this);
-        }
-        return true;
-    }
-
-    private void requestOverlayPermission() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName()));
-            startActivityForResult(intent, 1234);
-            Toast.makeText(this, "PLEASE ALLOW OVERLAY PERMISSION", Toast.LENGTH_LONG).show();
-        }
-    }
-
     private void startProgressSequence() {
+        if (!PermissionsHelper.hasStoragePermission(this)) {
+            Toast.makeText(this, "STORAGE PERMISSION REQUIRED FOR INSTALLATION", Toast.LENGTH_LONG).show();
+            PermissionsHelper.requestSpecialPermissions(this);
+            return;
+        }
+        
         launchBtn.setVisibility(View.GONE);
         progressHud.setVisibility(View.VISIBLE);
         
