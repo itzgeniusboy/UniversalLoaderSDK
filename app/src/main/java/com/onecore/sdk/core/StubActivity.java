@@ -51,20 +51,19 @@ public class StubActivity extends Activity {
                 return;
             }
 
-            Logger.d(TAG, "Attempting Direct Class Load: " + targetActivity);
+            Logger.d(TAG, "Triggering Redirected Launch via Shadow Intent: " + targetActivity);
             
-            // Load the class from the guest class loader
-            Class<?> activityClass = getClassLoader().loadClass(targetActivity);
-            Intent intent = new Intent(this, activityClass);
-            
+            // We launch StubActivity AGAIN, but our Instrumentation will intercept
+            // and swap the class to the targetActivity.
+            Intent intent = new Intent(this, StubActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
+            intent.putExtra("target_activity", targetActivity); // Metadata for Instrumentation
+            
+            // IMPORTANT: VAInstrumentation needs this intent to know what to swap
             startActivity(intent);
-            Logger.i(TAG, "Direct Load Success: " + targetActivity);
-
-            // Do not finish immediately to allow task transition
-            // finish(); 
+            
+            Logger.i(TAG, "Shadow Redirect Sent. Closing Stub Shell.");
+            finish(); 
             
         } catch (Exception e) {
             Logger.e(TAG, "Direct Load Failed: " + e.getMessage());

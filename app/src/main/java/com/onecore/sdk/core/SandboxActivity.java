@@ -7,6 +7,9 @@ import android.content.pm.PackageInfo;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.os.Handler;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import com.onecore.sdk.NativeHookManager;
 import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.Logger;
@@ -29,6 +32,20 @@ public class SandboxActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        // Premium Stealth UI for Sandbox Host
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setGravity(android.view.Gravity.CENTER);
+        layout.setBackgroundColor(0xFF000000);
+        
+        TextView tv = new TextView(this);
+        tv.setText("VIRTUAL KERNEL BOOTING...");
+        tv.setTextColor(0xFFFFFFFF);
+        tv.setTextSize(14);
+        layout.addView(tv);
+        
+        setContentView(layout);
         
         String originalPkg = getIntent().getStringExtra("target_package");
         this.libPath = getIntent().getStringExtra("library_path");
@@ -133,12 +150,21 @@ public class SandboxActivity extends Activity {
         
         // HIGHLIGHT: Prioritize known BGMI/Unreal Engine entry points for 4.3.0
         if (guestInfo.packageName.contains("pubg") || guestInfo.packageName.contains("imobile")) {
-            // New 4.3.0 Splash Activity if present
-            mainActivity = "com.epicgames.ue4.SplashActivity"; 
-            try {
-                getClassLoader().loadClass(mainActivity);
-            } catch (Exception e) {
-                mainActivity = "com.epicgames.ue4.GameActivity";
+            String[] variants = {
+                "com.epicgames.ue4.SplashActivity",
+                "com.epicgames.ue4.GameActivity",
+                "com.tencent.tmgp.pubgmri.MainActivity",
+                "com.tencent.tmgp.pubgm.MainActivity",
+                "com.epicgames.ue4.GameActivity"
+            };
+            
+            for (String variant : variants) {
+                try {
+                    guestClassLoader.loadClass(variant);
+                    mainActivity = variant;
+                    Logger.d(TAG, "Found variant entry point: " + mainActivity);
+                    break;
+                } catch (ClassNotFoundException ignored) {}
             }
         }
         
@@ -169,8 +195,11 @@ public class SandboxActivity extends Activity {
         
         startActivity(stubIntent);
         
-        Logger.i(TAG, "Redirected to Stub Process. Closing Host Shell.");
-        finish(); // Close the shell activity
+        Logger.i(TAG, "Redirected to Stub Process. Shell standby...");
+        // Keep the shell alive for a moment to prevent process recycling
+        new Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            if (!isFinishing()) finish();
+        }, 3000);
     }
 
     @Override

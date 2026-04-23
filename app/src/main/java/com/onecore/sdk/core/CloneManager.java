@@ -55,6 +55,9 @@ public class CloneManager {
                 new File(virtualRoot, "lib").mkdirs();
                 new File(virtualRoot, "obb").mkdirs();
             }
+
+            // Map OBBs
+            mapObb(context, packageName, virtualRoot);
             
             // 4. Setup Virtual Environment
             setupVirtualEnv(context, packageName, info.applicationInfo);
@@ -64,6 +67,31 @@ public class CloneManager {
         } catch (Throwable e) {
             Logger.e(TAG, "Clone Preparation Error: " + e.getMessage(), e);
             return false;
+        }
+    }
+
+    private void mapObb(Context context, String packageName, String virtualRoot) {
+        try {
+            File systemObbDir = new File("/storage/emulated/0/Android/obb/" + packageName);
+            File virtualObbDir = new File(virtualRoot, "obb");
+            if (!virtualObbDir.exists()) virtualObbDir.mkdirs();
+
+            if (systemObbDir.exists() && systemObbDir.isDirectory()) {
+                File[] obbs = systemObbDir.listFiles();
+                if (obbs != null) {
+                    for (File obb : obbs) {
+                        File target = new File(virtualObbDir, obb.getName());
+                        if (!target.exists()) {
+                            Os.symlink(obb.getAbsolutePath(), target.getAbsolutePath());
+                            Logger.d(TAG, "OBB Mapped: " + obb.getName());
+                        }
+                    }
+                }
+            } else {
+                Logger.w(TAG, "System OBB not found at: " + systemObbDir.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, "OBB Mapping Failed", e);
         }
     }
 
