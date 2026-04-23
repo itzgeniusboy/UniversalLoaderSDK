@@ -1,5 +1,6 @@
 package com.onecore.sdk.core;
 
+import android.app.Instrumentation;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import com.onecore.sdk.utils.Logger;
@@ -60,7 +61,7 @@ public class EnvironmentHooker {
         Object originalInstrumentation = instrumentationField.get(activityThread);
 
         // Replace with our Custom Instrumentation
-        VAInstrumentation vaInstrumentation = new VAInstrumentation(originalInstrumentation);
+        VAInstrumentation vaInstrumentation = new VAInstrumentation((Instrumentation) originalInstrumentation);
         instrumentationField.set(activityThread, vaInstrumentation);
         
         Logger.d(TAG, "mInstrumentation HOOKED with VAInstrumentation.");
