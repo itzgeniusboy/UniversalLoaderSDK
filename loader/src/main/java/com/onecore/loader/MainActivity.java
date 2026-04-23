@@ -183,4 +183,11 @@ public class MainActivity extends Activity {
             Logger.e(TAG, "Haptic feedback error", e);
         }
     }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Force kill all app processes on exit for total isolation cleanup
+        android.os.Process.killProcess(android.os.Process.myPid());
+    }
 }

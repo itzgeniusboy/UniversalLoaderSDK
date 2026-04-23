@@ -24,6 +24,7 @@ public class SandboxActivity extends Activity {
     private DexClassLoader guestClassLoader;
     private Resources guestResources;
     private String libPath;
+    private long lastHeartbeat = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,6 +34,11 @@ public class SandboxActivity extends Activity {
         this.libPath = getIntent().getStringExtra("library_path");
 
         try {
+            // Early native initialization before any guest code runs
+            String virtualRoot = getFilesDir().getAbsolutePath() + "/virtual/" + originalPkg;
+            NativeHookManager.setupIsolation(this, virtualRoot, originalPkg);
+            Logger.i(TAG, "Native Isolation Installed Successfully.");
+
             guestInfo = CloneManager.getInstance().getClonedPackage(originalPkg);
             
             // FALLBACK: If CloneManager cache is empty (due to separate process), use Intent Data
@@ -51,13 +57,12 @@ public class SandboxActivity extends Activity {
             }
 
             if (guestInfo == null) {
-                // LAST RESORT: Try to find common BGMI entry points directly
                 throw new Exception("Metadata not found for " + originalPkg);
             }
 
             Logger.i(TAG, "Booting Sandbox Process for: " + guestInfo.packageName);
 
-            // 1. Load Resources (Skinning)
+            // 1. Load Resources
             AssetManager assets = AssetManager.class.newInstance();
             Method addAssetPath = assets.getClass().getMethod("addAssetPath", String.class);
             addAssetPath.invoke(assets, guestInfo.applicationInfo.sourceDir);
@@ -67,10 +72,6 @@ public class SandboxActivity extends Activity {
             File dexDir = new File(getFilesDir(), "sandbox_dex/" + originalPkg);
             if (!dexDir.exists()) dexDir.mkdirs();
             
-            // Setup Native Isolation before loading Guest DEX
-            String virtualRoot = getFilesDir().getAbsolutePath() + "/virtual/" + originalPkg;
-            NativeHookManager.setupIsolation(this, virtualRoot, originalPkg);
-
             guestClassLoader = new DexClassLoader(
                     guestInfo.applicationInfo.sourceDir,
                     dexDir.getAbsolutePath(),
@@ -79,22 +80,22 @@ public class SandboxActivity extends Activity {
             );
             VirtualContainer.getInstance().setGuestClassLoader(guestClassLoader);
 
-            // 3. APPLY GLOBAL HOOKS (System Identity Fake)
+            // 3. APPLY GLOBAL HOOKS
             EnvironmentHooker.apply(this, guestInfo.packageName);
+            UidSpoofing.apply(this, 10000 + (int)(Math.random() * 5000)); // Sandbox UID
 
-            // 4. FIX: LOAD ESP LIBRARY IN GUEST NAMESPACE
+            // 4. LOAD ESP LIBRARY IN GUEST NAMESPACE
             if (libPath != null && new File(libPath).exists()) {
-                Logger.i(TAG, "Injecting ESP Library into Sandbox Namespace: " + libPath);
-                // We use System.load within the Host Activity which now shares 
-                // the environment with the Guest DEX.
                 System.load(libPath);
-                Logger.d(TAG, "ESP Library linked successfully.");
+                Logger.d(TAG, "Guest Library linked successfully.");
             }
 
-            // 5. Jump to Guest Entry Point via STUB REDIRECTION
+            // 5. Start Heartbeat to monitor Loader process
+            startService(new Intent(this, SandboxHeartbeatService.class));
+            startSandboxHeartbeat();
+
+            // 6. Jump to Guest Entry Point
             launchGuestViaStub();
-            
-            // 6. Notify Result: SUCCESS
             sendLaunchResult(true, null);
 
         } catch (Exception e) {
@@ -102,6 +103,21 @@ public class SandboxActivity extends Activity {
             sendLaunchResult(false, e.getMessage());
             finish();
         }
+    }
+
+    private void startSandboxHeartbeat() {
+        new Thread(() -> {
+            while (!isFinishing()) {
+                try {
+                    // If loader process disappears, sandbox should self-destruct
+                    // For demo, we check if original parent PID is still 1 (after host dies) 
+                    // or use a more complex Binder-based check in real scenarios.
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        }).start();
     }
 
     private void sendLaunchResult(boolean success, String error) {

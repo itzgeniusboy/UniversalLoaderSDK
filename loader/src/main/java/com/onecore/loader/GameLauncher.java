@@ -23,15 +23,18 @@ public class GameLauncher {
 
     public static void start(Context context, LaunchCallback callback) {
         try {
-            // Detect installed version
-            String targetPkg = PKG_IMOBILE;
+            // Detect installed version and generate virtual identity
+            String originalPkg = PKG_IMOBILE;
             try {
                 context.getPackageManager().getPackageInfo(PKG_IMOBILE, 0);
             } catch (Exception e) {
-                targetPkg = PKG_BGMI;
+                originalPkg = PKG_BGMI;
             }
+            
+            // Masking the package identity for deep isolation
+            String targetPkg = "com.onecore.cloned." + originalPkg.substring(originalPkg.lastIndexOf('.') + 1);
 
-            Logger.i(TAG, "Triggering Sandbox Launch for: " + targetPkg);
+            Logger.i(TAG, "Triggering Sandbox Launch for: " + targetPkg + " (Source: " + originalPkg + ")");
             if (callback != null) callback.onProgress("Initializing Isolated Engine...");
 
             // Ensure we use the Virtualization Container

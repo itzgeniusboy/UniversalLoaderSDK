@@ -67,20 +67,10 @@ public class StubActivity extends Activity {
             // finish(); 
             
         } catch (Exception e) {
-            Logger.e(TAG, "Direct Load Failed, falling back: " + e.getMessage());
-            fallbackLaunch(packageName);
-        }
-    }
-
-    private void fallbackLaunch(String packageName) {
-        try {
-            Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
-            if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
-            }
+            Logger.e(TAG, "Direct Load Failed: " + e.getMessage());
+            // No fallback to original app as per sandbox architecture
             finish();
-        } catch (Exception ignored) {}
+        }
     }
 
     @Override

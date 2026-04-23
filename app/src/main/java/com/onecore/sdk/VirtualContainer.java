@@ -205,23 +205,6 @@ public class VirtualContainer {
         } catch (Exception ignored) {}
     }
 
-    public void downloadAndInject(Context context, String packageName, String libraryUrl, String filename) {
-        if (!SDKLicense.getInstance().isLicensed()) return;
-        
-        LibraryDownloader.getInstance().downloadLibrary(libraryUrl, filename, null, new LibraryDownloader.DownloadCallback() {
-            @Override
-            public void onSuccess(File file) {
-                Logger.i(TAG, "Library ready for injection: " + file.getAbsolutePath());
-                injectLibrary(context, packageName, file.getAbsolutePath());
-            }
-
-            @Override
-            public void onFailure(Exception e) {
-                Logger.e(TAG, "Library download for injection failed: " + e.getMessage());
-            }
-        });
-    }
-
     public void injectLibrary(Context context, String packageName, String libraryPath) {
         if (!SDKLicense.getInstance().isLicensed()) return;
         

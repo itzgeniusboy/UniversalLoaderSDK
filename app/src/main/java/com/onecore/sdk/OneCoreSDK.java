@@ -200,35 +200,6 @@ public class OneCoreSDK {
         return SDKLicense.getInstance().isLicensed();
     }
 
-    public static String getExpiryDate() {
-        return SDKLicense.getInstance().getExpiryDate();
-    }
-
-    public static long getDaysLeft() {
-        return SDKLicense.getInstance().getDaysLeft();
-    }
-
-    // Feature 4 - Remote Config
-    public static void fetchRemoteConfig() {
-        if (!SDKLicense.getInstance().isLicensed()) return;
-        RemoteConfig.getInstance().fetchRemoteConfig();
-    }
-
-    public static String getConfigValue(String key) {
-        if (!SDKLicense.getInstance().isLicensed()) return null;
-        return RemoteConfig.getInstance().getConfigValue(key);
-    }
-
-    public static boolean isFeatureEnabled(String feature) {
-        if (!SDKLicense.getInstance().isLicensed()) return false;
-        return RemoteConfig.getInstance().isFeatureEnabled(feature);
-    }
-
-    public static void refreshConfig() {
-        if (!SDKLicense.getInstance().isLicensed()) return;
-        RemoteConfig.getInstance().refreshConfig();
-    }
-
     // Feature 5 - Analytics
     public static void trackEvent(String eventName) {
         if (!SDKLicense.getInstance().isLicensed()) return;
@@ -266,18 +237,7 @@ public class OneCoreSDK {
         SocialLoginHelper.getInstance().loginWithGoogle(activity, clientId);
     }
 
-    // Feature 7 - Library Injection & Download
-    public static void setLibraryDownloadUrl(String url) {
-        if (!SDKLicense.getInstance().isLicensed()) return;
-        // Logic to store the URL for auto-updates
-        Logger.d(TAG, "Library Download URL set to: " + url);
-    }
-
-    public static void downloadAndInject(String packageName, String url, String filename) {
-        if (!SDKLicense.getInstance().isLicensed()) return;
-        VirtualContainer.getInstance().downloadAndInject(appContext, packageName, url, filename);
-    }
-
+    // Feature 7 - Library Injection
     public static void injectLocalLibrary(String packageName, String path) {
         if (!SDKLicense.getInstance().isLicensed()) return;
         VirtualContainer.getInstance().injectLibrary(appContext, packageName, path);

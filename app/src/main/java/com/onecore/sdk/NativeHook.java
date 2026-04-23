@@ -11,7 +11,7 @@ public class NativeHook {
 
     static {
         try {
-            System.loadLibrary("onecore-native");
+            System.loadLibrary("onecore_native");
             isLoaded = true;
             Logger.d(TAG, "Native library loaded successfully.");
         } catch (UnsatisfiedLinkError e) {
