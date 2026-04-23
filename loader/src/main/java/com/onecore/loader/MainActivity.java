@@ -18,6 +18,7 @@ import com.onecore.loader.views.GradientButton;
 import com.onecore.sdk.OneCoreSDK;
 import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.Logger;
+import com.onecore.sdk.utils.PermissionsHelper;
 
 /**
  * Premium iOS-style Dashboard for OneCore Loader.
