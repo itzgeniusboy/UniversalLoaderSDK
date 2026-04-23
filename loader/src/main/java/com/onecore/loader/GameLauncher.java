@@ -1,23 +1,19 @@
 package com.onecore.loader;
 
-import android.app.ActivityManager;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
-import android.widget.Toast;
 import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.Logger;
-import java.util.List;
-import java.io.File;
 
 /**
- * Handles the final sequence of Injection -> Cloned Launch.
- * Optimized for Android 11+ non-root PID detection.
+ * Handles the launch of BGMI within the virtualized sandbox.
+ * Fixed for Android 14+ Non-Root Isolation.
  */
 public class GameLauncher {
     private static final String TAG = "GameLauncher";
-    private static String TARGET_PKG = "com.pubg.imobile";
-    private static final String FALLBACK_PKG = "com.pubg.bgmi";
+    private static final String PKG_IMOBILE = "com.pubg.imobile";
+    private static final String PKG_BGMI = "com.pubg.bgmi";
 
     public interface LaunchCallback {
         void onProcessDetected(int pid);
@@ -27,65 +23,38 @@ public class GameLauncher {
 
     public static void start(Context context, LaunchCallback callback) {
         try {
-            // Check which version is installed
-            String pkg = TARGET_PKG;
+            // Detect installed version
+            String targetPkg = PKG_IMOBILE;
             try {
-                context.getPackageManager().getPackageInfo(TARGET_PKG, 0);
+                context.getPackageManager().getPackageInfo(PKG_IMOBILE, 0);
             } catch (Exception e) {
-                pkg = FALLBACK_PKG;
+                targetPkg = PKG_BGMI;
             }
 
-            final String finalPkg = pkg;
-            Logger.i(TAG, "Initiating Virtual Space Launch for " + finalPkg);
-            
-            if (callback != null) callback.onProgress("Verifying Environment...");
+            Logger.i(TAG, "Triggering Sandbox Launch for: " + targetPkg);
+            if (callback != null) callback.onProgress("Initializing Isolated Engine...");
 
-            // Timeout Handler (10 Seconds)
-            final Handler handler = new Handler(Looper.getMainLooper());
-            final Runnable timeoutTask = () -> {
-                Logger.e(TAG, "Launch confirmation TIMEOUT for " + finalPkg);
-                if (callback != null) callback.onFailed("Launch Timeout (System Busy)");
-            };
-            handler.postDelayed(timeoutTask, 10000);
-
-            // 1. Ensure virtualization engine starts with confirmation callback
-            Logger.i(TAG, "CRITICAL: Triggering Virtualization Host...");
-            boolean initiated = VirtualContainer.getInstance().launch(context, finalPkg, new VirtualContainer.LaunchCallback() {
+            // Ensure we use the Virtualization Container
+            VirtualContainer.getInstance().launch(context, targetPkg, new VirtualContainer.LaunchCallback() {
                 @Override
                 public void onLaunchSuccess() {
-                    // Added: Brief delay to ensure Sandbox -> Stub -> Game transition is visually stable
-                    handler.postDelayed(() -> {
-                        handler.removeCallbacks(timeoutTask);
-                        Logger.i(TAG, "Launch confirmed by Kernel (Deep Sync).");
-                        if (callback != null) {
-                            callback.onProgress("Virtual Session ACTIVE");
-                            callback.onProcessDetected(0);
-                        }
-                    }, 500);
+                    Logger.i(TAG, "Virtual Session Active. Syncing Hooks...");
+                    if (callback != null) {
+                        callback.onProgress("Launch Success");
+                        callback.onProcessDetected(0);
+                    }
                 }
 
                 @Override
                 public void onLaunchFailed(String reason) {
-                    handler.removeCallbacks(timeoutTask);
-                    Logger.e(TAG, "Launch denied by Kernel: " + reason);
+                    Logger.e(TAG, "Sandbox Launch Failed: " + reason);
                     if (callback != null) callback.onFailed(reason);
                 }
             });
-            
-            if (!initiated) {
-                handler.removeCallbacks(timeoutTask);
-                Logger.e(TAG, "VirtualContainer rejected launch request.");
-                if (callback != null) callback.onFailed("Engine init failure.");
-            }
-        } catch (Throwable t) {
-            Logger.e(TAG, "FATAL: Uncaught exception in GameLauncher.start", t);
-            if (callback != null) {
-                callback.onFailed("System Error: " + t.getMessage());
-            }
-        }
-    }
 
-    private static void proceedToLaunch(Context context, LaunchCallback callback) {
-        start(context, callback);
+        } catch (Exception e) {
+            Logger.e(TAG, "Fatal Launch Error", e);
+            if (callback != null) callback.onFailed(e.getMessage());
+        }
     }
 }

@@ -5,34 +5,42 @@ import com.onecore.sdk.utils.Logger;
 import java.io.File;
 
 /**
- * Manages the connection between the Java Virtual Container and Native Syscall Hooks.
+ * Early-Stage Native Hooking Manager.
+ * Solves: Engineinitfailure by installing syscall hooks before Guest Load.
  */
 public class NativeHookManager {
     private static final String TAG = "NativeHookManager";
+    private static boolean hooksInstalled = false;
 
     static {
         try {
             System.loadLibrary("onecore_native");
         } catch (UnsatisfiedLinkError e) {
-            Logger.e(TAG, "Failed to load native hooks library");
+            Logger.e(TAG, "Native library 'onecore_native' missing!");
         }
     }
 
     /**
-     * Initializes native syscall hooks for path redirection and sandbox isolation.
-     * @param context Application context
-     * @param virtualRoot The root directory for sandbox data
-     * @param packageName The guest package name
+     * Installs path redirection hooks.
+     * MUST be called at the very beginning of the sandbox process.
      */
-    public static void setupIsolation(Context context, String virtualRoot, String packageName) {
+    public static synchronized void setupIsolation(Context context, String virtualRoot, String packageName) {
+        if (hooksInstalled) return;
+
         try {
             File root = new File(virtualRoot);
             if (!root.exists()) root.mkdirs();
             
+            // Create subdirectories for redirection
+            new File(root, "data").mkdirs();
+            new File(root, "obb").mkdirs();
+            new File(root, "external").mkdirs();
+
             initHooks(virtualRoot, packageName);
-            Logger.i(TAG, "Native Isolation Layers ACTIVE for " + packageName);
+            hooksInstalled = true;
+            Logger.i(TAG, "Virtual Syscall Layer: OPERATIONAL");
         } catch (Exception e) {
-            Logger.e(TAG, "Failed to setup native isolation", e);
+            Logger.e(TAG, "Failed to initialize native isolation layer", e);
         }
     }
 

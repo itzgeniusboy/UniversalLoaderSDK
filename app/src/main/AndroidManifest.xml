@@ -23,27 +23,26 @@
     <application
         android:label="OneCore SDK">
 
+        <!-- Sandbox Host Process -->
         <activity android:name="com.onecore.sdk.core.SandboxActivity" 
                   android:process=":sandbox" 
                   android:exported="false"
                   android:screenOrientation="portrait"
                   android:configChanges="orientation|screenSize|keyboardHidden" />
 
-        <!-- Testing Activity for Social Login -->
+        <!-- Stub Activity (Must be in same process as Sandbox for Hook persistence) -->
+        <activity android:name="com.onecore.sdk.core.StubActivity"
+                  android:process=":sandbox"
+                  android:exported="false"
+                  android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+                  android:configChanges="orientation|screenSize|keyboardHidden" />
+
         <activity android:name=".SocialLoginDemo" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                
-                <!-- Twitter Callback -->
                 <data android:scheme="onecore.oauth" android:host="callback" />
-                
-                <!-- Facebook Callback (Replace {APP_ID} with real ID in production) -->
-                <data android:scheme="fbYOUR_APP_ID" />
-                
-                <!-- Google Callback (Replace {CLIENT_ID} with real ID in production) -->
-                <data android:scheme="com.googleusercontent.apps.YOUR_CLIENT_ID" />
             </intent-filter>
         </activity>
     </application>
