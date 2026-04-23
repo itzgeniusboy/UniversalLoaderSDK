@@ -48,6 +48,20 @@ jobs:
     - name: Build SDK and Loader
       run: ./gradlew :app:assembleRelease :loader:assembleRelease --no-daemon --stacktrace
 
+    - name: Create GitHub Release
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v1.0.${{ github.run_number }}
+        name: OneCore Release v1.0.${{ github.run_number }}
+        files: |
+          loader/build/outputs/apk/release/*.apk
+          app/build/outputs/aar/*.aar
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Upload SDK AAR
       uses: actions/upload-artifact@v4
       with:
