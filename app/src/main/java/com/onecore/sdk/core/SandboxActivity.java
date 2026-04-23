@@ -65,6 +65,11 @@ public class SandboxActivity extends Activity {
             // 2. Load Guest Code (Isolated ClassLoader)
             File dexDir = new File(getFilesDir(), "sandbox_dex/" + originalPkg);
             if (!dexDir.exists()) dexDir.mkdirs();
+            
+            // Setup Native Isolation before loading Guest DEX
+            String virtualRoot = getFilesDir().getAbsolutePath() + "/virtual/" + originalPkg;
+            NativeHookManager.setupIsolation(this, virtualRoot, originalPkg);
+
             guestClassLoader = new DexClassLoader(
                     guestInfo.applicationInfo.sourceDir,
                     dexDir.getAbsolutePath(),
