@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.Window;
 import android.view.WindowManager;
+import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.Logger;
 import android.app.ActivityOptions;
 import android.os.Build;
