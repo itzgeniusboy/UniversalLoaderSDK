@@ -86,4 +86,41 @@
         android:layout_marginTop="8dp"
         android:layout_marginLeft="16dp" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="MAINTENANCE"
+        android:textColor="@color/ios_text_secondary"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:layout_marginTop="24dp"
+        android:layout_marginBottom="12dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/ios_glass_bg"
+        android:padding="4dp">
+
+        <RelativeLayout
+            android:id="@+id/btnCheckUpdate"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?android:attr/selectableItemBackground">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:text="Check for Updates"
+                android:textColor="#007AFF"
+                android:textSize="17sp" />
+        </RelativeLayout>
+
+    </LinearLayout>
+
 </LinearLayout>

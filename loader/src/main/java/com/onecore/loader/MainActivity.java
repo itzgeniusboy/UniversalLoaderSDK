@@ -54,6 +54,9 @@ public class MainActivity extends Activity {
 
         // Start premium pulse animation
         launchBtn.startPulse();
+
+        // Check for updates automatically on start
+        new UpdateChecker(this).checkForUpdates(false);
         
         launchBtn.setOnClickListener(v -> {
             provideHapticFeedback();
