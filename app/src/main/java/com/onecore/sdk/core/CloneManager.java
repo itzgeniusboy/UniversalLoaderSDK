@@ -113,16 +113,14 @@ public class CloneManager {
                             File target = new File(virtualLibDir, lib.getName());
                             if (target.exists()) target.delete();
                             Os.symlink(lib.getAbsolutePath(), target.getAbsolutePath());
-                            Logger.d(TAG, "Mapped Library: " + lib.getName());
+                            Logger.d(TAG, "Mapped Library: " + lib.getName() + " -> " + lib.getAbsolutePath());
                         } catch (Exception e) {
-                            Logger.w(TAG, "Failed to symlink " + lib.getName() + ": " + e.getMessage());
-                            // Fallback: Just point to original path if symlink fails? 
-                            // No, DexClassLoader needs a directory.
+                            Logger.e(TAG, "Failed to symlink lib " + lib.getName(), e);
                         }
                     }
                 }
             } else {
-                Logger.w(TAG, "Source native library directory not found: " + originalApp.nativeLibraryDir);
+                Logger.e(TAG, "Source native library directory NOT FOUND: " + originalApp.nativeLibraryDir);
             }
         } catch (Throwable e) {
             Logger.e(TAG, "Virtual Lib Mapping Failure", e);

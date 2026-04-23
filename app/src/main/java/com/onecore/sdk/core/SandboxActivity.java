@@ -152,7 +152,6 @@ public class SandboxActivity extends Activity {
         if (guestInfo.packageName.contains("pubg") || guestInfo.packageName.contains("imobile")) {
             String[] variants = {
                 "com.epicgames.ue4.SplashActivity",
-                "com.epicgames.ue4.GameActivity",
                 "com.tencent.tmgp.pubgmri.MainActivity",
                 "com.tencent.tmgp.pubgm.MainActivity",
                 "com.epicgames.ue4.GameActivity"
@@ -162,21 +161,33 @@ public class SandboxActivity extends Activity {
                 try {
                     guestClassLoader.loadClass(variant);
                     mainActivity = variant;
-                    Logger.d(TAG, "Found variant entry point: " + mainActivity);
+                    Logger.i(TAG, "Unreal Engine Entry Point Identified: " + mainActivity);
                     break;
                 } catch (ClassNotFoundException ignored) {}
             }
         }
         
         if (mainActivity == null && guestInfo.activities != null) {
+            Logger.d(TAG, "Scanning manifest for launcher activities...");
             for (android.content.pm.ActivityInfo ai : guestInfo.activities) {
-                if (ai.name.toLowerCase().contains("splash") || ai.name.toLowerCase().contains("launcher") || ai.name.toLowerCase().contains("main")) {
+                if (ai.name.toLowerCase().contains("splash") || ai.name.toLowerCase().contains("launcher")) {
                     mainActivity = ai.name;
+                    Logger.i(TAG, "Manifest match (Splash/Launcher): " + mainActivity);
                     break;
+                }
+            }
+            if (mainActivity == null) {
+                 for (android.content.pm.ActivityInfo ai : guestInfo.activities) {
+                    if (ai.name.toLowerCase().contains("main")) {
+                        mainActivity = ai.name;
+                        Logger.i(TAG, "Manifest match (Main): " + mainActivity);
+                        break;
+                    }
                 }
             }
             if (mainActivity == null && guestInfo.activities.length > 0) {
                 mainActivity = guestInfo.activities[0].name;
+                Logger.w(TAG, "No naming match. Using first activity: " + mainActivity);
             }
         }
         

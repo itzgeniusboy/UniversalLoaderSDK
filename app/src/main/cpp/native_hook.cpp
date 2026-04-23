@@ -20,6 +20,10 @@ static std::string g_package_name;
 static int (*orig_open)(const char *pathname, int flags, mode_t mode) = nullptr;
 static int (*orig_openat)(int dirfd, const char *pathname, int flags, mode_t mode) = nullptr;
 static int (*orig_access)(const char *pathname, int mode) = nullptr;
+static int (*orig_faccessat)(int dirfd, const char *pathname, int mode, int flags) = nullptr;
+static int (*orig_stat)(const char *pathname, struct stat *buf) = nullptr;
+static int (*orig_lstat)(const char *pathname, struct stat *buf) = nullptr;
+static int (*orig_fstatat)(int dirfd, const char *pathname, struct stat *buf, int flags) = nullptr;
 
 /**
  * Path Redirection Engine for BGMI Sandbox.
@@ -30,16 +34,34 @@ static std::string redirect_path(const char* path) {
     
     std::string s_path(path);
     
+    // Normalize path: ignore multiple slashes
+    if (s_path.find("//") != std::string::npos) {
+        // Simple normalization for common cases
+    }
+
     // 1. Data Dir Redirection
     std::string data_target = "/data/data/" + g_package_name;
-    if (s_path.find(data_target) == 0) {
-        return g_virtual_root + "/data" + s_path.substr(data_target.length());
+    if (s_path.compare(0, data_target.length(), data_target) == 0) {
+        std::string redirected = g_virtual_root + "/data" + s_path.substr(data_target.length());
+        return redirected;
     }
     
-    // 2. OBB Dir Redirection
-    std::string obb_target = "/storage/emulated/0/Android/obb/" + g_package_name;
-    if (s_path.find(obb_target) == 0) {
-        return g_virtual_root + "/obb" + s_path.substr(obb_target.length());
+    // 2. OBB Dir Redirection (Multiple possible roots)
+    const char* obb_roots[] = {
+        "/storage/emulated/0/Android/obb/",
+        "/sdcard/Android/obb/",
+        "/mnt/shell/emulated/0/Android/obb/",
+        "/storage/self/primary/Android/obb/",
+        "/mnt/media_rw/sdcard0/Android/obb/"
+    };
+    
+    for (const char* root : obb_roots) {
+        std::string target = std::string(root) + g_package_name;
+        if (s_path.compare(0, target.length(), target) == 0) {
+            std::string redirected = g_virtual_root + "/obb" + s_path.substr(target.length());
+            LOGI("HOOK: OBB Redirect -> %s", redirected.c_str());
+            return redirected;
+        }
     }
 
     return s_path;
@@ -50,11 +72,36 @@ int my_open(const char *pathname, int flags, mode_t mode) {
 }
 
 int my_openat(int dirfd, const char *pathname, int flags, mode_t mode) {
-    return orig_openat(dirfd, redirect_path(pathname).c_str(), flags, mode);
+    if (pathname && pathname[0] == '/') {
+        return orig_openat(dirfd, redirect_path(pathname).c_str(), flags, mode);
+    }
+    return orig_openat(dirfd, pathname, flags, mode);
 }
 
 int my_access(const char *pathname, int mode) {
     return orig_access(redirect_path(pathname).c_str(), mode);
+}
+
+int my_faccessat(int dirfd, const char *pathname, int mode, int flags) {
+    if (pathname && pathname[0] == '/') {
+        return orig_faccessat(dirfd, redirect_path(pathname).c_str(), mode, flags);
+    }
+    return orig_faccessat(dirfd, pathname, mode, flags);
+}
+
+int my_stat(const char *pathname, struct stat *buf) {
+    return orig_stat(redirect_path(pathname).c_str(), buf);
+}
+
+int my_lstat(const char *pathname, struct stat *buf) {
+    return orig_lstat(redirect_path(pathname).c_str(), buf);
+}
+
+int my_fstatat(int dirfd, const char *pathname, struct stat *buf, int flags) {
+    if (pathname && pathname[0] == '/') {
+        return orig_fstatat(dirfd, redirect_path(pathname).c_str(), buf, flags);
+    }
+    return orig_fstatat(dirfd, pathname, buf, flags);
 }
 
 // --- JNI Implementation for NativeHookManager ---
@@ -66,14 +113,19 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
     g_virtual_root = v_root;
     g_package_name = p_name;
 
-    LOGI("Initializing Sandbox Hooks for: %s", p_name);
+    LOGI("Initializing Sandbox IO Layer for: %s", p_name);
 
     void* libc = dlopen("libc.so", RTLD_NOW);
     if (libc) {
         DobbyHook(dlsym(libc, "open"), (void*)my_open, (void**)&orig_open);
         DobbyHook(dlsym(libc, "openat"), (void*)my_openat, (void**)&orig_openat);
         DobbyHook(dlsym(libc, "access"), (void*)my_access, (void**)&orig_access);
-        LOGI("Native Hooks INSTALLED successfully.");
+        DobbyHook(dlsym(libc, "faccessat"), (void*)my_faccessat, (void**)&orig_faccessat);
+        DobbyHook(dlsym(libc, "stat"), (void*)my_stat, (void**)&orig_stat);
+        DobbyHook(dlsym(libc, "lstat"), (void*)my_lstat, (void**)&orig_lstat);
+        DobbyHook(dlsym(libc, "fstatat"), (void*)my_fstatat, (void**)&orig_fstatat);
+        
+        LOGI("Extended Native Hooks INSTALLED.");
         dlclose(libc);
     }
 
