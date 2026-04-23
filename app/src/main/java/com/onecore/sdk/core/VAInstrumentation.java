@@ -37,6 +37,11 @@ public class VAInstrumentation extends Instrumentation {
             }
             
             try {
+                // Prune internal metadata from intent to avoid detection
+                intent.removeExtra("target_activity");
+                intent.removeExtra("target_package");
+                intent.setComponent(new android.content.ComponentName(cl.loadClass(targetActivity).getPackage().getName(), targetActivity));
+                
                 // Return instance of the REAL game activity
                 Activity activity = (Activity) cl.loadClass(targetActivity).newInstance();
                 Logger.d(TAG, "Successfully instantiated guest activity: " + targetActivity);
@@ -51,7 +56,24 @@ public class VAInstrumentation extends Instrumentation {
 
     @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
-        // Here we could inject guest resources if needed, but we handle it via LoadedApk hooks
+        // Redirection check for resources
+        if (activity.getClass().getName().startsWith("com.pubg") || 
+            activity.getClass().getName().startsWith("com.epicgames")) {
+            
+            Logger.i(TAG, "Patching resources for activity: " + activity.getClass().getName());
+            // In a real sandbox, we would replace the activity's mResources/mContext here
+            // But we already patched LoadedApk, which should cover getResources() calls.
+        }
+        
         base.callActivityOnCreate(activity, icicle);
+    }
+
+    @Override
+    public android.app.Application newApplication(ClassLoader cl, String className, android.content.Context context) 
+            throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+        
+        // If we are in the sandbox process, we want to return the REAL game Application class
+        // This is usually called when the process starts, but we might need to trigger it manually
+        return base.newApplication(cl, className, context);
     }
 }

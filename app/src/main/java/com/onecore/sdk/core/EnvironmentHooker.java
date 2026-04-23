@@ -83,6 +83,17 @@ public class EnvironmentHooker {
             ApplicationInfo ai = (ApplicationInfo) mApplicationInfoField.get(value);
             ai.packageName = packageName;
             
+            // Force recreation of resources associated with this LoadedApk
+            try {
+                Field mResourcesField = value.getClass().getDeclaredField("mResources");
+                mResourcesField.setAccessible(true);
+                mResourcesField.set(value, null);
+                
+                Field mResDirField = value.getClass().getDeclaredField("mResDir");
+                mResDirField.setAccessible(true);
+                // mResDir is already correct if we haven't changed sourceDir, but good to be sure
+            } catch (Exception ignored) {}
+            
             Logger.d(TAG, "LoadedApk successfully spoofed for: " + packageName);
         }
 
