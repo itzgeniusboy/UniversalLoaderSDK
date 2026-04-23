@@ -208,34 +208,6 @@ public class OneCoreSDK {
         return SDKLicense.getInstance().getDaysLeft();
     }
 
-    // Feature 3 - Auto-Updater
-    public static void checkForUpdates() {
-        if (!SDKLicense.getInstance().isLicensed()) return;
-        Updater.getInstance().checkForUpdates(appContext, false);
-    }
-
-    public static String getCurrentVersion() {
-        return getVersionName(appContext);
-    }
-
-    private static String getVersionName(Context context) {
-        try {
-            return context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName;
-        } catch (Exception e) {
-            return "1.0.0";
-        }
-    }
-
-    public static void downloadUpdate(String url, String version) {
-        Updater.getInstance().startDownload(appContext, url, version);
-    }
-
-    public static void installUpdate(java.io.File file) {
-        // executeInstall is private in Updater, but installUpdate was previously used
-        // Since we refactored Updater, let's keep OneCoreSDK consistent
-        // For now, I'll update the references
-    }
-
     // Feature 4 - Remote Config
     public static void fetchRemoteConfig() {
         if (!SDKLicense.getInstance().isLicensed()) return;

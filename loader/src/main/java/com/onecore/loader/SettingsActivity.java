@@ -11,10 +11,6 @@ public class SettingsActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
-
-        findViewById(R.id.btnCheckUpdate).setOnClickListener(v -> {
-            new UpdateChecker(this).checkForUpdates(true);
-        });
     }
 
     @Override

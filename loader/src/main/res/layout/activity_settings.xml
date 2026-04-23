@@ -104,7 +104,6 @@
         android:padding="4dp">
 
         <RelativeLayout
-            android:id="@+id/btnCheckUpdate"
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:paddingLeft="16dp"
@@ -116,8 +115,16 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_centerVertical="true"
-                android:text="Check for Updates"
-                android:textColor="#007AFF"
+                android:text="OneCore Version"
+                android:textColor="@color/ios_text_primary"
+                android:textSize="17sp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentRight="true"
+                android:layout_centerVertical="true"
+                android:text="v1.0.5"
+                android:textColor="@color/ios_text_secondary"
                 android:textSize="17sp" />
         </RelativeLayout>
 

@@ -43,33 +43,48 @@ public class StubActivity extends Activity {
 
     private void launchTargetInVirtualSpace(String packageName, int displayId) {
         try {
-            Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
-            if (intent == null) {
-                Logger.e(TAG, "Failed to resolve launch intent for: " + packageName);
+            String targetActivity = getIntent().getStringExtra("target_activity");
+            if (targetActivity == null) {
+                Logger.e(TAG, "No target activity specified for handoff.");
                 finish();
                 return;
             }
 
+            Logger.d(TAG, "Attempting Direct Class Load: " + targetActivity);
+            
+            // Load the class from the guest class loader
+            Class<?> activityClass = getClassLoader().loadClass(targetActivity);
+            Intent intent = new Intent(this, activityClass);
+            
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
-            if (Build.VERSION.SDK_INT >= 26 && displayId > 0) {
-                ActivityOptions options = ActivityOptions.makeBasic();
-                options.setLaunchDisplayId(displayId);
-                // StartActivity from here ensures the task is bound to the stub's display
-                startActivity(intent, options.toBundle());
-                Logger.d(TAG, "Sandbox Handoff Success. DisplayID: " + displayId);
-            } else {
-                startActivity(intent);
-            }
+            startActivity(intent);
+            Logger.i(TAG, "Direct Load Success: " + targetActivity);
 
-            // Finish the stub once handoff is successful
-            finish();
+            // Do not finish immediately to allow task transition
+            // finish(); 
             
         } catch (Exception e) {
-            Logger.e(TAG, "Sandbox Handoff Failed: " + e.getMessage());
-            finish();
+            Logger.e(TAG, "Direct Load Failed, falling back: " + e.getMessage());
+            fallbackLaunch(packageName);
         }
+    }
+
+    private void fallbackLaunch(String packageName) {
+        try {
+            Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+            }
+            finish();
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public ClassLoader getClassLoader() {
+        ClassLoader guestLoader = VirtualContainer.getInstance().getGuestClassLoader();
+        return guestLoader != null ? guestLoader : super.getClassLoader();
     }
 }
