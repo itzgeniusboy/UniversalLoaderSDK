@@ -40,35 +40,34 @@ public class CloneManager {
             info.applicationInfo.packageName = virtualPkg;
             
             // 2. Define Isolated Sandbox Paths
-            String sandboxRoot = context.getFilesDir().getAbsolutePath() + "/sandbox/" + packageName;
-            info.applicationInfo.dataDir = sandboxRoot;
-            info.applicationInfo.nativeLibraryDir = sandboxRoot + "/lib";
+            String virtualRoot = context.getFilesDir().getAbsolutePath() + "/virtual/" + packageName;
+            info.applicationInfo.dataDir = virtualRoot;
+            info.applicationInfo.nativeLibraryDir = virtualRoot + "/lib";
             
             cache.put(packageName, info);
             
             // 3. Initialize Physical Sandbox Directories
-            File dataDir = new File(sandboxRoot);
+            File dataDir = new File(virtualRoot);
             if (!dataDir.exists()) {
                 dataDir.mkdirs();
-                new File(sandboxRoot, "files").mkdirs();
-                new File(sandboxRoot, "cache").mkdirs();
-                new File(sandboxRoot, "lib").mkdirs();
+                new File(virtualRoot, "data/files").mkdirs();
+                new File(virtualRoot, "data/cache").mkdirs();
+                new File(virtualRoot, "lib").mkdirs();
+                new File(virtualRoot, "obb").mkdirs();
             }
             
-            // 4. Setup Virtual Environment (Standard for OneCore Engine)
+            // 4. Setup Virtual Environment
             setupVirtualEnv(context, packageName, info.applicationInfo);
             
-            Logger.i(TAG, "Deep Clone Prepared: " + packageName + " -> " + virtualPkg);
+            Logger.i(TAG, "Deep Clone Prepared successfully: " + packageName);
             return true;
-        } catch (Exception e) {
-            Logger.e(TAG, "Clone Preparation Error", e);
+        } catch (Throwable e) {
+            Logger.e(TAG, "Clone Preparation Error: " + e.getMessage(), e);
             return false;
         }
     }
 
     private void setupVirtualEnv(Context context, String originalPkg, ApplicationInfo virtualApp) {
-        // Here we map the real APK resources to the virtual context
-        // In a real implementation, we would symlink native libraries from the source APK
         try {
             PackageManager pm = context.getPackageManager();
             ApplicationInfo originalApp = pm.getApplicationInfo(originalPkg, 0);
@@ -76,17 +75,29 @@ public class CloneManager {
             File sourceLibDir = new File(originalApp.nativeLibraryDir);
             File virtualLibDir = new File(virtualApp.nativeLibraryDir);
             
+            if (!virtualLibDir.exists()) virtualLibDir.mkdirs();
+            
             if (sourceLibDir.exists() && sourceLibDir.isDirectory()) {
                 File[] libs = sourceLibDir.listFiles();
                 if (libs != null) {
                     for (File lib : libs) {
-                        // Create symlinks to avoid copying massive game binaries
-                        Os.symlink(lib.getAbsolutePath(), virtualLibDir.getAbsolutePath() + "/" + lib.getName());
+                        try {
+                            File target = new File(virtualLibDir, lib.getName());
+                            if (target.exists()) target.delete();
+                            Os.symlink(lib.getAbsolutePath(), target.getAbsolutePath());
+                            Logger.d(TAG, "Mapped Library: " + lib.getName());
+                        } catch (Exception e) {
+                            Logger.w(TAG, "Failed to symlink " + lib.getName() + ": " + e.getMessage());
+                            // Fallback: Just point to original path if symlink fails? 
+                            // No, DexClassLoader needs a directory.
+                        }
                     }
                 }
+            } else {
+                Logger.w(TAG, "Source native library directory not found: " + originalApp.nativeLibraryDir);
             }
-        } catch (Exception e) {
-            Logger.w(TAG, "Virtual Lib Mapping Warning: " + e.getMessage());
+        } catch (Throwable e) {
+            Logger.e(TAG, "Virtual Lib Mapping Failure", e);
         }
     }
 

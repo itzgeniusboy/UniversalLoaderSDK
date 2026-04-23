@@ -14,10 +14,10 @@ public class IORedirector {
 
     static {
         try {
-            System.loadLibrary("onecore");
+            System.loadLibrary("onecore_native");
             Logger.i(TAG, "Native IO Hook Engine Linked.");
         } catch (UnsatisfiedLinkError e) {
-            Logger.e(TAG, "Failed to load native IO library: " + e.getMessage());
+            Logger.e(TAG, "Failed to load native library onecore_native: " + e.getMessage());
         }
     }
 

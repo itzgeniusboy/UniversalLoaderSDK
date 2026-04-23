@@ -103,8 +103,8 @@ public class VirtualContainer {
             // 1. Prepare Metadata and Sandbox (Deep Clone)
             boolean prepared = CloneManager.getInstance().prepareClone(context, packageName);
             if (!prepared) {
-                Logger.e(TAG, "Clone Preparation Failed: App not found or inaccessible.");
-                if (callback != null) callback.onLaunchFailed("Preparation Failed");
+                Logger.e(TAG, "Clone Preparation Failed for Package: " + packageName);
+                if (callback != null) callback.onLaunchFailed("Clone Preparation Failed: Ensure target app is installed.");
                 return false;
             }
 
@@ -112,9 +112,11 @@ public class VirtualContainer {
             bypassHiddenApiRestrictions();
 
             // 3. Isolated Context & Hooks Setup
+            Logger.d(TAG, "Ensuring virtual environment directories for: " + packageName);
             IORedirector.ensureVirtualEnv(context, packageName);
             
             // 4. Sandbox Launch (Host Process)
+            Logger.i(TAG, "Triggering Sandbox Host Activity...");
             launchInVirtualSandbox(context, packageName);
             Logger.i(TAG, "Sandbox boot command SENT successfully.");
             return true;

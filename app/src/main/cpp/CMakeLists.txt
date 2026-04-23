@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Library name matches System.loadLibrary("onecore_native")
 add_library(onecore_native SHARED
         native_hook.cpp
+        memory.cpp
         dobby.c
 )
 

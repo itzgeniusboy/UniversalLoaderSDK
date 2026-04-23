@@ -81,6 +81,11 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
     env->ReleaseStringUTFChars(package_name, p_name);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_onecore_sdk_IORedirector_initNativeHooks(JNIEnv* env, jclass clazz, jstring virtual_root, jstring package_name) {
+    Java_com_onecore_sdk_NativeHookManager_initHooks(env, clazz, virtual_root, package_name);
+}
+
 // --- JNI Implementation for NativeHook (Memory Ops) ---
 
 extern "C" JNIEXPORT jlong JNICALL
@@ -115,17 +120,6 @@ Java_com_onecore_sdk_NativeHook_writeMemoryNative(JNIEnv* env, jobject obj, jlon
     memcpy((void*)addr, buffer, size);
     env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
     return JNI_TRUE;
-}
-
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_onecore_sdk_NativeHook_readProcessMemory(JNIEnv* env, jobject obj, jint pid, jlong addr, jbyteArray buffer) {
-    // Shared memory or /proc/pid/mem based reading
-    return JNI_FALSE; 
-}
-
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_onecore_sdk_NativeHook_writeProcessMemory(JNIEnv* env, jobject obj, jint pid, jlong addr, jbyteArray buffer) {
-    return JNI_FALSE;
 }
 
 // --- UID Spoofing Hook ---

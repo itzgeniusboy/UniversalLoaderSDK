@@ -25,10 +25,22 @@ public class GameLauncher {
         try {
             // Detect installed version and generate virtual identity
             String originalPkg = PKG_IMOBILE;
+            boolean installed = true;
             try {
                 context.getPackageManager().getPackageInfo(PKG_IMOBILE, 0);
             } catch (Exception e) {
-                originalPkg = PKG_BGMI;
+                try {
+                    context.getPackageManager().getPackageInfo(PKG_BGMI, 0);
+                    originalPkg = PKG_BGMI;
+                } catch (Exception e2) {
+                    installed = false;
+                }
+            }
+            
+            if (!installed) {
+                Logger.e(TAG, "BGMI (com.pubg.imobile or com.pubg.bgmi) not installed on this device.");
+                if (callback != null) callback.onFailed("BGMI is not installed. Please install the game first.");
+                return;
             }
             
             // Masking the package identity for deep isolation
@@ -38,7 +50,7 @@ public class GameLauncher {
             if (callback != null) callback.onProgress("Initializing Isolated Engine...");
 
             // Ensure we use the Virtualization Container
-            VirtualContainer.getInstance().launch(context, targetPkg, new VirtualContainer.LaunchCallback() {
+            VirtualContainer.getInstance().launch(context, originalPkg, new VirtualContainer.LaunchCallback() {
                 @Override
                 public void onLaunchSuccess() {
                     Logger.i(TAG, "Virtual Session Active. Syncing Hooks...");
