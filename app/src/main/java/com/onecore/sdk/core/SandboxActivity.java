@@ -7,6 +7,7 @@ import android.content.pm.PackageInfo;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.os.Bundle;
+import com.onecore.sdk.NativeHookManager;
 import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.Logger;
 import java.io.File;
