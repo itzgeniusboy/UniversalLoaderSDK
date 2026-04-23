@@ -69,9 +69,10 @@ public class PermissionsHelper {
 
     /**
      * Triggers the appropriate settings UI for special permissions.
-     * Fixed: Simplified flow to avoid loops.
+     * Fixed: Seamless one-by-one flow.
      */
-    public static void requestSpecialPermissions(Context context) {
+    public static boolean requestNextPermission(Context context) {
+        // 1. Storage Permission (Android 11+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !hasStoragePermission(context)) {
             try {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
@@ -83,21 +84,36 @@ public class PermissionsHelper {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(intent);
             }
-            return;
+            return true;
+        } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && !hasStoragePermission(context)) {
+            if (context instanceof android.app.Activity) {
+                requestStandardStorage((android.app.Activity) context);
+                return true;
+            }
         }
 
+        // 2. Overlay Permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !hasOverlayPermission(context)) {
             Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:" + context.getPackageName()));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(intent);
-            return;
+            return true;
         }
 
+        // 3. Usage Stats
         if (!hasUsageStatsPermission(context)) {
             Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(intent);
+            return true;
         }
+        
+        return false;
+    }
+
+    @Deprecated
+    public static void requestSpecialPermissions(Context context) {
+        requestNextPermission(context);
     }
 }

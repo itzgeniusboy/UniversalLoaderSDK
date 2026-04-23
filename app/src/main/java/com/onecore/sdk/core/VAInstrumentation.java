@@ -37,11 +37,6 @@ public class VAInstrumentation extends Instrumentation {
             }
             
             try {
-                // Prune internal metadata from intent to avoid detection
-                intent.removeExtra("target_activity");
-                intent.removeExtra("target_package");
-                intent.setComponent(new android.content.ComponentName(cl.loadClass(targetActivity).getPackage().getName(), targetActivity));
-                
                 // Return instance of the REAL game activity
                 Activity activity = (Activity) cl.loadClass(targetActivity).newInstance();
                 Logger.d(TAG, "Successfully instantiated guest activity: " + targetActivity);

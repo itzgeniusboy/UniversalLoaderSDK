@@ -45,7 +45,6 @@ static std::string redirect_path(const char* path) {
     
     // Anti-Detection: Proc Spoofing
     if (s_path == "/proc/self/cmdline" || s_path == "/proc/cmdline") {
-        // Redirect to a fake cmdline file that contains only the package name
         std::string fake_cmd = g_virtual_root + "/proc_cmdline";
         FILE* f = fopen(fake_cmd.c_str(), "w");
         if (f) {
@@ -55,32 +54,22 @@ static std::string redirect_path(const char* path) {
         return fake_cmd;
     }
 
-    if (s_path == "/proc/self/maps" || s_path == "/proc/maps") {
-        // Unreal Engine scans maps for tampering. In a more advanced sandbox we'd filter this.
-        // For now, redirecting helps bypass some trivial checks.
-        return s_path; 
-    }
-
-    // Anti-Detection: Hide common root files
-    if (s_path.find("/su") != std::string::npos || 
-        s_path.find("/magisk") != std::string::npos ||
-        s_path.find("busybox") != std::string::npos) {
-        return "/system/bin/non_existent_file_onecore";
-    }
-
-    // 1. Data Dir Redirection (/data/data/...)
-    std::string data_target = "/data/data/" + g_package_name;
-    if (s_path.compare(0, data_target.length(), data_target) == 0) {
-        return g_virtual_root + "/data" + s_path.substr(data_target.length());
+    // 1. Data Dir Redirection (/data/user/0/... or /data/data/...)
+    const char* data_roots[] = {"/data/user/0/", "/data/data/"};
+    for (const char* root : data_roots) {
+        std::string target = std::string(root) + g_package_name;
+        if (s_path.compare(0, target.length(), target) == 0) {
+            return g_virtual_root + "/data" + s_path.substr(target.length());
+        }
     }
 
     // 2. OBB Dir Redirection (/storage/emulated/0/Android/obb/...)
     const char* obb_roots[] = {
         "/storage/emulated/0/Android/obb/",
         "/sdcard/Android/obb/",
-        "/mnt/shell/emulated/0/Android/obb/",
         "/storage/self/primary/Android/obb/",
-        "/mnt/media_rw/sdcard0/Android/obb/"
+        "/mnt/shell/emulated/0/Android/obb/",
+        "/data/media/0/Android/obb/"
     };
     
     for (const char* root : obb_roots) {
@@ -102,6 +91,13 @@ static std::string redirect_path(const char* path) {
         if (s_path.compare(0, target.length(), target) == 0) {
             return g_virtual_root + "/data" + s_path.substr(target.length());
         }
+    }
+
+    // 4. Root Hiding (Busybox, su, Magisk)
+    if (s_path.find("/su") != std::string::npos || 
+        s_path.find("/magisk") != std::string::npos ||
+        s_path.find("busybox") != std::string::npos) {
+        return "/system/bin/onecore_missing";
     }
 
     return s_path;
