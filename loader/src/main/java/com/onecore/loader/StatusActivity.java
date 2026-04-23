@@ -169,19 +169,23 @@ public class StatusActivity extends Activity {
                     downloadBar.setIndeterminate(false);
                     downloadBar.setProgress(100);
                     downloadStatus.setText("SUCCESS: Binary Data Extracted");
+                    Logger.i(TAG, "Assets ready at: " + extractedDir.getAbsolutePath());
                 });
                 done[0] = true;
             }
 
             @Override
             public void onFailure(String reason) {
+                Logger.e(TAG, "Download failed: " + reason);
                 error[0] = new Exception(reason);
                 done[0] = true;
             }
 
             @Override
-            public void onProgress(String msg) {
-                mainHandler.post(() -> downloadStatus.setText(msg));
+            public void onProgress(String message) {
+                mainHandler.post(() -> {
+                    downloadStatus.setText(message);
+                });
             }
         });
 
