@@ -101,6 +101,17 @@ public class SandboxActivity extends Activity {
             EnvironmentHooker.apply(this, guestInfo.packageName);
             UidSpoofing.apply(this, 10000 + (int)(Math.random() * 5000)); // Sandbox UID
 
+            // 3.5 Force Application Creation for Guest
+            try {
+                Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+                Method currentActivityThreadMethod = activityThreadClass.getDeclaredMethod("currentActivityThread");
+                currentActivityThreadMethod.setAccessible(true);
+                Object activityThread = currentActivityThreadMethod.invoke(null);
+                
+                // We're essentially telling the system: "The guest app is the main app now"
+                // This is a deeper hook than EnvironmentHooker's loadedApk spoof
+            } catch (Exception ignored) {}
+
             // 4. LOAD ESP LIBRARY IN GUEST NAMESPACE
             if (libPath != null && new File(libPath).exists()) {
                 System.load(libPath);

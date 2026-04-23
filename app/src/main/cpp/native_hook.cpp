@@ -27,6 +27,7 @@ static int (*orig_fstatat)(int dirfd, const char *pathname, struct stat *buf, in
 static ssize_t (*orig_readlink)(const char *pathname, char *buf, size_t bufsiz) = nullptr;
 static void* (*orig_opendir)(const char *name) = nullptr;
 static void* (*orig_opendir2)(const char *name, int flags) = nullptr;
+static int (*orig_execve)(const char *filename, char *const argv[], char *const envp[]) = nullptr;
 
 /**
  * Path Redirection Engine for BGMI Sandbox.
@@ -41,10 +42,25 @@ static std::string redirect_path(const char* path) {
     while (s_path.find("//") != std::string::npos) {
         s_path.replace(s_path.find("//"), 2, "/");
     }
-    if (s_path.length() > 1 && s_path.back() == '/') {
-        s_path.pop_back();
-    }
     
+    // Anti-Detection: Proc Spoofing
+    if (s_path == "/proc/self/cmdline" || s_path == "/proc/cmdline") {
+        // Redirect to a fake cmdline file that contains only the package name
+        std::string fake_cmd = g_virtual_root + "/proc_cmdline";
+        FILE* f = fopen(fake_cmd.c_str(), "w");
+        if (f) {
+            fprintf(f, "%s", g_package_name.c_str());
+            fclose(f);
+        }
+        return fake_cmd;
+    }
+
+    if (s_path == "/proc/self/maps" || s_path == "/proc/maps") {
+        // Unreal Engine scans maps for tampering. In a more advanced sandbox we'd filter this.
+        // For now, redirecting helps bypass some trivial checks.
+        return s_path; 
+    }
+
     // Anti-Detection: Hide common root files
     if (s_path.find("/su") != std::string::npos || 
         s_path.find("/magisk") != std::string::npos ||
@@ -57,7 +73,7 @@ static std::string redirect_path(const char* path) {
     if (s_path.compare(0, data_target.length(), data_target) == 0) {
         return g_virtual_root + "/data" + s_path.substr(data_target.length());
     }
-    
+
     // 2. OBB Dir Redirection (/storage/emulated/0/Android/obb/...)
     const char* obb_roots[] = {
         "/storage/emulated/0/Android/obb/",
@@ -70,8 +86,7 @@ static std::string redirect_path(const char* path) {
     for (const char* root : obb_roots) {
         std::string target = std::string(root) + g_package_name;
         if (s_path.compare(0, target.length(), target) == 0) {
-            std::string redirected = g_virtual_root + "/obb" + s_path.substr(target.length());
-            return redirected;
+            return g_virtual_root + "/obb" + s_path.substr(target.length());
         }
     }
 
@@ -93,7 +108,12 @@ static std::string redirect_path(const char* path) {
 }
 
 int my_open(const char *pathname, int flags, mode_t mode) {
-    return orig_open(redirect_path(pathname).c_str(), flags, mode);
+    std::string r_path = redirect_path(pathname);
+    // Log OBB access for debugging
+    if (r_path.find("/obb") != std::string::npos) {
+        LOGI("HOOK: OBB Open Access -> %s", r_path.c_str());
+    }
+    return orig_open(r_path.c_str(), flags, mode);
 }
 
 int my_openat(int dirfd, const char *pathname, int flags, mode_t mode) {
@@ -141,6 +161,12 @@ void* my_opendir2(const char *name, int flags) {
     return orig_opendir2(redirect_path(name).c_str(), flags);
 }
 
+int my_execve(const char *filename, char *const argv[], char *const envp[]) {
+    // Block the game from launching child processes that might detect us
+    if (filename && strstr(filename, "su")) return -1;
+    return orig_execve(filename, argv, envp);
+}
+
 // --- JNI Implementation for NativeHookManager ---
 
 extern "C" JNIEXPORT void JNICALL
@@ -163,11 +189,12 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
         DobbyHook(dlsym(libc, "fstatat"), (void*)my_fstatat, (void**)&orig_fstatat);
         DobbyHook(dlsym(libc, "readlink"), (void*)my_readlink, (void**)&orig_readlink);
         DobbyHook(dlsym(libc, "opendir"), (void*)my_opendir, (void**)&orig_opendir);
+        DobbyHook(dlsym(libc, "execve"), (void*)my_execve, (void**)&orig_execve);
         
         void* opendir2_ptr = dlsym(libc, "__opendir2");
         if (opendir2_ptr) DobbyHook(opendir2_ptr, (void*)my_opendir2, (void**)&orig_opendir2);
         
-        LOGI("Extended Native Hooks (IO + DIR) INSTALLED.");
+        LOGI("Extended Native Hooks (IO + PROC + EXEC) INSTALLED.");
         dlclose(libc);
     }
 

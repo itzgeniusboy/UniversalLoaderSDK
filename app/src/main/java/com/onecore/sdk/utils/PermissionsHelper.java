@@ -69,26 +69,24 @@ public class PermissionsHelper {
 
     /**
      * Triggers the appropriate settings UI for special permissions.
+     * Fixed: Simplified flow to avoid loops.
      */
     public static void requestSpecialPermissions(Context context) {
-        // We request them one by one based on priority
-        
-        // 1. Storage Permission (Android 11+) - CRITICAL FOR OBB
-        if (!hasStoragePermission(context)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !hasStoragePermission(context)) {
+            try {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
                         Uri.parse("package:" + context.getPackageName()));
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(intent);
-                return; // Stop here, wait for return
-            } else if (context instanceof android.app.Activity) {
-                requestStandardStorage((android.app.Activity) context);
-                return;
+            } catch (Exception e) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
             }
+            return;
         }
 
-        // 2. Overlay Permission (CRITICAL FOR ESP)
-        if (!hasOverlayPermission(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !hasOverlayPermission(context)) {
             Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:" + context.getPackageName()));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -96,7 +94,6 @@ public class PermissionsHelper {
             return;
         }
 
-        // 3. Usage Stats
         if (!hasUsageStatsPermission(context)) {
             Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

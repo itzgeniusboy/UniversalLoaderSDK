@@ -72,26 +72,39 @@ public class CloneManager {
 
     private void mapObb(Context context, String packageName, String virtualRoot) {
         try {
+            // Priority: Real OBB path
             File systemObbDir = new File("/storage/emulated/0/Android/obb/" + packageName);
+            if (!systemObbDir.exists()) {
+                systemObbDir = new File("/sdcard/Android/obb/" + packageName);
+            }
+            
             File virtualObbDir = new File(virtualRoot, "obb");
             if (!virtualObbDir.exists()) virtualObbDir.mkdirs();
 
             if (systemObbDir.exists() && systemObbDir.isDirectory()) {
                 File[] obbs = systemObbDir.listFiles();
-                if (obbs != null) {
+                if (obbs != null && obbs.length > 0) {
                     for (File obb : obbs) {
                         File target = new File(virtualObbDir, obb.getName());
-                        if (!target.exists()) {
-                            Os.symlink(obb.getAbsolutePath(), target.getAbsolutePath());
-                            Logger.d(TAG, "OBB Mapped: " + obb.getName());
+                        // If link fails, UE4 will just use the redirected path which we already hooked anyway
+                        try {
+                            if (!target.exists()) {
+                                Os.symlink(obb.getAbsolutePath(), target.getAbsolutePath());
+                                Logger.d(TAG, "OBB SYMLINK SUCCESS: " + obb.getName());
+                            }
+                        } catch (Exception e) {
+                            Logger.w(TAG, "Symlink failed, natively handled via redirect_path: " + e.getMessage());
+                            // Fallback: If symlink fails, the native open() hook will still catch it
                         }
                     }
+                } else {
+                    Logger.w(TAG, "OBB Folder is EMPTY at " + systemObbDir.getAbsolutePath());
                 }
             } else {
-                Logger.w(TAG, "System OBB not found at: " + systemObbDir.getAbsolutePath());
+                Logger.e(TAG, "CRITICAL: OBB Folder NOT FOUND. Game will Black Screen.");
             }
         } catch (Exception e) {
-            Logger.e(TAG, "OBB Mapping Failed", e);
+            Logger.e(TAG, "OBB Mapping Exception", e);
         }
     }
 
