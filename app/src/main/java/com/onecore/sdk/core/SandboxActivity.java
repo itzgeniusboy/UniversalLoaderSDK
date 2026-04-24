@@ -64,7 +64,7 @@ public class SandboxActivity extends Activity {
             
             // FALLBACK: If CloneManager cache is empty
             if (guestInfo == null) {
-                Logger.w(TAG, "Cache miss. Syncing metadata from IPC intent data...");
+                Logger.w(TAG, "Cache miss in sandbox process. Reconstructing metadata...");
                 String sourceDir = getIntent().getStringExtra("source_dir");
                 if (sourceDir != null) {
                     guestInfo = new PackageInfo();
@@ -74,6 +74,16 @@ public class SandboxActivity extends Activity {
                     guestInfo.applicationInfo.sourceDir = sourceDir;
                     guestInfo.applicationInfo.dataDir = getIntent().getStringExtra("data_dir");
                     guestInfo.applicationInfo.nativeLibraryDir = getIntent().getStringExtra("native_lib_dir");
+                    
+                    // Reconstruct a minimal activities list if we have a main_activity
+                    String mainActivityExtra = getIntent().getStringExtra("main_activity");
+                    if (mainActivityExtra != null) {
+                        android.content.pm.ActivityInfo ai = new android.content.pm.ActivityInfo();
+                        ai.name = mainActivityExtra;
+                        ai.packageName = originalPkg;
+                        guestInfo.activities = new android.content.pm.ActivityInfo[]{ai};
+                        Logger.d(TAG, "Reconstructed basic activities list with: " + mainActivityExtra);
+                    }
                     Logger.d(TAG, "Metadata reconstructed successfully.");
                 }
             }
@@ -163,59 +173,36 @@ public class SandboxActivity extends Activity {
     }
 
     private void launchGuestViaStub() throws Exception {
-        // Find Launch Activity with MAIN/LAUNCHER intent filters
-        String mainActivity = null;
+        String mainActivity = getIntent().getStringExtra("main_activity");
         
-        // HIGHLIGHT: Prioritize known BGMI/Unreal Engine entry points for 4.3.0
-        if (guestInfo.packageName.contains("pubg") || guestInfo.packageName.contains("imobile")) {
-            String[] variants = {
-                "com.epicgames.ue4.SplashActivity",
-                "com.tencent.tmgp.pubgmri.MainActivity",
-                "com.tencent.tmgp.pubgm.MainActivity",
-                "com.epicgames.ue4.GameActivity"
-            };
-            
-            for (String variant : variants) {
-                try {
-                    guestClassLoader.loadClass(variant);
-                    mainActivity = variant;
-                    Logger.i(TAG, "Unreal Engine Entry Point Identified: " + mainActivity);
-                    break;
-                } catch (ClassNotFoundException ignored) {}
-            }
-        }
-        
+        // Find Launch Activity in metadata if not explicitly passed
         if (mainActivity == null && guestInfo.activities != null) {
-            Logger.d(TAG, "Scanning manifest for launcher activities...");
             for (android.content.pm.ActivityInfo ai : guestInfo.activities) {
                 if (ai.name.toLowerCase().contains("splash") || ai.name.toLowerCase().contains("launcher")) {
                     mainActivity = ai.name;
-                    Logger.i(TAG, "Manifest match (Splash/Launcher): " + mainActivity);
                     break;
                 }
             }
-            if (mainActivity == null) {
-                 for (android.content.pm.ActivityInfo ai : guestInfo.activities) {
-                    if (ai.name.toLowerCase().contains("main")) {
-                        mainActivity = ai.name;
-                        Logger.i(TAG, "Manifest match (Main): " + mainActivity);
-                        break;
-                    }
-                }
-            }
-            if (mainActivity == null && guestInfo.activities.length > 0) {
-                mainActivity = guestInfo.activities[0].name;
-                Logger.w(TAG, "No naming match. Using first activity: " + mainActivity);
-            }
         }
         
-        if (mainActivity == null) throw new Exception("No launchable activity found in guest APK.");
+        // Final attempt via system resolution
+        if (mainActivity == null) {
+            try {
+                Intent launchIntent = getPackageManager().getLaunchIntentForPackage(guestInfo.packageName);
+                if (launchIntent != null && launchIntent.getComponent() != null) {
+                    mainActivity = launchIntent.getComponent().getClassName();
+                    Logger.i(TAG, "Resolved Launch Activity via PackageManager: " + mainActivity);
+                }
+            } catch (Exception e) {
+                Logger.w(TAG, "PackageManager resolution failed: " + e.getMessage());
+            }
+        }
+
+        if (mainActivity == null) throw new Exception("Could not resolve guest main activity.");
         
-        Logger.d(TAG, "Relaying to StubHost for: " + mainActivity);
-        Logger.i(TAG, "Final Launch Intent Configuration: PKG=" + guestInfo.packageName + " ACT=" + mainActivity);
+        Logger.i(TAG, "!! LAUNCHING GUEST !! -> " + mainActivity);
         
-        // CRITICAL FIX: We launch the StubActivity which IS in our manifest,
-        // but we pass the target guest class name to it.
+        // We use the StubActivity as a proxy to stay within the sandbox process
         Intent stubIntent = new Intent(this, StubActivity.class);
         stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         stubIntent.putExtra("target_activity", mainActivity);
@@ -224,11 +211,15 @@ public class SandboxActivity extends Activity {
         
         startActivity(stubIntent);
         
-        Logger.i(TAG, "Redirected to Stub Process. Shell standby...");
-        // Keep the shell alive for a moment to prevent process recycling
+        Logger.i(TAG, "Handover to StubActivity initiated. Transitioning...");
+        
+        // Keep this activity alive long enough to ensure transition success
         new Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-            if (!isFinishing()) finish();
-        }, 3000);
+            if (!isFinishing()) {
+                Logger.d(TAG, "Sandbox shell lifecycle completed.");
+                finish();
+            }
+        }, 5000); // 5 second buffer for heavy Unreal Engine games
     }
 
     @Override

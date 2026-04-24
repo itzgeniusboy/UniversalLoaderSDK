@@ -152,6 +152,21 @@ public class VirtualContainer {
             sandboxIntent.putExtra("source_dir", info.applicationInfo.sourceDir);
             sandboxIntent.putExtra("data_dir", info.applicationInfo.dataDir);
             sandboxIntent.putExtra("native_lib_dir", info.applicationInfo.nativeLibraryDir);
+            
+            // Resolve Launch Activity in Main Process to avoid process-isolation metadata misses
+            String launchActivity = null;
+            if (info.activities != null && info.activities.length > 0) {
+                for (android.content.pm.ActivityInfo ai : info.activities) {
+                    if (ai.name.toLowerCase().contains("splash") || ai.name.toLowerCase().contains("launcher")) {
+                        launchActivity = ai.name;
+                        break;
+                    }
+                }
+                if (launchActivity == null) launchActivity = info.activities[0].name;
+            }
+            if (launchActivity != null) {
+                sandboxIntent.putExtra("main_activity", launchActivity);
+            }
         }
         
         // Inject library via same-process queue

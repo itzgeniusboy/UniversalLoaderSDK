@@ -62,8 +62,10 @@ public class StubActivity extends Activity {
             // IMPORTANT: VAInstrumentation needs this intent to know what to swap
             startActivity(intent);
             
-            Logger.i(TAG, "Shadow Redirect Sent. Closing Stub Shell.");
-            finish(); 
+            Logger.i(TAG, "Shadow Redirect Sent. Shell transition in progress...");
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                if (!isFinishing()) finish(); 
+            }, 500); 
             
         } catch (Exception e) {
             Logger.e(TAG, "Direct Load Failed: " + e.getMessage());
