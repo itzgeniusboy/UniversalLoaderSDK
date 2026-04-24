@@ -119,6 +119,15 @@ public class VAInstrumentation extends Instrumentation {
                 } catch (Exception e) {
                     Logger.e(TAG, "Failed to inject ClassLoader into LoadedApk: " + e.getMessage());
                 }
+
+                // 🔥 Inject mOuterContext so views attach correctly
+                try {
+                    Field mOuterContext = baseContext.getClass().getDeclaredField("mOuterContext");
+                    mOuterContext.setAccessible(true);
+                    mOuterContext.set(baseContext, activity);
+                } catch (Exception e) {
+                    Logger.e(TAG, "Failed to inject mOuterContext: " + e.getMessage());
+                }
             }
 
         } catch (Throwable e) {

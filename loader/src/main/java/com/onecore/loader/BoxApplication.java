@@ -4,6 +4,7 @@ import android.app.Application;
 import com.onecore.sdk.OneCoreSDK;
 import com.onecore.sdk.utils.Logger;
 import com.onecore.sdk.core.hook.ActivityThreadHandlerHook;
+import com.onecore.sdk.core.hook.ApplicationHook;
 
 /**
  * Main Application class for OneCore Loader.
@@ -28,9 +29,23 @@ public class BoxApplication extends Application {
             hookInstrumentation();
             ActivityThreadHandlerHook.hook();
             
+            initVirtualApplication();
+            
             Logger.i(TAG, "SUCCESS: Virtualization Core and Hooks initialized in Application process.");
         } catch (Exception e) {
             Logger.e(TAG, "FATAL: SDK Initialization failed. Application may not function correctly.", e);
+        }
+    }
+
+    private void initVirtualApplication() {
+        try {
+            android.app.Application app = ApplicationHook.createApplication();
+            if (app != null) {
+                app.onCreate();
+                Logger.i(TAG, "Virtual Application created and onCreate called.");
+            }
+        } catch (Throwable e) {
+            Logger.e(TAG, "Failed to initialize virtual application: " + e.getMessage());
         }
     }
 
