@@ -8,6 +8,7 @@ import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.IBinder;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import com.onecore.sdk.utils.Logger;
 
 /**

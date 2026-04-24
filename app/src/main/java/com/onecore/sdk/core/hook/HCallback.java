@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.List;
 import com.onecore.sdk.core.CloneManager;
 import com.onecore.sdk.utils.Logger;
