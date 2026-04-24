@@ -19,6 +19,7 @@ public class VAInstrumentation extends Instrumentation {
 
     public VAInstrumentation(Instrumentation base) {
         this.base = base;
+        Logger.i(TAG, "VAInstrumentation Proxy initialized and active.");
     }
 
     @Override
@@ -114,6 +115,8 @@ public class VAInstrumentation extends Instrumentation {
 
     @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
+        Logger.d(TAG, "Hooked callActivityOnCreate: " + activity.getClass().getName());
+        
         ClassLoader guestLoader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
         
         if (guestLoader != null && activity.getClass().getClassLoader() == guestLoader) {
