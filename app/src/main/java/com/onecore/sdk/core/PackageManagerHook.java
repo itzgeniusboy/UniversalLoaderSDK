@@ -51,6 +51,10 @@ public class PackageManagerHook implements InvocationHandler {
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String name = method.getName();
 
+        if ("getAppResourcePackageName".equals(name) || "getAppResourcePackageNameAsUser".equals(name)) {
+            return BinderHookManager.sCurrentPackage;
+        }
+
         if (args != null && args.length > 0) {
             if ("getPackageInfo".equals(name) || "getPackageInfoAsUser".equals(name)) {
                 String pkgName = (String) args[0];

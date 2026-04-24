@@ -30,6 +30,7 @@ public class BinderHookManager {
                 hookActivityTaskManager();
             }
             hookPackageManager(context);
+            hookPermissionManager();
 
             // 2. 🔥 Execute ActivityThread Hook (Instrumentation & Handler)
             ActivityThreadHook.inject();
@@ -84,6 +85,28 @@ public class BinderHookManager {
         java.lang.reflect.Field mInstanceField = singletonClass.getDeclaredField("mInstance");
         mInstanceField.setAccessible(true);
         mInstanceField.set(gDefault, proxy);
+    }
+
+    private static void hookPermissionManager() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                // IPermissionManager is used on Android 11+
+                Class<?> pmClass = Class.forName("android.content.pm.IPermissionManager$Stub");
+                Method asInterface = pmClass.getDeclaredMethod("asInterface", IBinder.class);
+                
+                // Get original IPermissionManager
+                Method getService = Class.forName("android.os.ServiceManager").getDeclaredMethod("getService", String.class);
+                IBinder binder = (IBinder) getService.invoke(null, "permissionmgr");
+                Object realPM = asInterface.invoke(null, binder);
+                
+                Object proxy = ActivityManagerHook.createProxy(realPM); // Re-use generic proxy creator
+                
+                // We'd need to inject this into ServiceManager or where it's cached.
+                // This is complex as it's often cached in ActivityThread or ContextImpl.
+            }
+        } catch (Exception e) {
+            Logger.v(TAG, "PermissionManager hook not fully implemented for this version");
+        }
     }
 
     private static void hookPackageManager(android.content.Context context) throws Exception {

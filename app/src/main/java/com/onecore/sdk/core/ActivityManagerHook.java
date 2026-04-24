@@ -67,26 +67,34 @@ public class ActivityManagerHook implements InvocationHandler {
                             android.content.Intent stubIntent = new android.content.Intent();
                             stubIntent.setClassName(com.onecore.sdk.OneCoreSDK.getContext().getPackageName(), "com.onecore.sdk.core.StubActivity");
                             
-                            // Important: Use flags from original intent and ensure NEW_TASK if needed
                             stubIntent.addFlags(intent.getFlags());
                             stubIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
                             
                             stubIntent.putExtra("target_package", pkgName);
                             stubIntent.putExtra("target_activity", className);
                             stubIntent.putExtra("EXTRA_TARGET_INTENT", new android.content.Intent(intent));
+                            stubIntent.putExtra("_VA_NON_HOOK_", true);
                             
                             args[intentIdx] = stubIntent;
                             Logger.d("ActivityManagerHook", "Redirected to StubActivity");
                         } else if (methodName.equals("startService")) {
                             // Run the service in the virtual environment
                             ServiceManager.startService(com.onecore.sdk.OneCoreSDK.getContext(), intent);
-                            return null; // Don't let AMS handle it yet as we handle it ourselves
+                            return null;
                         } else if (methodName.equals("bindService")) {
-                            // bindService redirection logic - usually we'd have a ProxyService
+                            android.os.IBinder binder = ServiceManager.bindService(com.onecore.sdk.OneCoreSDK.getContext(), intent);
+                            // Real bind service involves ServiceConnection callback. This is a simplified direct binder return.
+                            return binder != null;
+                        } else if (methodName.equals("stopService")) {
+                             // Handle service stop
                         }
                     }
                 }
             }
+        }
+
+        if (methodName.equals("checkPermission")) {
+             return PermissionManager.checkPermission((String)args[0], (int)args[1], (int)args[2]);
         }
 
         // Return Fake UID or PID if requested by the Game

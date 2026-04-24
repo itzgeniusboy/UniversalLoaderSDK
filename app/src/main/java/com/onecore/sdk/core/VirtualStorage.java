@@ -38,11 +38,12 @@ public class VirtualStorage {
 
             String redirected = new File(sVirtualRoot, pkgName + "/data" + suffix).getAbsolutePath();
             
-            // Ensure parent directory exists
+            // Ensure parent directory exists for the redirected path
             File file = new File(redirected);
             File parent = file.getParentFile();
             if (parent != null && !parent.exists()) parent.mkdirs();
             
+            Logger.v(TAG, "Redirected: " + originalPath + " -> " + redirected);
             return redirected;
         }
         

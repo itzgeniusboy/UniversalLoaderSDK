@@ -13,6 +13,7 @@ import java.util.Map;
 public class ServiceManager {
     private static final String TAG = "OneCore-ServiceMgr";
     private static final Map<String, Service> mServices = new HashMap<>();
+    private static final Map<String, android.os.IBinder> mBinders = new HashMap<>();
 
     public static void startService(android.content.Context context, Intent intent) {
         if (intent == null || intent.getComponent() == null) return;
@@ -34,35 +35,57 @@ public class ServiceManager {
             // Apply ContextFixer before onCreate
             Context virtualContext = ContextManager.createVirtualContext(context, pkgName, cl, res);
             
-            // Use reflection to call attach
-            try {
-                java.lang.reflect.Method attach = Service.class.getDeclaredMethod("attach",
-                    android.content.Context.class,
-                    Class.forName("android.app.ActivityThread"),
-                    String.class,
-                    android.os.IBinder.class,
-                    android.app.Application.class,
-                    Object.class);
-                attach.setAccessible(true);
-                
-                // Try to find activity thread
-                Object at = null;
-                try {
-                    Class<?> atClass = Class.forName("android.app.ActivityThread");
-                    at = atClass.getDeclaredMethod("currentActivityThread").invoke(null);
-                } catch (Exception ignored) {}
-
-                attach.invoke(service, virtualContext, at, className, null, ApplicationManager.getVirtualApp(), null);
-            } catch (Exception e) {
-                Logger.w(TAG, "Standard attach failed, using context binding fallback: " + e.getMessage());
-                ContextManager.bindContext(service, pkgName, cl, res);
-            }
+            attachService(service, virtualContext, className, pkgName, cl, res);
 
             service.onCreate();
             service.onStartCommand(intent, 0, 0);
             mServices.put(className, service);
         } catch (Exception e) {
             Logger.e(TAG, "Failed to start virtual service " + className, e);
+        }
+    }
+
+    public static android.os.IBinder bindService(android.content.Context context, Intent intent) {
+        if (intent == null || intent.getComponent() == null) return null;
+        
+        String className = intent.getComponent().getClassName();
+        String pkgName = intent.getComponent().getPackageName();
+        
+        if (!mServices.containsKey(className)) {
+            startService(context, intent);
+        }
+        
+        Service service = mServices.get(className);
+        if (service != null) {
+            if (mBinders.containsKey(className)) return mBinders.get(className);
+            android.os.IBinder binder = service.onBind(intent);
+            mBinders.put(className, binder);
+            return binder;
+        }
+        return null;
+    }
+
+    private static void attachService(Service service, Context virtualContext, String className, String pkgName, ClassLoader cl, android.content.res.Resources res) {
+        try {
+            java.lang.reflect.Method attach = Service.class.getDeclaredMethod("attach",
+                android.content.Context.class,
+                Class.forName("android.app.ActivityThread"),
+                String.class,
+                android.os.IBinder.class,
+                android.app.Application.class,
+                Object.class);
+            attach.setAccessible(true);
+            
+            Object at = null;
+            try {
+                Class<?> atClass = Class.forName("android.app.ActivityThread");
+                at = atClass.getDeclaredMethod("currentActivityThread").invoke(null);
+            } catch (Exception ignored) {}
+
+            attach.invoke(service, virtualContext, at, className, null, ApplicationManager.getVirtualApp(), null);
+        } catch (Exception e) {
+            Logger.w(TAG, "Standard attach failed, using context binding fallback: " + e.getMessage());
+            ContextManager.bindContext(service, pkgName, cl, res);
         }
     }
 

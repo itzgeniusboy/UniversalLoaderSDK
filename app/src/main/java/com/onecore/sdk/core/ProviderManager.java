@@ -16,7 +16,7 @@ public class ProviderManager {
     private static final String TAG = "OneCore-ProviderMgr";
 
     public static void installProviders(Context context, Application app, String packageName, List<ProviderInfo> providers) {
-        if (providers == null || providers.isEmpty()) return;
+        if (providers == null || providers.isEmpty() || app == null) return;
 
         Logger.i(TAG, "Installing " + providers.size() + " providers for " + packageName);
 
@@ -26,35 +26,40 @@ public class ProviderManager {
             curAtMethod.setAccessible(true);
             Object activityThread = curAtMethod.invoke(null);
 
+            if (activityThread == null) return;
+
+            // ActivityThread.installContentProviders(Context, List<ProviderInfo>)
+            Method installMethod = null;
+            try {
+                installMethod = atClass.getDeclaredMethod("installContentProviders", Context.class, List.class);
+                installMethod.setAccessible(true);
+            } catch (NoSuchMethodException e) {
+                // Older versions or different signature
+            }
+
+            if (installMethod != null) {
+                installMethod.invoke(activityThread, app, providers);
+                Logger.d(TAG, "System installContentProviders called successfully");
+                return;
+            }
+
+            // Manual fallback if installation method is not found
             for (ProviderInfo info : providers) {
                 try {
-                    Logger.d(TAG, "Installing provider: " + info.name + " (" + info.authority + ")");
-                    
-                    // 1. Create instance
+                    Logger.d(TAG, "Installing provider manually: " + info.name);
                     ClassLoader cl = app.getClassLoader();
                     ContentProvider provider = (ContentProvider) cl.loadClass(info.name).newInstance();
                     
-                    // 2. Attach context
-                    // Note: ContentProvider.attachInfo is the standard way to initialize
                     Method attachInfo = ContentProvider.class.getDeclaredMethod("attachInfo", Context.class, ProviderInfo.class);
                     attachInfo.setAccessible(true);
                     
-                    // Ensure context is the virtualized one
-                    Context providerContext = ContextManager.createVirtualContext(context, packageName, cl, app.getResources());
-                    attachInfo.invoke(provider, providerContext, info);
-                    
-                    // 3. Register with ActivityThread to make it accessible via ContentResolver
-                    // This is complex as it involves private APIs that vary across Android versions.
-                    // A simpler way often used in virtualization is to hook the ContentResolver calls.
-                    // However, we can try to inject into mLocalProviders
-                    registerProviderLocally(activityThread, provider, info);
-                    
+                    attachInfo.invoke(provider, app, info);
                 } catch (Exception e) {
-                    Logger.e(TAG, "Failed to install provider: " + info.name, e);
+                    Logger.e(TAG, "Failed to install provider manually: " + info.name, e);
                 }
             }
         } catch (Exception e) {
-            Logger.e(TAG, "Failed to access ActivityThread for provider installation", e);
+            Logger.e(TAG, "Failed during provider installation", e);
         }
     }
 
