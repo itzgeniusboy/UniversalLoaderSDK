@@ -166,8 +166,10 @@ public class OneCoreSDK {
             return;
         }
         
-        Logger.d(TAG, "Launching app: " + packageName);
-        VirtualContainer.getInstance().launch(appContext, packageName, callback);
+        Logger.d(TAG, "Launching app in background: " + packageName);
+        new Thread(() -> {
+            VirtualContainer.getInstance().launch(appContext, packageName, callback);
+        }).start();
     }
 
     public static Context getContext() {

@@ -357,8 +357,7 @@ public class VirtualContainer {
      */
     public Object proxyService(Object realService, final String serviceName, String packageName) {
         if ("package".equals(serviceName)) {
-            String vPath = OneCoreSDK.getContext().getFilesDir().getAbsolutePath() + "/virtual/" + packageName;
-            return PackageManagerHook.createProxy(realService, packageName, vPath);
+            return PackageManagerHook.createProxy(realService);
         } else if ("activity".equals(serviceName)) {
             return ActivityManagerHook.createProxy(realService);
         }

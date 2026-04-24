@@ -99,7 +99,12 @@ public class CloneManager {
             
             // Task 5: Extraction
             Logger.i(TAG, "Triggering Native Library Extraction...");
-            extractNativeLibs(appInfo.nativeLibraryDir, libDirStr);
+            File libDir = new File(libDirStr);
+            if (libDir.list() == null || libDir.list().length == 0) {
+                extractNativeLibs(appInfo.nativeLibraryDir, libDirStr);
+            } else {
+                Logger.d(TAG, "Native libraries already extracted.");
+            }
             
             Logger.i(TAG, "!! CLONE PREPARATION COMPLETE !! Result: SUCCESS");
             return true;
