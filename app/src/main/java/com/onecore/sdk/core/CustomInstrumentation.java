@@ -13,6 +13,7 @@ import java.lang.reflect.Method;
 /**
  * FINAL Instrumentation Hook for Phase 1.
  * Ensures REAL Activity is loaded using the guest ClassLoader (DexClassLoader).
+ * Fixes the "Black Screen" by forcing correct ClassLoader and Resources during Activity creation.
  */
 public class CustomInstrumentation extends Instrumentation {
     private static final String TAG = "OneCore-Instrumentation";
@@ -33,11 +34,20 @@ public class CustomInstrumentation extends Instrumentation {
             Logger.i(TAG, "Intercepting Activity Creation: " + className + " -> " + realClassName);
             
             // 2. LOAD USING GUEST CLASSLOADER (DexClassLoader)
-            // MUST use the isolated loader to avoid "Class Not Found" or "Wrong Class" errors
+            // IGNORE incoming ClassLoader cl as requested
             ClassLoader guestLoader = CloneManager.getInstance().getClassLoader();
             if (guestLoader != null) {
-                Logger.d(TAG, "Using DexClassLoader for " + realClassName);
-                return super.newActivity(guestLoader, realClassName, targetIntent);
+                Logger.d(TAG, "Forcing DexClassLoader for: " + realClassName);
+                // Manually load and instantiate to ensure isolation
+                try {
+                    Class<?> activityClass = guestLoader.loadClass(realClassName);
+                    Activity activity = (Activity) activityClass.newInstance();
+                    return activity;
+                } catch (Exception e) {
+                    Logger.e(TAG, "Manual Class Loading FAILED: " + realClassName, e);
+                    // Fallback to super with guestLoader
+                    return super.newActivity(guestLoader, realClassName, targetIntent);
+                }
             }
         }
 
@@ -48,7 +58,8 @@ public class CustomInstrumentation extends Instrumentation {
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
         Logger.i(TAG, ">>> callActivityOnCreate: " + activity.getClass().getName());
         
-        // 3. SECURE CONTEXT FIX (Resources/ClassLoader injection into the instance)
+        // 3. SECURE CONTEXT FIX (Resources/ClassLoader/LoadedApk injection)
+        // This is the most critical part to remove the Black Screen!
         fixContext(activity);
         
         try {
@@ -65,37 +76,46 @@ public class CustomInstrumentation extends Instrumentation {
             android.content.res.Resources guestResources = CloneManager.getInstance().getResources();
             ClassLoader guestLoader = CloneManager.getInstance().getClassLoader();
 
-            if (guestResources != null) {
-                // Patch ContextImpl Resources
-                try {
-                    Field mResources = baseContext.getClass().getDeclaredField("mResources");
-                    mResources.setAccessible(true);
-                    mResources.set(baseContext, guestResources);
-                } catch (Exception ignored) {}
+            if (guestResources != null && guestLoader != null) {
+                Logger.d(TAG, "Patching Activity Context with Guest Resources and ClassLoader.");
 
-                // Patch ContextImpl LoadedApk (mPackageInfo)
-                try {
-                    Field mPackageInfo = baseContext.getClass().getDeclaredField("mPackageInfo");
-                    mPackageInfo.setAccessible(true);
+                // Patch ContextImpl fields
+                Field mResources = getField(baseContext.getClass(), "mResources");
+                if (mResources != null) mResources.set(baseContext, guestResources);
+
+                // Patch LoadedApk (mPackageInfo) - This ensures all future resource lookups are correct
+                Field mPackageInfo = getField(baseContext.getClass(), "mPackageInfo");
+                if (mPackageInfo != null) {
                     Object loadedApk = mPackageInfo.get(baseContext);
-
                     if (loadedApk != null) {
-                        Field mClassLoader = loadedApk.getClass().getDeclaredField("mClassLoader");
-                        mClassLoader.setAccessible(true);
-                        mClassLoader.set(loadedApk, guestLoader);
+                        Field mClassLoader = getField(loadedApk.getClass(), "mClassLoader");
+                        if (mClassLoader != null) mClassLoader.set(loadedApk, guestLoader);
 
-                        Field mResourcesField = loadedApk.getClass().getDeclaredField("mResources");
-                        mResourcesField.setAccessible(true);
-                        mResourcesField.set(loadedApk, guestResources);
+                        Field mRes = getField(loadedApk.getClass(), "mResources");
+                        if (mRes != null) mRes.set(loadedApk, guestResources);
                     }
-                } catch (Exception ignored) {}
+                }
+                
+                // Patch Activity class resource cache
+                Field mActivityRes = getField(Activity.class, "mResources");
+                if (mActivityRes != null) mActivityRes.set(activity, guestResources);
             }
         } catch (Exception e) {
             Logger.e(TAG, "Context Fix FAILED", e);
         }
     }
 
-    // Capture startActivity calls to redirect them to StubActivity (Reflection proxy to mBase)
+    private Field getField(Class<?> clazz, String fieldName) {
+        try {
+            Field field = clazz.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return field;
+        } catch (NoSuchFieldException e) {
+            return null;
+        }
+    }
+
+    // Capture startActivity calls to redirect them to StubActivity
     public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
