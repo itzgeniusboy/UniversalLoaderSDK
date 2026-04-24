@@ -44,46 +44,82 @@ public class ProviderManager {
             Object transport = getProviderTransport(provider);
             if (transport == null) return;
 
-            // 1. Update mLocalProviders
-            Field mLocalProvidersField = activityThread.getClass().getDeclaredField("mLocalProviders");
-            mLocalProvidersField.setAccessible(true);
-            java.util.Map mLocalProviders = (java.util.Map) mLocalProvidersField.get(activityThread);
-            mLocalProviders.put(provider.getClass().getName(), transport);
+            String[] authorities = info.authority.split(";");
 
-            // 2. Update mProviderMap
-            Field mProviderMapField = activityThread.getClass().getDeclaredField("mProviderMap");
-            mProviderMapField.setAccessible(true);
-            java.util.Map mProviderMap = (java.util.Map) mProviderMapField.get(activityThread);
-            
-            if (info.authority != null) {
-                String[] auths = info.authority.split(";");
-                for (String auth : auths) {
-                    // On newer Android, mProviderMap values are ProviderClientRecord
-                    // On older, they might be direct IContentProvider
-                    // We try to find the correct value for the map to stay crash-free
-                    Object mapValue = transport; // Default
-                    
-                    // Heuristic: check if there's any existing entry to see what type is expected
-                    if (!mProviderMap.isEmpty()) {
-                        Object firstVal = mProviderMap.values().iterator().next();
-                        if (firstVal != null && !firstVal.getClass().getName().contains("IContentProvider")) {
-                             // It's likely a ProviderClientRecord or similar intermediate holder
-                             // We could try to create one, but it's risky.
-                             // Instead, we just put our transport. If it fails, the next access will use IActivityManager.getContentProvider
-                             // which we already hooked and serves our proxied provider correctly.
-                        }
-                    }
-                    
+            // 1. Create ProviderClientRecord if possible (Android 4.0+)
+            Object pcRecord = null;
+            try {
+                Class<?> pcrClass = Class.forName("android.app.ActivityThread$ProviderClientRecord");
+                java.lang.reflect.Constructor<?> constructor = pcrClass.getDeclaredConstructors()[0];
+                constructor.setAccessible(true);
+                
+                // Signatures vary:
+                // Newer: (String[] names, IContentProvider provider, ContentProvider localProvider, ContentProviderHolder holder)
+                // Older: (String name, IContentProvider provider, ContentProvider localProvider)
+                if (constructor.getParameterTypes().length >= 4) {
+                    pcRecord = constructor.newInstance(authorities, transport, provider, null);
+                } else {
+                    pcRecord = constructor.newInstance(info.authority, transport, provider);
+                }
+            } catch (Exception e) {
+                Logger.w(TAG, "Could not create ProviderClientRecord, using transport directly");
+            }
+
+            Object mapValue = (pcRecord != null) ? pcRecord : transport;
+
+            // 2. Update mLocalProviders (IBinder -> PCRecord/Transport)
+            try {
+                Field mLocalProvidersField = atClass.getDeclaredField("mLocalProviders");
+                mLocalProvidersField.setAccessible(true);
+                java.util.Map mLocalProviders = (java.util.Map) mLocalProvidersField.get(activityThread);
+                mLocalProviders.put(transport instanceof android.os.IBinder ? transport : provider.getClass().getName(), mapValue);
+            } catch (Exception e) {
+                Logger.w(TAG, "mLocalProviders update failed");
+            }
+
+            // 3. Update mProviderMap (ProviderKey/String -> PCRecord/Transport)
+            try {
+                Field mProviderMapField = atClass.getDeclaredField("mProviderMap");
+                mProviderMapField.setAccessible(true);
+                java.util.Map mProviderMap = (java.util.Map) mProviderMapField.get(activityThread);
+                
+                for (String auth : authorities) {
+                    // Try direct string key (older)
                     mProviderMap.put(auth, mapValue);
+                    
+                    // Try ProviderKey (newer Android)
+                    try {
+                        Class<?> pkClass = Class.forName("android.app.ActivityThread$ProviderKey");
+                        java.lang.reflect.Constructor<?> pkCons = pkClass.getDeclaredConstructor(String.class, int.class);
+                        pkCons.setAccessible(true);
+                        Object pk = pkCons.newInstance(auth, android.os.Process.myUserHandle().hashCode());
+                        mProviderMap.put(pk, mapValue);
+                    } catch (Exception ignored) {}
+
                     // Register in our mapper for redirection help
                     AuthorityMapper.registerAuthority(auth, auth); 
-                    Logger.v(TAG, "Authority registered: " + auth);
                 }
+            } catch (Exception e) {
+                Logger.w(TAG, "mProviderMap update failed");
             }
-            
+
+            // 4. Update mLocalProvidersByName (String/ComponentName -> PCRecord/Transport)
+            try {
+                Field mLocalProvidersByNameField = atClass.getDeclaredField("mLocalProvidersByName");
+                mLocalProvidersByNameField.setAccessible(true);
+                java.util.Map mLocalProvidersByName = (java.util.Map) mLocalProvidersByNameField.get(activityThread);
+                for (String auth : authorities) {
+                    mLocalProvidersByName.put(auth, mapValue);
+                }
+                
+                // Also ComponentName if expected
+                android.content.ComponentName cn = new android.content.ComponentName(info.packageName, info.name);
+                mLocalProvidersByName.put(cn, mapValue);
+            } catch (Exception ignored) {}
+
             Logger.i(TAG, "Provider " + info.name + " (" + info.authority + ") registered locally in ActivityThread.");
         } catch (Exception e) {
-            Logger.w(TAG, "Failed to register provider in ActivityThread maps: " + e.getMessage());
+            Logger.e(TAG, "Critical: Provider registration FAILED: " + e.getMessage(), e);
         }
     }
 
