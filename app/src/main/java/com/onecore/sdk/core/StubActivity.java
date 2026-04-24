@@ -21,32 +21,8 @@ public class StubActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        Intent target = getIntent();
-        String realActivity = target.getStringExtra("target_activity");
-
-        if (realActivity != null) {
-            try {
-                Logger.i(TAG, "Redirecting from Stub to: " + realActivity);
-                Intent newIntent = new Intent();
-                newIntent.setClassName(this, realActivity);
-                newIntent.putExtras(target);
-                
-                // IMPORTANT: Ensure flags are handled or added if needed
-                newIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                
-                startActivity(newIntent);
-                finish();
-
-            } catch (Exception e) {
-                Logger.e(TAG, "Redirection failed: " + e.getMessage());
-                e.printStackTrace();
-                finish();
-            }
-        } else {
-            Logger.w(TAG, "StubActivity created without target_activity. Finishing.");
-            finish();
-        }
+        // DO NOTHING
+        // Instrumentation will replace this Activity automatically
     }
 
     @Override
