@@ -92,8 +92,24 @@ public class ActivityManagerHook implements InvocationHandler {
                     return null; // Skip real system broadcast as we handled it
                 }
             } else if (methodName.equals("getContentProvider") || methodName.equals("getContentProviderExternal")) {
-                String authority = (String) args[1];
-                android.content.pm.ProviderInfo pi = com.onecore.sdk.core.pm.VirtualPackageManager.resolveProviderByAuthority(authority);
+                String authority = null;
+                // Heuristic to find the authority name: it's a String that isn't a package name
+                // and usually appears after callingPkg/attributionTag
+                for (Object arg : args) {
+                    if (arg instanceof String) {
+                        String s = (String) arg;
+                        if (s.contains(".") || !s.isEmpty()) {
+                            // Check if it's a resolved authority in our registry
+                            if (com.onecore.sdk.core.pm.VirtualPackageManager.resolveProviderByAuthority(s) != null) {
+                                authority = s;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (authority != null) {
+                    android.content.pm.ProviderInfo pi = com.onecore.sdk.core.pm.VirtualPackageManager.resolveProviderByAuthority(authority);
                 if (pi != null) {
                     Logger.d("ActivityManagerHook", "IActivityManager." + methodName + " spoof: " + authority);
                     

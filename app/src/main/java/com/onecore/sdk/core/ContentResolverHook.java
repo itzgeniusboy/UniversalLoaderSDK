@@ -85,51 +85,87 @@ public class ContentResolverHook implements InvocationHandler {
         // signatures for IContentProvider differ significantly by API level
         // We use a flexible dispatcher that tries to match args to ContentProvider methods
         
-        switch (methodName) {
-            case "query":
-                // Android 11+: query(attributionTag, uri, projection, queryArgs, cancellationSignal)
-                // Android 10: query(callingPkg, uri, projection, queryArgs, cancellationSignal)
-                // Older: query(callingPkg, uri, projection, selection, selectionArgs, sortOrder, cancellationSignal)
-                return handleQuery(args);
-            case "insert":
-                // insert(callingPkg, attributionTag, uri, values, extras)
-                return handleInsert(args);
-            case "update":
-                return handleUpdate(args);
-            case "delete":
-                return handleDelete(args);
-            case "call":
-                // call(callingPkg, attributionTag, authority, method, arg, extras)
-                return handleCall(args);
-            case "getType":
-                return localProvider.getType(findUri(args));
-            case "openFile":
-                return localProvider.openFile(findUri(args), findString(args, "r"));
-            case "openAssetFile":
-                return localProvider.openAssetFile(findUri(args), findString(args, "r"));
-            case "openTypedAssetFile":
-                return localProvider.openTypedAssetFile(findUri(args), findString(args, "*/*"), findBundle(args), null);
-            case "getStreamTypes":
-                return localProvider.getStreamTypes(findUri(args), findString(args, "*/*"));
-            case "bulkInsert":
-                return handleBulkInsert(args);
-            case "canonicalize":
-                return localProvider.canonicalize(findUri(args));
-            case "uncanonicalize":
-                return localProvider.uncanonicalize(findUri(args));
-            case "refresh":
-                return localProvider.refresh(findUri(args), findBundle(args), null);
-            case "applyBatch":
-                return handleApplyBatch(args);
-            case "createCancellationSignal":
-                try {
-                    return Class.forName("android.os.ICancellationSignal$Stub").newInstance();
-                } catch (Exception e) {
-                    return null;
-                }
+        // Identity Spoofing: Set calling package if possible
+        String callingPkg = findCallingPackage(args);
+        setCallingPackage(callingPkg);
+        
+        try {
+            switch (methodName) {
+                case "query":
+                    return handleQuery(args);
+                case "insert":
+                    return handleInsert(args);
+                case "update":
+                    return handleUpdate(args);
+                case "delete":
+                    return handleDelete(args);
+                case "call":
+                    return handleCall(args);
+                case "getType":
+                    return localProvider.getType(findUri(args));
+                case "openFile":
+                    return localProvider.openFile(findUri(args), findString(args, "r"));
+                case "openAssetFile":
+                    return localProvider.openAssetFile(findUri(args), findString(args, "r"));
+                case "openTypedAssetFile":
+                    return localProvider.openTypedAssetFile(findUri(args), findString(args, "*/*"), findBundle(args), null);
+                case "getStreamTypes":
+                    return localProvider.getStreamTypes(findUri(args), findString(args, "*/*"));
+                case "bulkInsert":
+                    return handleBulkInsert(args);
+                case "canonicalize":
+                    return localProvider.canonicalize(findUri(args));
+                case "uncanonicalize":
+                    return localProvider.uncanonicalize(findUri(args));
+                case "refresh":
+                    return localProvider.refresh(findUri(args), findBundle(args), null);
+                case "applyBatch":
+                    return handleApplyBatch(args);
+                case "createCancellationSignal":
+                    try {
+                        return Class.forName("android.os.ICancellationSignal$Stub").newInstance();
+                    } catch (Exception e) {
+                        return null;
+                    }
+            }
+        } finally {
+            clearCallingPackage();
         }
         
         return null; 
+    }
+
+    private String findCallingPackage(Object[] args) {
+        if (args == null || args.length == 0) return null;
+        if (args[0] instanceof String) {
+            String s = (String) args[0];
+            // Calling package usually has at least one dot
+            if (s.contains(".")) return s;
+        }
+        return null;
+    }
+
+    private void setCallingPackage(String pkg) {
+        if (pkg == null) return;
+        try {
+            java.lang.reflect.Field field = ContentProvider.class.getDeclaredField("mCallingPackage");
+            field.setAccessible(true);
+            ThreadLocal<String> threadLocal = (ThreadLocal<String>) field.get(null);
+            if (threadLocal != null) {
+                threadLocal.set(pkg);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void clearCallingPackage() {
+        try {
+            java.lang.reflect.Field field = ContentProvider.class.getDeclaredField("mCallingPackage");
+            field.setAccessible(true);
+            ThreadLocal<String> threadLocal = (ThreadLocal<String>) field.get(null);
+            if (threadLocal != null) {
+                threadLocal.remove();
+            }
+        } catch (Exception ignored) {}
     }
 
     private Object handleApplyBatch(Object[] args) {
@@ -199,6 +235,7 @@ public class ContentResolverHook implements InvocationHandler {
         String[] selectionArgs = null;
         String sortOrder = null;
         Bundle queryArgs = null;
+        Object cancellationSignal = null;
         
         // Find Uri index to use as an anchor
         int uriIndex = -1;
@@ -210,7 +247,7 @@ public class ContentResolverHook implements InvocationHandler {
         }
 
         if (uriIndex != -1) {
-            // After Uri, the order is usually: projection, queryArgs (or selection, selectionArgs, sortOrder)
+            // After Uri, the order is usually: projection, queryArgs/selection, selectionArgs, sortOrder, cancellationSignal
             if (uriIndex + 1 < args.length && args[uriIndex + 1] instanceof String[]) {
                 projection = (String[]) args[uriIndex + 1];
             }
@@ -220,13 +257,17 @@ public class ContentResolverHook implements InvocationHandler {
             if (nextIdx < args.length) {
                 if (args[nextIdx] instanceof Bundle) {
                     queryArgs = (Bundle) args[nextIdx];
-                } else if (args[nextIdx] instanceof String) {
+                    if (nextIdx + 1 < args.length && !args[nextIdx + 1].getClass().getName().contains("String")) {
+                        cancellationSignal = args[nextIdx + 1];
+                    }
+                } else if (args[nextIdx] instanceof String || args[nextIdx] == null) {
                     selection = (String) args[nextIdx];
                     if (nextIdx + 1 < args.length && args[nextIdx + 1] instanceof String[]) {
                         selectionArgs = (String[]) args[nextIdx + 1];
                     }
                     if (nextIdx + 2 < args.length && args[nextIdx + 2] instanceof String) {
                         sortOrder = (String) args[nextIdx + 2];
+                        if (nextIdx + 3 < args.length) cancellationSignal = args[nextIdx + 3];
                     }
                 }
             }
@@ -234,7 +275,9 @@ public class ContentResolverHook implements InvocationHandler {
         
         try {
             if (queryArgs != null && android.os.Build.VERSION.SDK_INT >= 26) {
-                return localProvider.query(uri, projection, queryArgs, null);
+                android.os.CancellationSignal signal = null;
+                if (cancellationSignal instanceof android.os.CancellationSignal) signal = (android.os.CancellationSignal) cancellationSignal;
+                return localProvider.query(uri, projection, queryArgs, signal);
             }
             return localProvider.query(uri, projection, selection, selectionArgs, sortOrder);
         } catch (Exception e) {
