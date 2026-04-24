@@ -105,6 +105,10 @@ public class ContentResolverHook implements InvocationHandler {
                 return localProvider.openFile(findUri(args), findString(args, "r"));
             case "openAssetFile":
                 return localProvider.openAssetFile(findUri(args), findString(args, "r"));
+            case "openTypedAssetFile":
+                return localProvider.openTypedAssetFile(findUri(args), findString(args, "*/*"), findBundle(args), null);
+            case "getStreamTypes":
+                return localProvider.getStreamTypes(findUri(args), findString(args, "*/*"));
             case "bulkInsert":
                 return handleBulkInsert(args);
             case "canonicalize":
@@ -157,7 +161,12 @@ public class ContentResolverHook implements InvocationHandler {
         android.net.Uri uri = findUri(args);
         android.content.ContentValues[] values = null;
         for (Object arg : args) if (arg instanceof android.content.ContentValues[]) values = (android.content.ContentValues[]) arg;
-        return localProvider.bulkInsert(uri, values);
+        try {
+            return localProvider.bulkInsert(uri, values);
+        } catch (Exception e) {
+            Logger.e(TAG, "Local bulkInsert failed: " + uri, e);
+            return 0;
+        }
     }
 
     private Object handleQuery(Object[] args) {
@@ -166,17 +175,25 @@ public class ContentResolverHook implements InvocationHandler {
         String selection = null;
         String[] selectionArgs = null;
         String sortOrder = null;
-        // In newer versions, indices for query are (callingPkg, uri, projection, queryArgs, cancellationSignal)
-        // or (attributionTag, uri, projection, queryArgs, cancellationSignal)
+        Bundle queryArgs = null;
         
+        // Android 10+ uses queryArgs Bundle
         for (Object arg : args) {
-            if (arg instanceof String[]) projection = (String[]) arg;
-            else if (arg instanceof android.os.CancellationSignal) { /* skip */ }
+            if (arg instanceof String[]) {
+                if (projection == null) projection = (String[]) arg;
+                else if (selectionArgs == null) selectionArgs = (String[]) arg;
+            } else if (arg instanceof Bundle) {
+                queryArgs = (Bundle) arg;
+            } else if (arg instanceof String) {
+                if (selection == null) selection = (String) arg;
+                else if (sortOrder == null) sortOrder = (String) arg;
+            }
         }
         
-        // For simple apps, just passing the URI is often 80% of the way there.
-        // In a Production SDK, we would use introspection to map exactly based on API Level.
         try {
+            if (queryArgs != null && android.os.Build.VERSION.SDK_INT >= 26) {
+                return localProvider.query(uri, projection, queryArgs, null);
+            }
             return localProvider.query(uri, projection, selection, selectionArgs, sortOrder);
         } catch (Exception e) {
             Logger.e(TAG, "Local query failed: " + uri, e);
