@@ -13,7 +13,8 @@ public class ApplicationHook {
 
     public static Application createApplication() {
         try {
-            Object loadedApk = getLoadedApk();
+            Object at = getActivityThread();
+            Object loadedApk = getLoadedApk(at);
             if (loadedApk == null) {
                 Logger.e(TAG, "Could not find LoadedApk to create application.");
                 return null;
@@ -21,15 +22,34 @@ public class ApplicationHook {
 
             Method makeApplication = loadedApk.getClass()
                     .getDeclaredMethod("makeApplication", boolean.class, Instrumentation.class);
-
             makeApplication.setAccessible(true);
 
-            // Using a plain instrumentation here to avoid recursion if hooked
+            // Fetch the current instrumentation (the one we hooked)
+            Field mInstrumentationField = at.getClass().getDeclaredField("mInstrumentation");
+            mInstrumentationField.setAccessible(true);
+            Instrumentation instrumentation = (Instrumentation) mInstrumentationField.get(at);
+
             Application app = (Application) makeApplication.invoke(
                     loadedApk,
                     false,
-                    new Instrumentation()
+                    instrumentation
             );
+
+            if (app != null) {
+                // 🔥 Sync with ActivityThread
+                Field mInitialApplicationField = at.getClass().getDeclaredField("mInitialApplication");
+                mInitialApplicationField.setAccessible(true);
+                mInitialApplicationField.set(at, app);
+
+                Field mAllApplicationsField = at.getClass().getDeclaredField("mAllApplications");
+                mAllApplicationsField.setAccessible(true);
+                java.util.List<Application> allApps = (java.util.List<Application>) mAllApplicationsField.get(at);
+                if (!allApps.contains(app)) {
+                    allApps.add(app);
+                }
+                
+                Logger.i(TAG, "Virtual Application successfully bound to ActivityThread.");
+            }
 
             return app;
 
@@ -41,28 +61,27 @@ public class ApplicationHook {
         return null;
     }
 
-    private static Object getLoadedApk() throws Exception {
+    private static Object getActivityThread() throws Exception {
         Class<?> atClass = Class.forName("android.app.ActivityThread");
         Method current = atClass.getDeclaredMethod("currentActivityThread");
         current.setAccessible(true);
+        return current.invoke(null);
+    }
 
-        Object at = current.invoke(null);
-
-        Field mPackagesField = atClass.getDeclaredField("mPackages");
+    private static Object getLoadedApk(Object at) throws Exception {
+        Field mPackagesField = at.getClass().getDeclaredField("mPackages");
         mPackagesField.setAccessible(true);
 
         Map<String, WeakReference<?>> mPackages =
                 (Map<String, WeakReference<?>>) mPackagesField.get(at);
 
-        // In a real hook, we'd find the correct one for the guest.
-        // For now, we take the first available or the one we patched recently.
+        // Preference: Return a LoadedApk that we've already patched
         for (WeakReference<?> ref : mPackages.values()) {
             Object loadedApk = ref.get();
             if (loadedApk != null) {
                 return loadedApk;
             }
         }
-
         return null;
     }
 }

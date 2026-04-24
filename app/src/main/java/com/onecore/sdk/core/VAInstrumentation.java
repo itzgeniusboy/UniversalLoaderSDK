@@ -116,8 +116,16 @@ public class VAInstrumentation extends Instrumentation {
                     Field mClassLoader = loadedApk.getClass().getDeclaredField("mClassLoader");
                     mClassLoader.setAccessible(true);
                     mClassLoader.set(loadedApk, cl);
+
+                    // Sync resources to LoadedApk as well
+                    try {
+                        Field mLoadedApkResources = loadedApk.getClass().getDeclaredField("mResources");
+                        mLoadedApkResources.setAccessible(true);
+                        mLoadedApkResources.set(loadedApk, res);
+                    } catch (Exception ignored) {}
+
                 } catch (Exception e) {
-                    Logger.e(TAG, "Failed to inject ClassLoader into LoadedApk: " + e.getMessage());
+                    Logger.e(TAG, "Failed to inject into LoadedApk: " + e.getMessage());
                 }
 
                 // 🔥 Inject mOuterContext so views attach correctly
@@ -128,6 +136,14 @@ public class VAInstrumentation extends Instrumentation {
                 } catch (Exception e) {
                     Logger.e(TAG, "Failed to inject mOuterContext: " + e.getMessage());
                 }
+
+                // Inject into LayoutInflater
+                try {
+                    activity.getWindow().getLayoutInflater(); // Trigger creation
+                    Field mContext = activity.getLayoutInflater().getClass().getDeclaredField("mContext");
+                    mContext.setAccessible(true);
+                    mContext.set(activity.getLayoutInflater(), activity);
+                } catch (Exception ignored) {}
             }
 
         } catch (Throwable e) {
@@ -144,7 +160,28 @@ public class VAInstrumentation extends Instrumentation {
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
         
-        Logger.i(TAG, "execStartActivity SYSTEM-LAUNCH -> " + (intent.getComponent() != null ? intent.getComponent().getClassName() : intent.toString()));
+        Logger.i(TAG, "execStartActivity Hooked. Target: " + (intent.getComponent() != null ? intent.getComponent().getClassName() : intent.toString()));
+
+        // Check if the target belongs to the guest app
+        if (intent.getComponent() != null) {
+            String packageName = intent.getComponent().getPackageName();
+            String className = intent.getComponent().getClassName();
+            
+            // If it's not our own package, it's likely a guest activity (or a system one)
+            // For now, if we are in guest mode, we redirect.
+            if (CloneManager.getInstance().getClonedPackage(packageName) != null) {
+                Logger.d(TAG, "Redirecting internal guest activity launch: " + className);
+                
+                Intent stubIntent = new Intent();
+                stubIntent.setClassName(who.getPackageName(), "com.onecore.sdk.core.StubActivity");
+                stubIntent.putExtra("target_activity", className);
+                stubIntent.putExtra("target_package", packageName);
+                stubIntent.putExtra("original_intent", new Intent(intent));
+                stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                
+                intent = stubIntent;
+            }
+        }
         
         // Use reflection to call the base execStartActivity as it's hidden
         try {

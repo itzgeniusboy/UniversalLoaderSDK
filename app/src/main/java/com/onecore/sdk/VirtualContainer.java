@@ -112,7 +112,7 @@ public class VirtualContainer {
                 context.getClassLoader() 
             );
             CloneManager.getInstance().setClassLoader(this.guestClassLoader);
-            com.onecore.sdk.core.LoadedApkHook.hook(this.guestClassLoader);
+            com.onecore.sdk.core.LoadedApkHook.hook(packageName, this.guestClassLoader);
 
             // Task 6: Resource Loading - Load AssetManager with addAssetPath(apkPath)
             Logger.d(TAG, "Initializing Guest Resources...");
