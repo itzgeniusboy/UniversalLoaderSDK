@@ -115,7 +115,7 @@ public class SandboxActivity extends Activity {
             
             Intent targetIntent = new Intent();
             targetIntent.setClassName(targetPackage, mainActivity);
-            intent.putExtra("_VA_TARGET_", targetIntent);
+            intent.putExtra("EXTRA_TARGET_INTENT", targetIntent);
             
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             

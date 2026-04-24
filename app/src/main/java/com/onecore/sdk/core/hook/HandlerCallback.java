@@ -3,25 +3,23 @@ package com.onecore.sdk.core.hook;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.Message;
+import com.onecore.sdk.core.pm.VirtualPackageManager;
+import com.onecore.sdk.utils.Logger;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
-import com.onecore.sdk.core.pm.VirtualPackageManager;
-import com.onecore.sdk.utils.Logger;
 
 /**
- * Intercepts LAUNCH_ACTIVITY and EXECUTE_TRANSACTION messages.
- * This is the final opportunity to swap the StubActivity back to the Real Activity.
+ * FINAL Handler Callback for ActivityThread.mH.
+ * Restores original Intent right before Activity creation.
  */
 public class HandlerCallback implements Handler.Callback {
-    private static final String TAG = "OneCore-H";
+    private static final String TAG = "OneCore-Handler";
 
-    private static final int LAUNCH_ACTIVITY = 100; // Legacy (< Android 9)
-    private static final int EXECUTE_TRANSACTION = 159; // Modern (Android 9+)
+    private static final int LAUNCH_ACTIVITY = 100;
+    private static final int EXECUTE_TRANSACTION = 159;
 
-    public HandlerCallback(Handler base) {
-        // Base is currently unused but can be useful for fallback
-    }
+    public HandlerCallback(Handler base) {}
 
     @Override
     public boolean handleMessage(Message msg) {
@@ -30,7 +28,7 @@ public class HandlerCallback implements Handler.Callback {
         } else if (msg.what == EXECUTE_TRANSACTION) {
             handleTransaction(msg.obj);
         }
-        return false; // Let original Handler continue processing
+        return false;
     }
 
     private void handleLaunchActivity(Object r) {
@@ -39,17 +37,18 @@ public class HandlerCallback implements Handler.Callback {
             intentField.setAccessible(true);
             Intent stubIntent = (Intent) intentField.get(r);
             
-            Intent target = stubIntent.getParcelableExtra("_VA_TARGET_");
+            Intent target = stubIntent.getParcelableExtra("EXTRA_TARGET_INTENT");
             if (target != null) {
                 intentField.set(r, target);
                 
+                // Fix ActivityInfo metadata
                 Field infoField = r.getClass().getDeclaredField("activityInfo");
                 infoField.setAccessible(true);
                 android.content.pm.ActivityInfo ai = (android.content.pm.ActivityInfo) infoField.get(r);
                 fixActivityInfo(ai, target);
             }
         } catch (Exception e) {
-            Logger.e(TAG, "handleLaunchActivity Error", e);
+            Logger.e(TAG, "Legacy Launch Interception Failed", e);
         }
     }
 
@@ -67,7 +66,7 @@ public class HandlerCallback implements Handler.Callback {
                 }
             }
         } catch (Exception e) {
-            // Fallback for fields
+            // Android 9/10/11+ often use field access for mActivityCallbacks
             try {
                 Field callbacksField = transaction.getClass().getDeclaredField("mActivityCallbacks");
                 callbacksField.setAccessible(true);
@@ -80,7 +79,7 @@ public class HandlerCallback implements Handler.Callback {
                     }
                 }
             } catch (Exception ex) {
-                Logger.e(TAG, "handleTransaction Error", ex);
+                Logger.e(TAG, "Modern Transaction Interception Failed", ex);
             }
         }
     }
@@ -91,7 +90,7 @@ public class HandlerCallback implements Handler.Callback {
             intentField.setAccessible(true);
             Intent stubIntent = (Intent) intentField.get(item);
 
-            Intent target = stubIntent.getParcelableExtra("_VA_TARGET_");
+            Intent target = stubIntent.getParcelableExtra("EXTRA_TARGET_INTENT");
             if (target != null) {
                 intentField.set(item, target);
 
@@ -99,9 +98,10 @@ public class HandlerCallback implements Handler.Callback {
                 infoField.setAccessible(true);
                 android.content.pm.ActivityInfo ai = (android.content.pm.ActivityInfo) infoField.get(item);
                 fixActivityInfo(ai, target);
+                Logger.i(TAG, "Successfully restored Intent for transaction launch");
             }
         } catch (Exception e) {
-            Logger.e(TAG, "processLaunchItem Error", e);
+            Logger.e(TAG, "LaunchItem Restoration Failed", e);
         }
     }
 
@@ -117,7 +117,7 @@ public class HandlerCallback implements Handler.Callback {
             info.packageName = pkg;
             info.theme = realAi.theme;
             info.applicationInfo = realAi.applicationInfo;
-            Logger.i(TAG, "In-place fix for ActivityInfo complete: " + info.name);
+            // Transfer other important metadata here
         }
     }
 }

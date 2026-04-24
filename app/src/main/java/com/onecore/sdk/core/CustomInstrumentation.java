@@ -6,13 +6,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
+import com.onecore.sdk.utils.Logger;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import com.onecore.sdk.utils.Logger;
 
 /**
- * Custom Instrumentation to intercept Activity life-cycle and launch events.
- * Resolves the "Black Screen" issue by properly mapping ClassLoaders and Resources.
+ * FINAL Instrumentation Hook for Phase 1.
+ * Ensures ClassLoader isolation and proper activity creation.
  */
 public class CustomInstrumentation extends Instrumentation {
     private static final String TAG = "OneCore-Instrumentation";
@@ -26,18 +26,23 @@ public class CustomInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
-        Logger.d(TAG, "newActivity intercept: " + className);
-        
-        // 1. Check if this is a redirection launch from our StubActivity
-        Intent target = intent.getParcelableExtra("_VA_TARGET_");
-        if (target != null && target.getComponent() != null) {
-            String targetActivity = target.getComponent().getClassName();
-            Logger.i(TAG, "Redirection [Stub -> Real]: " + targetActivity);
+        Logger.d(TAG, "newActivity check: " + className);
+
+        // 1. Resolve REAL Activity from Intent if it was redirected
+        Intent targetIntent = intent.getParcelableExtra("EXTRA_TARGET_INTENT");
+        if (targetIntent != null && targetIntent.getComponent() != null) {
+            String realClassName = targetIntent.getComponent().getClassName();
+            Logger.i(TAG, "Redirection Detected: " + className + " -> " + realClassName);
             
-            // 2. Use the Guest ClassLoader to load the real Activity
-            cl = CloneManager.getInstance().getClassLoader();
-            className = targetActivity;
-            intent = target;
+            // 2. LOAD USING GUEST CLASSLOADER (DexClassLoader)
+            ClassLoader guestLoader = CloneManager.getInstance().getClassLoader();
+            if (guestLoader != null) {
+                cl = guestLoader;
+                className = realClassName;
+            }
+        } else if (className.contains("StubActivity")) {
+             // Fallback: If we missed the intent part but it's our stub
+             Logger.w(TAG, "newActivity reached with Stub but NO target intent!");
         }
 
         return super.newActivity(cl, className, intent);
@@ -47,45 +52,32 @@ public class CustomInstrumentation extends Instrumentation {
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
         Logger.i(TAG, ">>> callActivityOnCreate: " + activity.getClass().getName());
         
-        // 3. Critically inject Resources and ClassLoader before Activity.onCreate is called
-        injectGuestContext(activity);
+        // 3. SECURE CONTEXT FIX (Resources/ClassLoader)
+        fixContext(activity);
         
         try {
             mBase.callActivityOnCreate(activity, icicle);
         } catch (Throwable e) {
-            Logger.e(TAG, "callActivityOnCreate Hook failed for " + activity.getClass().getName(), e);
+            Logger.e(TAG, "Activity Creation CRASHED: " + e.getMessage(), e);
             throw e;
         }
     }
 
-    private void injectGuestContext(Activity activity) {
+    private void fixContext(Activity activity) {
         try {
             Context baseContext = activity.getBaseContext();
-            android.content.res.Resources guestRes = CloneManager.getInstance().getResources();
+            android.content.res.Resources guestResources = CloneManager.getInstance().getResources();
             ClassLoader guestLoader = CloneManager.getInstance().getClassLoader();
 
-            if (guestRes != null) {
-                Logger.d(TAG, "Injecting Guest Resources into: " + activity.getClass().getSimpleName());
-
-                // Patch ContextImpl
+            if (guestResources != null) {
+                // Patch ContextImpl Resources
                 try {
                     Field mResources = baseContext.getClass().getDeclaredField("mResources");
                     mResources.setAccessible(true);
-                    mResources.set(baseContext, guestRes);
-                    
-                    Field mTheme = baseContext.getClass().getDeclaredField("mTheme");
-                    mTheme.setAccessible(true);
-                    mTheme.set(baseContext, null); // Reset theme for re-inflation
-                } catch (Exception e) {}
+                    mResources.set(baseContext, guestResources);
+                } catch (Exception ignored) {}
 
-                // Patch Activity Resource cache
-                try {
-                    Field mActivityRes = Activity.class.getDeclaredField("mResources");
-                    mActivityRes.setAccessible(true);
-                    mActivityRes.set(activity, guestRes);
-                } catch (Exception e) {}
-
-                // Patch LoadedApk (The most critical part for View rendering)
+                // Patch ContextImpl LoadedApk (mPackageInfo)
                 try {
                     Field mPackageInfo = baseContext.getClass().getDeclaredField("mPackageInfo");
                     mPackageInfo.setAccessible(true);
@@ -98,18 +90,16 @@ public class CustomInstrumentation extends Instrumentation {
 
                         Field mLoadedApkResources = loadedApk.getClass().getDeclaredField("mResources");
                         mLoadedApkResources.setAccessible(true);
-                        mLoadedApkResources.set(loadedApk, guestRes);
+                        mLoadedApkResources.set(loadedApk, guestResources);
                     }
-                } catch (Exception e) {}
-                
-                Logger.i(TAG, "Guest Context successfully injected.");
+                } catch (Exception ignored) {}
             }
-        } catch (Throwable e) {
-            Logger.e(TAG, "Guest Context Injection FAILED", e);
+        } catch (Exception e) {
+            Logger.e(TAG, "Context Fix FAILED", e);
         }
     }
 
-    // Capture startActivity calls to redirect them to StubActivity
+    // Support for multiple execStartActivity signatures
     public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
@@ -144,11 +134,9 @@ public class CustomInstrumentation extends Instrumentation {
         if (intent != null && intent.getComponent() != null) {
             String pkg = intent.getComponent().getPackageName();
             if (CloneManager.getInstance().getClonedPackage(pkg) != null) {
-                Logger.d(TAG, "Intercepted internal launch request: " + intent.getComponent().getClassName());
-                
                 Intent stub = new Intent();
                 stub.setClassName(who.getPackageName(), "com.onecore.sdk.core.StubActivity");
-                stub.putExtra("_VA_TARGET_", new Intent(intent));
+                stub.putExtra("EXTRA_TARGET_INTENT", new Intent(intent));
                 stub.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 return stub;
             }

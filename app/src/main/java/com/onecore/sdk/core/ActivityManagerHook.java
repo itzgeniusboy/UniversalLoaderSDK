@@ -67,7 +67,7 @@ public class ActivityManagerHook implements InvocationHandler {
                             
                             stubIntent.putExtra("target_package", pkgName);
                             stubIntent.putExtra("target_activity", className);
-                            stubIntent.putExtra("_VA_TARGET_", new android.content.Intent(intent));
+                            stubIntent.putExtra("EXTRA_TARGET_INTENT", new android.content.Intent(intent));
                             
                             args[intentIdx] = stubIntent;
                             Logger.d("ActivityManagerHook", "Redirected to StubActivity");

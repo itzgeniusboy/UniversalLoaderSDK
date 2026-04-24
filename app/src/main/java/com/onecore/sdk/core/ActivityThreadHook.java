@@ -7,52 +7,55 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
- * Handles the actual injection of Hooks into the Android ActivityThread.
+ * FINAL ActivityThread Hook.
+ * Responsible for core system service redirection and callback injection.
  */
 public class ActivityThreadHook {
-    private static final String TAG = "OneCore-AT-Hook";
+    private static final String TAG = "OneCore-AT";
 
     public static void inject() {
         try {
-            Logger.i(TAG, "Locating ActivityThread...");
+            Logger.i(TAG, "Initiating ActivityThread Injection...");
+            
+            // 1. Find ActivityThread instance
             Class<?> atClass = Class.forName("android.app.ActivityThread");
-            Method curAtMethod = atClass.getDeclaredMethod("currentActivityThread");
-            curAtMethod.setAccessible(true);
-            Object activityThread = curAtMethod.invoke(null);
+            Method currentAtMethod = atClass.getDeclaredMethod("currentActivityThread");
+            currentAtMethod.setAccessible(true);
+            Object activityThread = currentAtMethod.invoke(null);
 
             if (activityThread == null) {
-                Logger.e(TAG, "ActivityThread is NULL. Host process corrupted?");
+                Logger.e(TAG, "CRITICAL: ActivityThread not found!");
                 return;
             }
 
-            // 1. Swap Instrumentation
-            Field mInstrField = atClass.getDeclaredField("mInstrumentation");
-            mInstrField.setAccessible(true);
-            android.app.Instrumentation baseInst = (android.app.Instrumentation) mInstrField.get(activityThread);
+            // 2. Redirect Instrumentation
+            Field instrField = atClass.getDeclaredField("mInstrumentation");
+            instrField.setAccessible(true);
+            android.app.Instrumentation baseInst = (android.app.Instrumentation) instrField.get(activityThread);
             
             if (!(baseInst instanceof CustomInstrumentation)) {
-                mInstrField.set(activityThread, new CustomInstrumentation(baseInst));
-                Logger.d(TAG, "Instrumentation Hooked (CustomInstrumentation)");
+                instrField.set(activityThread, new CustomInstrumentation(baseInst));
+                Logger.d(TAG, "Instrumentation redirected via CustomInstrumentation");
             }
 
-            // 2. Swap Handler Callback
-            Field mHField = atClass.getDeclaredField("mH");
-            mHField.setAccessible(true);
-            Handler mH = (Handler) mHField.get(activityThread);
+            // 3. Inject Handler.Callback into mH
+            Field hField = atClass.getDeclaredField("mH");
+            hField.setAccessible(true);
+            Handler mH = (Handler) hField.get(activityThread);
 
-            Field mCbField = Handler.class.getDeclaredField("mCallback");
-            mCbField.setAccessible(true);
+            Field cbField = Handler.class.getDeclaredField("mCallback");
+            cbField.setAccessible(true);
             
-            Object currentCb = mCbField.get(mH);
+            Object currentCb = cbField.get(mH);
             if (!(currentCb instanceof HandlerCallback)) {
-                mCbField.set(mH, new HandlerCallback(mH));
-                Logger.d(TAG, "ActivityThread Handler Hooked (HandlerCallback)");
+                cbField.set(mH, new HandlerCallback(mH));
+                Logger.d(TAG, "ActivityThread.mH hooked via HandlerCallback");
             }
 
-            Logger.i(TAG, ">> ActivityThread Hooks ACTIVE <<");
+            Logger.i(TAG, "PHASE 1 Hooks successfully injected.");
 
         } catch (Exception e) {
-            Logger.e(TAG, "ActivityThread Injection CRITICAL FAILURE", e);
+            Logger.e(TAG, "ActivityThread Hooked FAILED", e);
         }
     }
 }
