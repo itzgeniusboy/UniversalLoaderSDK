@@ -52,7 +52,11 @@ public class ContentResolverHook implements InvocationHandler {
                 case "call":
                 case "getType":
                 case "openFile":
-                case "openAssetFile":
+                case "openTypedAssetFile":
+                case "getStreamTypes":
+                case "refresh":
+                case "canonicalize":
+                case "uncanonicalize":
                     return invokeLocal(name, args);
                 
                 // Binder specific methods
@@ -90,16 +94,45 @@ public class ContentResolverHook implements InvocationHandler {
                 return handleCall(args);
             case "getType":
                 return localProvider.getType(findUri(args));
-        }
+            case "openFile":
+                return localProvider.openFile(findUri(args), findString(args, "r"));
+            case "openAssetFile":
+                return localProvider.openAssetFile(findUri(args), findString(args, "r"));
+            case "bulkInsert":
+                return handleBulkInsert(args);
+            case "canonicalize":
+                return localProvider.canonicalize(findUri(args));
+            case "uncanonicalize":
+                return localProvider.uncanonicalize(findUri(args));
+            case "refresh":
+                return localProvider.refresh(findUri(args), findBundle(args), null);
         
         return null; 
     }
 
     private android.net.Uri findUri(Object[] args) {
+        if (args == null) return null;
         for (Object arg : args) {
-            if (arg instanceof android.net.Uri) return (android.net.Uri);
+            if (arg instanceof android.net.Uri) return (android.net.Uri) arg;
         }
         return null;
+    }
+
+    private android.os.Bundle findBundle(Object[] args) {
+        for (Object arg : args) if (arg instanceof android.os.Bundle) return (android.os.Bundle) arg;
+        return null;
+    }
+
+    private String findString(Object[] args, String defaultValue) {
+        for (Object arg : args) if (arg instanceof String) return (String) arg;
+        return defaultValue;
+    }
+
+    private Object handleBulkInsert(Object[] args) {
+        android.net.Uri uri = findUri(args);
+        android.content.ContentValues[] values = null;
+        for (Object arg : args) if (arg instanceof android.content.ContentValues[]) values = (android.content.ContentValues[]) arg;
+        return localProvider.bulkInsert(uri, values);
     }
 
     private Object handleQuery(Object[] args) {
@@ -161,19 +194,37 @@ public class ContentResolverHook implements InvocationHandler {
 
     private Object handleCall(Object[] args) {
         // call(callingPkg, attributionTag, authority, method, arg, extras)
-        // Usually method starts from index 2 or 3
+        // Signatures vary significantly:
+        // API 29+: call(callingPkg, attributionTag, authority, method, arg, extras)
+        // API 19-28: call(callingPkg, method, arg, extras)
+        
         String method = null;
         String argText = null;
         Bundle extras = null;
         
-        for (int i = 0; i < args.length; i++) {
-            if (args[i] instanceof String) {
-                // Heuristic: method name usually doesn't have package structure
-                String s = (String) args[i];
-                if (i >= 2 && method == null && !s.contains(".")) method = s;
-                else if (method != null && argText == null) argText = s;
-            } else if (args[i] instanceof Bundle) {
-                extras = (Bundle) args[i];
+        for (Object arg : args) {
+            if (arg instanceof Bundle) {
+                extras = (Bundle) arg;
+            }
+        }
+        
+        // Find method and argText by heuristics or position
+        if (args.length >= 4 && args[1] instanceof String && args[2] instanceof String) {
+             // Likely API 19-28: callingPkg, method, arg, extras
+             method = (String) args[1];
+             argText = (String) args[2];
+        } else if (args.length >= 6) {
+             // Likely API 29+: callingPkg, attributionTag, authority, method, arg, extras
+             method = (String) args[3];
+             argText = (String) args[4];
+        } else {
+            // Heuristic fallback
+            for (int i = 0; i < args.length; i++) {
+                if (args[i] instanceof String) {
+                    String s = (String) args[i];
+                    if (i >= 1 && method == null && !s.contains(".") && s.length() > 0) method = s;
+                    else if (method != null && argText == null) argText = s;
+                }
             }
         }
         
