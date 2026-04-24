@@ -167,8 +167,11 @@ public class PackageManagerHook implements InvocationHandler {
 
         if ("checkPermission".equals(name)) {
             String permName = (String) args[0];
-            // Grant mostly all permissions for virtual app to avoid crashes
-            Logger.v(TAG, "checkPermission spoof: " + permName);
+            String pkgName = (String) args[1];
+            return PermissionManager.checkPermission(permName, pkgName, android.os.Process.myUid());
+        }
+
+        if ("checkUidPermission".equals(name)) {
             return android.content.pm.PackageManager.PERMISSION_GRANTED;
         }
 

@@ -22,9 +22,34 @@ public class ReceiverManager {
             sReceivers.add(new ReceiverRecord(receiver, filter));
         }
         
-        // We also need to register it with the real system context if it needs system broadcasts
-        // but often the virtual app just wants its own communication.
-        context.registerReceiver(receiver, filter);
+        // Register with the host context to receive system broadcasts
+        try {
+            context.registerReceiver(receiver, filter);
+        } catch (Exception e) {
+            Logger.e(TAG, "Failed to register receiver with host context", e);
+        }
+    }
+
+    public static void sendBroadcast(Context context, android.content.Intent intent) {
+        if (intent == null) return;
+        
+        Logger.d(TAG, "Sending virtual broadcast: " + intent.getAction());
+        
+        // Manual dispatch to local virtual receivers if we want isolation
+        synchronized (sReceivers) {
+            for (ReceiverRecord record : sReceivers) {
+                if (record.filter.matchAction(intent.getAction())) {
+                    try {
+                        record.receiver.onReceive(context, intent);
+                    } catch (Exception e) {
+                        Logger.e(TAG, "Local broadcast dispatch failed", e);
+                    }
+                }
+            }
+        }
+        
+        // Also send to the real system
+        context.sendBroadcast(intent);
     }
 
     private static class ReceiverRecord {

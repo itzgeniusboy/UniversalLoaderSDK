@@ -17,18 +17,21 @@ public class ContextFixer {
     public static void fix(Context context, String packageName, ClassLoader classLoader, Resources resources) {
         if (context == null) return;
         try {
-            // Recurse into ContextWrapper (Activity, Service, Application etc.)
-            if (context instanceof android.content.ContextWrapper) {
-                fix(((android.content.ContextWrapper) context).getBaseContext(), packageName, classLoader, resources);
+            // Process the context and its base contexts if it's a wrapper
+            Context current = context;
+            while (current instanceof android.content.ContextWrapper) {
+                Context base = ((android.content.ContextWrapper) current).getBaseContext();
+                if (base == null || base == current) break;
+                current = base;
             }
 
-            Logger.v(TAG, "Applying deep patch to Context: " + context.getClass().getName());
+            Logger.v(TAG, "Applying deep patch to Context: " + current.getClass().getName());
             
             // 1. Patch ContextImpl instance fields
-            patchContextImpl(context, packageName, classLoader, resources);
+            patchContextImpl(current, packageName, classLoader, resources);
             
             // 2. Patch LoadedApk (mPackageInfo) - CRITICAL for internal framework logic
-            patchLoadedApk(context, packageName, classLoader, resources);
+            patchLoadedApk(current, packageName, classLoader, resources);
 
         } catch (Exception e) {
             Logger.e(TAG, "CRITICAL: ContextFixer failed for " + packageName, e);

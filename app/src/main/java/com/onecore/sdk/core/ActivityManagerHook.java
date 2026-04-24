@@ -48,9 +48,13 @@ public class ActivityManagerHook implements InvocationHandler {
             }
 
             if (methodName.equals("registerReceiver")) {
-                // Track receivers for isolation if needed
+                // We've already wrapped it in ReceiverManager if called via Context
             } else if (methodName.equals("sendBroadcast")) {
-                // If it's a broadcast from guest app, we might want to redirect or modify it
+                android.content.Intent intent = (android.content.Intent) args[intentIdx];
+                if (intent != null) {
+                    ReceiverManager.sendBroadcast(com.onecore.sdk.OneCoreSDK.getContext(), intent);
+                    return null; // Skip real system broadcast as we handled it
+                }
             }
 
             if (intentIdx != -1) {
@@ -94,7 +98,11 @@ public class ActivityManagerHook implements InvocationHandler {
         }
 
         if (methodName.equals("checkPermission")) {
-             return PermissionManager.checkPermission((String)args[0], (int)args[1], (int)args[2]);
+             return PermissionManager.checkPermission((String)args[0], (String)args[1], (int)args[2]);
+        }
+
+        if (methodName.equals("checkUriPermission")) {
+             return android.content.pm.PackageManager.PERMISSION_GRANTED;
         }
 
         // Return Fake UID or PID if requested by the Game

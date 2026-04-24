@@ -69,7 +69,7 @@ public class LoadedApkHook {
                                 f.set(loadedApk, guestAi.nativeLibraryDir);
                             } else if (field.equals("mDataDir")) {
                                 f.set(loadedApk, guestAi.dataDir);
-                            } else {
+                            } else if (field.equals("mAppDir") || field.equals("mResDir")) {
                                 f.set(loadedApk, guestAi.sourceDir);
                             }
                         } catch (Exception ignored) {}

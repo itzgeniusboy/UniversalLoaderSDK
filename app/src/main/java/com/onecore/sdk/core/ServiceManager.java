@@ -51,6 +51,8 @@ public class ServiceManager {
         String className = intent.getComponent().getClassName();
         String pkgName = intent.getComponent().getPackageName();
         
+        Logger.d(TAG, "Binding virtual service: " + className);
+        
         if (!mServices.containsKey(className)) {
             startService(context, intent);
         }
@@ -58,11 +60,21 @@ public class ServiceManager {
         Service service = mServices.get(className);
         if (service != null) {
             if (mBinders.containsKey(className)) return mBinders.get(className);
-            android.os.IBinder binder = service.onBind(intent);
-            mBinders.put(className, binder);
-            return binder;
+            try {
+                android.os.IBinder binder = service.onBind(intent);
+                mBinders.put(className, binder);
+                return binder;
+            } catch (Exception e) {
+                Logger.e(TAG, "Failed to call onBind for " + className, e);
+            }
         }
         return null;
+    }
+
+    public static void startForeground(Service service, int id, android.app.Notification notification) {
+        Logger.i(TAG, "Service.startForeground() intercepted for id: " + id);
+        // In a real implementation, we would either proxy this to a host notification channel
+        // or show our own. For now, we simply log it to prevent crashes.
     }
 
     private static void attachService(Service service, Context virtualContext, String className, String pkgName, ClassLoader cl, android.content.res.Resources res) {

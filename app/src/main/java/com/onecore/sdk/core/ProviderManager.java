@@ -43,9 +43,7 @@ public class ProviderManager {
                 return;
             }
 
-            // Manual fallback if installation method is not found
-            for (ProviderInfo info : providers) {
-                try {
+                    // Manual fallback if installation method is not found
                     Logger.d(TAG, "Installing provider manually: " + info.name);
                     ClassLoader cl = app.getClassLoader();
                     ContentProvider provider = (ContentProvider) cl.loadClass(info.name).newInstance();
@@ -53,11 +51,14 @@ public class ProviderManager {
                     Method attachInfo = ContentProvider.class.getDeclaredMethod("attachInfo", Context.class, ProviderInfo.class);
                     attachInfo.setAccessible(true);
                     
+                    // Use the application context for providers
                     attachInfo.invoke(provider, app, info);
+                    
+                    // Store locally if helpful
+                    registerProviderLocally(activityThread, provider, info);
                 } catch (Exception e) {
                     Logger.e(TAG, "Failed to install provider manually: " + info.name, e);
                 }
-            }
         } catch (Exception e) {
             Logger.e(TAG, "Failed during provider installation", e);
         }
