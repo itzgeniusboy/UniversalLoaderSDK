@@ -23,9 +23,40 @@ public class BoxApplication extends Application {
             // 2. Load Core Engine Hooks
             OneCoreSDK.install();
             
+            // 3. Early Instrumentation Hook (User requested global hook)
+            hookInstrumentation();
+            
             Logger.i(TAG, "SUCCESS: Virtualization Core and Hooks initialized in Application process.");
         } catch (Exception e) {
             Logger.e(TAG, "FATAL: SDK Initialization failed. Application may not function correctly.", e);
+        }
+    }
+
+    private void hookInstrumentation() {
+        try {
+            Logger.d(TAG, "Attempting Global Instrumentation Hook...");
+            Class<?> atClass = Class.forName("android.app.ActivityThread");
+            java.lang.reflect.Method current = atClass.getDeclaredMethod("currentActivityThread");
+            current.setAccessible(true);
+
+            Object thread = current.invoke(null);
+
+            java.lang.reflect.Field mInstrumentation = atClass.getDeclaredField("mInstrumentation");
+            mInstrumentation.setAccessible(true);
+
+            android.app.Instrumentation base = (android.app.Instrumentation) mInstrumentation.get(thread);
+            
+            // Avoid double hooking
+            if (!(base instanceof com.onecore.sdk.core.VAInstrumentation)) {
+                com.onecore.sdk.core.VAInstrumentation proxy = new com.onecore.sdk.core.VAInstrumentation(base);
+                mInstrumentation.set(thread, proxy);
+                Logger.i(TAG, "Global Instrumentation Hook SUCCESS.");
+            } else {
+                Logger.d(TAG, "Instrumentation already hooked.");
+            }
+
+        } catch (Throwable e) {
+            Logger.e(TAG, "Global Instrumentation Hook FAILED: " + e.getMessage());
         }
     }
 }

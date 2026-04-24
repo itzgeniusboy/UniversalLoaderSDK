@@ -179,6 +179,25 @@ public class CloneManager {
         }
     }
 
+    private ClassLoader guestClassLoader;
+    private android.content.res.Resources guestResources;
+
+    public ClassLoader getClassLoader() {
+        return guestClassLoader;
+    }
+
+    public void setClassLoader(ClassLoader loader) {
+        this.guestClassLoader = loader;
+    }
+
+    public android.content.res.Resources getResources() {
+        return guestResources;
+    }
+
+    public void setResources(android.content.res.Resources res) {
+        this.guestResources = res;
+    }
+
     public PackageInfo getClonedPackage(String originalPackageName) {
         return cache.get(originalPackageName);
     }

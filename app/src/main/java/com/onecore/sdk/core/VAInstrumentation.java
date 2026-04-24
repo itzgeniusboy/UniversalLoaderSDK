@@ -4,8 +4,10 @@ import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.IBinder;
+import java.lang.reflect.Field;
 import java.util.Map;
 import com.onecore.sdk.utils.Logger;
 
@@ -26,149 +28,98 @@ public class VAInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
-        Intent originalIntent = intent.getParcelableExtra("original_intent");
         String targetActivity = intent.getStringExtra("target_activity");
 
         if (targetActivity != null) {
             Logger.i(TAG, "Restoring Virtual Activity: " + targetActivity);
             try {
                 String targetPackage = intent.getStringExtra("target_package");
+                Intent originalIntent = intent.getParcelableExtra("original_intent");
                 
                 // Restore original intent for the guest activity if it exists
                 if (originalIntent != null) {
                     intent.fillIn(originalIntent, Intent.FILL_IN_COMPONENT | Intent.FILL_IN_ACTION | Intent.FILL_IN_DATA | Intent.FILL_IN_CATEGORIES);
-                    // Ensure the target remains explicitly set to avoid loops or system misses
-                    intent.setClassName(targetPackage, targetActivity);
-                } else {
-                    intent.setClassName(targetPackage, targetActivity);
                 }
-
+                
+                // Ensure target remains set to the correct package/class
+                intent.setClassName(targetPackage != null ? targetPackage : className, targetActivity);
+                
+                // Clean up stub extras to prevent guest app from seeing them
                 intent.removeExtra("target_activity");
                 intent.removeExtra("target_package");
                 intent.removeExtra("original_intent");
 
-                ClassLoader guestLoader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
-                if (guestLoader != null) {
-                    // System-driven instantiation using the guest class loader via the base instrumentation
-                    Activity activity = base.newActivity(guestLoader, targetActivity, intent);
-                    
-                    // Hook into ActivityThread records to fix rendering/metadata
-                    patchActivityThreadRecord(activity, targetPackage, targetActivity);
-                    
-                    Logger.d(TAG, "Activity instantiated by system: " + activity.getClass().getName());
-                    return activity;
-                }
+                ClassLoader appCl = getVirtualClassLoader(); // IMPORTANT
+                return super.newActivity(appCl, targetActivity, intent);
+
             } catch (Exception e) {
                 Logger.e(TAG, "System-driven launch swap failed: " + e.getMessage());
+                e.printStackTrace();
             }
         }
         
-        return base.newActivity(cl, className, intent);
+        return super.newActivity(cl, className, intent);
     }
 
-    private void patchActivityThreadRecord(Activity activity, String pkg, String clazz) {
-        try {
-            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-            Object activityThread = activityThreadClass.getDeclaredMethod("currentActivityThread").invoke(null);
-            java.lang.reflect.Field mActivitiesField = activityThreadClass.getDeclaredField("mActivities");
-            mActivitiesField.setAccessible(true);
-            Map<Object, Object> mActivities = (Map<Object, Object>) mActivitiesField.get(activityThread);
-
-            // We need to find the record that was just created for StubActivity
-            // and update its fields to match the Guest Activity.
-            for (Object record : mActivities.values()) {
-                java.lang.reflect.Field activityField = record.getClass().getDeclaredField("activity");
-                activityField.setAccessible(true);
-                Object recordActivity = activityField.get(record);
-                
-                // If this record's activity is not yet set (or is the one we're creating), it's our target
-                if (recordActivity == null || recordActivity == activity) {
-                    Logger.d(TAG, "Patching ActivityClientRecord for " + clazz);
-                    
-                    // Update ActivityInfo if possible
-                    try {
-                        java.lang.reflect.Field intentField = record.getClass().getDeclaredField("intent");
-                        intentField.setAccessible(true);
-                        Intent recordIntent = (Intent) intentField.get(record);
-                        
-                        // If it's the StubActivity intent, it's our candidate
-                        if (recordIntent != null && recordIntent.hasExtra("target_activity")) {
-                            Logger.d(TAG, "Found Matching ActivityClientRecord: " + clazz);
-                            
-                            java.lang.reflect.Field infoField = record.getClass().getDeclaredField("activityInfo");
-                            infoField.setAccessible(true);
-                            android.content.pm.ActivityInfo info = (android.content.pm.ActivityInfo) infoField.get(record);
-                            info.packageName = pkg;
-                            info.name = clazz;
-                            
-                            // Link the activity to the record if not already
-                            activityField.set(record, activity);
-                            break;
-                        }
-                    } catch (Exception ignored) {}
-                }
-            }
-        } catch (Exception e) {
-            Logger.w(TAG, "ActivityThread Record Patching Failed: " + e.getMessage());
-        }
+    private ClassLoader getVirtualClassLoader() {
+        return CloneManager.getInstance().getClassLoader(); 
     }
 
     @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
         Logger.i(TAG, ">>> HOOK ACTIVE: callActivityOnCreate for " + activity.getClass().getName());
-        
-        ClassLoader guestLoader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
-        
-        if (guestLoader != null && activity.getClass().getClassLoader() == guestLoader) {
-            String pkg = activity.getPackageName();
-            Logger.i(TAG, "Lifecycle: guest.onCreate -> " + activity.getClass().getName());
-            
-            // Apply Metadata and Theme
-            patchActivityMetadata(activity);
-            
-            // Try to set correct theme if not already set by manifest swap
-            try {
-                android.content.pm.PackageInfo info = com.onecore.sdk.VirtualContainer.getInstance().getClonedPackage(pkg);
-                if (info != null && info.activities != null) {
-                    for (android.content.pm.ActivityInfo ai : info.activities) {
-                        if (ai.name.equals(activity.getClass().getName()) && ai.theme != 0) {
-                            activity.setTheme(ai.theme);
-                            break;
-                        }
-                    }
-                }
-            } catch (Exception ignored) {}
-        }
-        
-        base.callActivityOnCreate(activity, icicle);
+        inject(activity);
+        super.callActivityOnCreate(activity, icicle);
     }
 
-    private void patchActivityMetadata(Activity activity) {
+    private void inject(Activity activity) {
         try {
-            android.content.res.Resources guestRes = com.onecore.sdk.VirtualContainer.getInstance().getGuestResources();
-            if (guestRes != null) {
-                java.lang.reflect.Field mResourcesField = Activity.class.getDeclaredField("mResources");
-                mResourcesField.setAccessible(true);
-                mResourcesField.set(activity, guestRes);
+            Context baseCtx = activity.getBaseContext();
+            Resources res = CloneManager.getInstance().getResources();
+
+            if (res != null) {
+                // Try multiple fields as different Android versions might name it differently or move it
+                try {
+                    Field mResources = Context.class.getDeclaredField("mResources");
+                    mResources.setAccessible(true);
+                    mResources.set(baseCtx, res);
+                } catch (NoSuchFieldException e) {
+                    // Fallback for some versions
+                    try {
+                        Class<?> contextImplClass = Class.forName("android.app.ContextImpl");
+                        Field mResourcesImpl = contextImplClass.getDeclaredField("mResources");
+                        mResourcesImpl.setAccessible(true);
+                        mResourcesImpl.set(baseCtx, res);
+                    } catch (Exception ignored) {}
+                }
+                
+                // Also set it on the activity itself
+                try {
+                    Field mActivityResources = Activity.class.getDeclaredField("mResources");
+                    mActivityResources.setAccessible(true);
+                    mActivityResources.set(activity, res);
+                } catch (Exception ignored) {}
             }
-        } catch (Exception e) {
-            Logger.w(TAG, "Failed to patch activity metadata: " + e.getMessage());
+
+        } catch (Throwable e) {
+            Logger.e(TAG, "Injection failed: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
     @Override
     public void callActivityOnResume(Activity activity) {
-        base.callActivityOnResume(activity);
+        super.callActivityOnResume(activity);
     }
 
     @Override
     public void callActivityOnStop(Activity activity) {
-        base.callActivityOnStop(activity);
+        super.callActivityOnStop(activity);
     }
 
     @Override
     public void callActivityOnPause(Activity activity) {
-        base.callActivityOnPause(activity);
+        super.callActivityOnPause(activity);
     }
 
     /**

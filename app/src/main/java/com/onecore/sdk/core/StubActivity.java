@@ -20,22 +20,33 @@ public class StubActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // The real work is now done by VAInstrumentation.newActivity 
-        // which intercepts the creation of THIS activity instance 
-        // and swaps the class to the target activity.
-        
-        // If we reach HERE, it means the class swiping failed or 
-        // this is actually StubActivity itself.
         super.onCreate(savedInstanceState);
-        
-        Logger.w(TAG, "StubActivity created directly. Class swiping may have failed.");
-        
-        // Ensure UI is clean
-        requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        
-        finish();
+
+        Intent target = getIntent();
+        String realActivity = target.getStringExtra("target_activity");
+
+        if (realActivity != null) {
+            try {
+                Logger.i(TAG, "Redirecting from Stub to: " + realActivity);
+                Intent newIntent = new Intent();
+                newIntent.setClassName(this, realActivity);
+                newIntent.putExtras(target);
+                
+                // IMPORTANT: Ensure flags are handled or added if needed
+                newIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                
+                startActivity(newIntent);
+                finish();
+
+            } catch (Exception e) {
+                Logger.e(TAG, "Redirection failed: " + e.getMessage());
+                e.printStackTrace();
+                finish();
+            }
+        } else {
+            Logger.w(TAG, "StubActivity created without target_activity. Finishing.");
+            finish();
+        }
     }
 
     @Override

@@ -108,6 +108,7 @@ public class VirtualContainer {
                 libPath,
                 context.getClassLoader().getParent() 
             );
+            CloneManager.getInstance().setClassLoader(this.guestClassLoader);
 
             // Task 6: Resource Loading - Load AssetManager with addAssetPath(apkPath)
             Logger.d(TAG, "Initializing Guest Resources...");
@@ -118,6 +119,7 @@ public class VirtualContainer {
                 
                 android.content.res.Resources hostRes = context.getResources();
                 this.guestResources = new android.content.res.Resources(am, hostRes.getDisplayMetrics(), hostRes.getConfiguration());
+                CloneManager.getInstance().setResources(this.guestResources);
                 Logger.i(TAG, "Guest Resources LOADED.");
             } catch (Exception e) {
                 Logger.e(TAG, "Failed to load Guest Resources: " + e.getMessage());

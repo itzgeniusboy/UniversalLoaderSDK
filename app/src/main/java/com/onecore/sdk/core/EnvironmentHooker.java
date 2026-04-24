@@ -142,13 +142,16 @@ public class EnvironmentHooker {
     private static void hookInstrumentation(Object activityThread, Class<?> activityThreadClass) throws Exception {
         Field instrumentationField = activityThreadClass.getDeclaredField("mInstrumentation");
         instrumentationField.setAccessible(true);
-        Object originalInstrumentation = instrumentationField.get(activityThread);
+        Instrumentation originalInstrumentation = (Instrumentation) instrumentationField.get(activityThread);
 
-        // Replace with our Custom Instrumentation
-        VAInstrumentation vaInstrumentation = new VAInstrumentation((Instrumentation) originalInstrumentation);
-        instrumentationField.set(activityThread, vaInstrumentation);
-        
-        Logger.d(TAG, "mInstrumentation HOOKED with VAInstrumentation.");
+        // Replace with our Custom Instrumentation if not already hooked
+        if (!(originalInstrumentation instanceof VAInstrumentation)) {
+            VAInstrumentation vaInstrumentation = new VAInstrumentation(originalInstrumentation);
+            instrumentationField.set(activityThread, vaInstrumentation);
+            Logger.d(TAG, "mInstrumentation HOOKED with VAInstrumentation.");
+        } else {
+            Logger.d(TAG, "mInstrumentation already hooked.");
+        }
     }
 
     private static void hookLoadedApk(Object activityThread, Class<?> activityThreadClass, String packageName) throws Exception {
