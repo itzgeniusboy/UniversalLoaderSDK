@@ -15,16 +15,29 @@ public class ReceiverManager {
     private static final List<ReceiverRecord> sReceivers = new ArrayList<>();
 
     public static void registerReceiver(Context context, BroadcastReceiver receiver, IntentFilter filter) {
+        registerReceiver(context, receiver, filter, null, null, 0);
+    }
+
+    public static void registerReceiver(Context context, BroadcastReceiver receiver, IntentFilter filter, int flags) {
+        registerReceiver(context, receiver, filter, null, null, flags);
+    }
+
+    public static void registerReceiver(Context context, BroadcastReceiver receiver, IntentFilter filter, String broadcastPermission, android.os.Handler scheduler, int flags) {
         if (receiver == null || filter == null) return;
         
-        Logger.d(TAG, "Registering virtual receiver: " + receiver.getClass().getName());
+        Logger.d(TAG, "Registering virtual receiver: " + receiver.getClass().getName() + " with flags: " + flags);
         synchronized (sReceivers) {
             sReceivers.add(new ReceiverRecord(receiver, filter));
         }
         
         // Register with the host context to receive system broadcasts
         try {
-            context.registerReceiver(receiver, filter);
+            // Android 13 (API 33) introduced registerReceiver(..., flags)
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                context.registerReceiver(receiver, filter, broadcastPermission, scheduler, flags);
+            } else {
+                context.registerReceiver(receiver, filter, broadcastPermission, scheduler);
+            }
         } catch (Exception e) {
             Logger.e(TAG, "Failed to register receiver with host context", e);
         }

@@ -17,9 +17,22 @@ public class PermissionManager {
     public static int checkPermission(String permission, String pkgName, int uid) {
         if (permission == null) return PackageManager.PERMISSION_DENIED;
         
-        // In virtual environment we default to granted for sandbox stability
+        // In virtual environment we default to granted for sandbox stability.
+        // For production, we may want to check real system grant status but often 
+        // games need these granted automatically to skip complex UI flows.
         Logger.v(TAG, "checkPermission spoof for " + pkgName + ": " + permission);
         return PackageManager.PERMISSION_GRANTED;
+    }
+
+    public static int checkSelfPermission(Context context, String permission) {
+        if (permission == null) return PackageManager.PERMISSION_DENIED;
+        Logger.v(TAG, "checkSelfPermission spoof: " + permission);
+        return PackageManager.PERMISSION_GRANTED;
+    }
+
+    public static boolean shouldShowRequestPermissionRationale(Activity activity, String permission) {
+        Logger.v(TAG, "shouldShowRequestPermissionRationale spoof for: " + permission);
+        return false; // Prevent annoying dialog rationales
     }
 
     public static void requestPermissions(Activity activity, String[] permissions, int requestCode) {

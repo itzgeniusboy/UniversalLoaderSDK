@@ -55,6 +55,13 @@ public class ActivityManagerHook implements InvocationHandler {
                     ReceiverManager.sendBroadcast(com.onecore.sdk.OneCoreSDK.getContext(), intent);
                     return null; // Skip real system broadcast as we handled it
                 }
+            } else if (methodName.equals("getContentProvider")) {
+                String authority = (String) args[1];
+                android.content.pm.ProviderInfo pi = com.onecore.sdk.core.pm.VirtualPackageManager.resolveProviderByAuthority(authority);
+                if (pi != null) {
+                    Logger.d("ActivityManagerHook", "IActivityManager.getContentProvider spoof: " + authority);
+                    // In a production app, we would return a ContentProviderHolder containing the locally installed provider
+                }
             }
 
             if (intentIdx != -1) {
@@ -106,19 +113,25 @@ public class ActivityManagerHook implements InvocationHandler {
         }
 
         // Return Fake UID or PID if requested by the Game
-        if (methodName.equals("getRunningAppProcesses")) {
+        if (methodName.equals("getRunningAppProcesses") || methodName.equals("getHistoricalProcessExitReasons")) {
             Object result = method.invoke(realService, args);
             if (result instanceof java.util.List) {
-                java.util.List<android.app.ActivityManager.RunningAppProcessInfo> list = (java.util.List<android.app.ActivityManager.RunningAppProcessInfo>) result;
-                for (android.app.ActivityManager.RunningAppProcessInfo info : list) {
-                    if (info.pid == android.os.Process.myPid()) {
-                        // Spoof our process name to be the guest app's package name
-                        info.processName = BinderHookManager.sCurrentPackage;
-                        info.pkgList = new String[]{BinderHookManager.sCurrentPackage};
+                java.util.List list = (java.util.List) result;
+                for (Object item : list) {
+                    if (item instanceof android.app.ActivityManager.RunningAppProcessInfo) {
+                        android.app.ActivityManager.RunningAppProcessInfo info = (android.app.ActivityManager.RunningAppProcessInfo) item;
+                        if (info.pid == android.os.Process.myPid()) {
+                            info.processName = BinderHookManager.sCurrentPackage;
+                            info.pkgList = new String[]{BinderHookManager.sCurrentPackage};
+                        }
                     }
                 }
             }
             return result;
+        }
+
+        if (methodName.equals("getProcessMemoryInfo") || methodName.equals("getMemoryInfo")) {
+             // Performance optimization: we might want to return slightly tweaked values to prevent anti-cheat detection of virtualization
         }
 
         return method.invoke(realService, args);

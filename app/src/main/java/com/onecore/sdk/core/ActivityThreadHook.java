@@ -37,20 +37,27 @@ public class ActivityThreadHook {
             if (!(baseInst instanceof CustomInstrumentation)) {
                 instrField.set(activityThread, new CustomInstrumentation(baseInst));
                 Logger.d(TAG, "Instrumentation redirected via CustomInstrumentation");
+            } else {
+                Logger.v(TAG, "Instrumentation already hooked.");
             }
 
             // 3. Inject Handler.Callback into mH
-            Field hField = atClass.getDeclaredField("mH");
-            hField.setAccessible(true);
-            Handler mH = (Handler) hField.get(activityThread);
-
-            Field cbField = Handler.class.getDeclaredField("mCallback");
-            cbField.setAccessible(true);
-            
-            Object currentCb = cbField.get(mH);
-            if (!(currentCb instanceof HandlerCallback)) {
-                cbField.set(mH, new HandlerCallback(mH));
-                Logger.d(TAG, "ActivityThread.mH hooked via HandlerCallback");
+            try {
+                Field hField = atClass.getDeclaredField("mH");
+                hField.setAccessible(true);
+                Handler mH = (Handler) hField.get(activityThread);
+                if (mH != null) {
+                    Field cbField = Handler.class.getDeclaredField("mCallback");
+                    cbField.setAccessible(true);
+                    
+                    Object currentCb = cbField.get(mH);
+                    if (!(currentCb instanceof HandlerCallback)) {
+                        cbField.set(mH, new HandlerCallback(mH));
+                        Logger.d(TAG, "ActivityThread.mH hooked successfully.");
+                    }
+                }
+            } catch (Exception e) {
+                Logger.e(TAG, "Failed to hook mH: " + e.getMessage());
             }
 
             // 4. Inject PackageManager Proxy

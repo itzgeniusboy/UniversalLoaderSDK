@@ -55,9 +55,15 @@ public class ProviderManager {
                         Method attachInfo = ContentProvider.class.getDeclaredMethod("attachInfo", Context.class, ProviderInfo.class);
                         attachInfo.setAccessible(true);
                         attachInfo.invoke(provider, app, info);
+                        Logger.v(TAG, "attachInfo successful for " + info.name);
                     } catch (Exception e) {
-                        // Fallback for older/different internal attach
                         Logger.w(TAG, "Standard attachInfo failed for " + info.name + ", attempting fallback");
+                        // Fallback: manually set mContext if possible or just call onCreate
+                        try {
+                            Field contextField = ContentProvider.class.getDeclaredField("mContext");
+                            contextField.setAccessible(true);
+                            contextField.set(provider, app);
+                        } catch (Exception ignored) {}
                         provider.onCreate();
                     }
                     
