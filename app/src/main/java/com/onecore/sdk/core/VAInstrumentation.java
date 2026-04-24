@@ -115,7 +115,7 @@ public class VAInstrumentation extends Instrumentation {
 
     @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
-        Logger.d(TAG, "Hooked callActivityOnCreate: " + activity.getClass().getName());
+        Logger.i(TAG, ">>> HOOK ACTIVE: callActivityOnCreate for " + activity.getClass().getName());
         
         ClassLoader guestLoader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
         
@@ -179,7 +179,7 @@ public class VAInstrumentation extends Instrumentation {
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
         
-        Logger.i(TAG, "execStartActivity SYSTEM-LAUNCH: " + (intent.getComponent() != null ? intent.getComponent().getClassName() : intent.toString()));
+        Logger.i(TAG, ">>> HOOK ACTIVE: execStartActivity SYSTEM-LAUNCH -> " + (intent.getComponent() != null ? intent.getComponent().getClassName() : intent.toString()));
         
         // Use reflection to call the base execStartActivity as it's hidden
         try {

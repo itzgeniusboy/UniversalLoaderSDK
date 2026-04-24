@@ -16,9 +16,18 @@ public class ActivityManagerHook implements InvocationHandler {
     }
 
     public static Object createProxy(Object realService) {
+        java.util.Set<Class<?>> interfaces = new java.util.HashSet<>();
+        Class<?> current = realService.getClass();
+        while (current != null) {
+            for (Class<?> iface : current.getInterfaces()) {
+                interfaces.add(iface);
+            }
+            current = current.getSuperclass();
+        }
+        
         return Proxy.newProxyInstance(
                 realService.getClass().getClassLoader(),
-                realService.getClass().getInterfaces(),
+                interfaces.toArray(new Class[0]),
                 new ActivityManagerHook(realService)
         );
     }
