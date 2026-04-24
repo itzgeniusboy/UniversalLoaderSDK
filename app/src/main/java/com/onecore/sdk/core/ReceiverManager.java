@@ -30,6 +30,17 @@ public class ReceiverManager {
         }
     }
 
+    public static void unregisterReceiver(Context context, BroadcastReceiver receiver) {
+        if (receiver == null) return;
+        Logger.d(TAG, "Unregistering receiver: " + receiver.getClass().getName());
+        synchronized (sReceivers) {
+            sReceivers.removeIf(record -> record.receiver == receiver);
+        }
+        try {
+            context.unregisterReceiver(receiver);
+        } catch (Exception ignored) {}
+    }
+
     public static void sendBroadcast(Context context, android.content.Intent intent) {
         if (intent == null) return;
         

@@ -24,16 +24,22 @@ public class PermissionManager {
 
     public static void requestPermissions(Activity activity, String[] permissions, int requestCode) {
         if (activity == null || permissions == null) return;
-        Logger.i(TAG, "Intercepted requestPermissions for " + activity.getClass().getName());
         
-        // Android 6.0+ permission request - we can either call system or spoof success
-        // To avoid ANRs or user confusion, sometimes auto-grant is preferred in deep clones.
+        // Android 10+ location permissions often need special handling if not requested correctly
+        Logger.i(TAG, "Requesting " + permissions.length + " permissions for " + activity.getClass().getSimpleName());
         
-        // Option A: Forward to system (Real Dialog)
-        // activity.requestPermissions(permissions, requestCode);
-        
-        // Option B: Auto-grant for Sandbox (No UI)
-        dispatchGrantResults(activity, requestCode, permissions);
+        // Final compatibility: We'll attempt a silent grant first for the sandbox
+        if (shouldAutoGrant()) {
+            dispatchGrantResults(activity, requestCode, permissions);
+        } else {
+            // Otherwise, proxy to the real system if the user needs to see it
+            activity.requestPermissions(permissions, requestCode);
+        }
+    }
+
+    private static boolean shouldAutoGrant() {
+        // In a high-performance sandbox, we usually auto-grant to avoid UI interrupts
+        return true;
     }
 
     private static void dispatchGrantResults(Activity activity, int requestCode, String[] permissions) {

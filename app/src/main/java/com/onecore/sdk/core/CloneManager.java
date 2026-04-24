@@ -168,11 +168,20 @@ public class CloneManager {
         File[] files = src.listFiles();
         if (files == null) return;
         
+        String myAbi = android.os.Build.SUPPORTED_ABIS[0];
+        
         for (File f : files) {
             if (f.isDirectory()) {
-                File nextDst = new File(dst, f.getName());
-                nextDst.mkdirs();
-                recursiveCopyLibs(f, nextDst);
+                // If it's an ABI directory, only enter if it matches current device ABI
+                if (isAbiDir(f.getName())) {
+                    if (f.getName().equals(myAbi) || f.getName().startsWith(myAbi.split("-")[0])) {
+                        recursiveCopyLibs(f, dst); // Flatten into target lib dir
+                    }
+                } else {
+                    File nextDst = new File(dst, f.getName());
+                    nextDst.mkdirs();
+                    recursiveCopyLibs(f, nextDst);
+                }
             } else if (f.getName().endsWith(".so")) {
                 try {
                     File targetFile = new File(dst, f.getName());
@@ -184,6 +193,10 @@ public class CloneManager {
                 }
             }
         }
+    }
+
+    private boolean isAbiDir(String name) {
+        return name.equals("arm64-v8a") || name.equals("armeabi-v7a") || name.equals("x86") || name.equals("x86_64");
     }
 
     private static class Os {

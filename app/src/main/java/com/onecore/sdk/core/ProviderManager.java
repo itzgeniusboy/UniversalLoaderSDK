@@ -50,13 +50,17 @@ public class ProviderManager {
                     ClassLoader cl = app.getClassLoader();
                     ContentProvider provider = (ContentProvider) cl.loadClass(info.name).newInstance();
                     
-                    Method attachInfo = ContentProvider.class.getDeclaredMethod("attachInfo", Context.class, ProviderInfo.class);
-                    attachInfo.setAccessible(true);
+                    // Attach context accurately
+                    try {
+                        Method attachInfo = ContentProvider.class.getDeclaredMethod("attachInfo", Context.class, ProviderInfo.class);
+                        attachInfo.setAccessible(true);
+                        attachInfo.invoke(provider, app, info);
+                    } catch (Exception e) {
+                        // Fallback for older/different internal attach
+                        Logger.w(TAG, "Standard attachInfo failed for " + info.name + ", attempting fallback");
+                        provider.onCreate();
+                    }
                     
-                    // Use the application context for providers
-                    attachInfo.invoke(provider, app, info);
-                    
-                    // Store locally if helpful
                     registerProviderLocally(activityThread, provider, info);
                 } catch (Exception e) {
                     Logger.e(TAG, "Failed to install provider manually: " + info.name, e);
