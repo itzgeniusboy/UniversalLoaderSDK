@@ -32,6 +32,29 @@ public class ActivityManagerHook implements InvocationHandler {
         );
     }
 
+    private Object createContentProviderHolder(android.content.pm.ProviderInfo info, Object providerProxy) {
+        try {
+            Class<?> holderClass = Class.forName("android.app.ContentProviderHolder");
+            Object holder = holderClass.getConstructor(android.content.pm.ProviderInfo.class).newInstance(info);
+            
+            java.lang.reflect.Field providerField = holderClass.getDeclaredField("provider");
+            providerField.setAccessible(true);
+            providerField.set(holder, providerProxy);
+            
+            java.lang.reflect.Field noReleaseField = holderClass.getDeclaredField("noReleaseNeeded");
+            noReleaseField.setAccessible(true);
+            noReleaseField.set(holder, true);
+            
+            return holder;
+        } catch (Exception e) {
+            Logger.e("ActivityManagerHook", "Failed to create ContentProviderHolder", e);
+            // On older Android versions, ContentProviderHolder might not exist or be different
+            // In those cases, the return type of getContentProvider might be IContentProvider directly
+            // or an IContentProvider.ContentProviderHolder inner class
+            return null;
+        }
+    }
+
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String methodName = method.getName();
@@ -55,12 +78,27 @@ public class ActivityManagerHook implements InvocationHandler {
                     ReceiverManager.sendBroadcast(com.onecore.sdk.OneCoreSDK.getContext(), intent);
                     return null; // Skip real system broadcast as we handled it
                 }
-            } else if (methodName.equals("getContentProvider")) {
+            } else if (methodName.equals("getContentProvider") || methodName.equals("getContentProviderExternal")) {
                 String authority = (String) args[1];
                 android.content.pm.ProviderInfo pi = com.onecore.sdk.core.pm.VirtualPackageManager.resolveProviderByAuthority(authority);
                 if (pi != null) {
-                    Logger.d("ActivityManagerHook", "IActivityManager.getContentProvider spoof: " + authority);
-                    // In a production app, we would return a ContentProviderHolder containing the locally installed provider
+                    Logger.d("ActivityManagerHook", "IActivityManager." + methodName + " spoof: " + authority);
+                    
+                    android.content.ContentProvider localProvider = ProviderInstaller.getInstalledProvider(pi.name);
+                    if (localProvider == null) {
+                        // Attempt lazy install if not already installed
+                        android.app.Application app = ApplicationManager.getVirtualApp(pi.packageName);
+                        if (app != null) {
+                            localProvider = ProviderInstaller.install(app, pi);
+                        }
+                    }
+
+                    if (localProvider != null) {
+                        Object proxy = ContentResolverHook.createProxy(localProvider);
+                        if (proxy != null) {
+                            return createContentProviderHolder(pi, proxy);
+                        }
+                    }
                 }
             }
 

@@ -14,9 +14,14 @@ import java.lang.reflect.Method;
 public class ApplicationManager {
     private static final String TAG = "OneCore-AppMgr";
     private static Application sVirtualApp;
+    private static final java.util.Map<String, Application> sAppMap = new java.util.HashMap<>();
 
     public static Application getVirtualApp() {
         return sVirtualApp;
+    }
+
+    public static Application getVirtualApp(String packageName) {
+        return sAppMap.get(packageName);
     }
 
     public static Application bindApplication(Context hostContext, String packageName, String appClassName, ClassLoader cl, android.content.res.Resources res) {
@@ -25,14 +30,14 @@ public class ApplicationManager {
             return null;
         }
 
-        if (sVirtualApp != null) return sVirtualApp;
+        if (sAppMap.containsKey(packageName)) return sAppMap.get(packageName);
 
         synchronized (ApplicationManager.class) {
-            if (sVirtualApp != null) return sVirtualApp;
+            if (sAppMap.containsKey(packageName)) return sAppMap.get(packageName);
             
             try {
                 String targetClassName = appClassName != null ? appClassName : "android.app.Application";
-                Logger.i(TAG, "Lifecycle: Binding Application -> " + targetClassName);
+                Logger.i(TAG, "Lifecycle: Binding Application -> " + targetClassName + " for " + packageName);
                 
                 // 1. Instantiate Application
                 Instrumentation instrumentation = new Instrumentation();
@@ -74,8 +79,9 @@ public class ApplicationManager {
                 // 6. Lifecycle onCreate
                 app.onCreate();
                 sVirtualApp = app;
+                sAppMap.put(packageName, app);
                 
-                Logger.i(TAG, "Virtual Application successfully initialized.");
+                Logger.i(TAG, "Virtual Application successfully initialized: " + packageName);
                 return app;
             } catch (Exception e) {
                 Logger.e(TAG, "CRITICAL: Application Environment Binding FAILED", e);

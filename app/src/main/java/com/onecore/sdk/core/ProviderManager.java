@@ -20,6 +20,19 @@ public class ProviderManager {
 
         Logger.i(TAG, "Installing " + providers.size() + " providers for " + packageName);
 
+        for (ProviderInfo info : providers) {
+            try {
+                ContentProvider provider = ProviderInstaller.install(app, info);
+                if (provider != null) {
+                    registerProviderLocally(provider, info);
+                }
+            } catch (Exception e) {
+                Logger.e(TAG, "Failed to install provider: " + info.name, e);
+            }
+        }
+    }
+
+    private static void registerProviderLocally(ContentProvider provider, ProviderInfo info) {
         try {
             Class<?> atClass = Class.forName("android.app.ActivityThread");
             Method curAtMethod = atClass.getDeclaredMethod("currentActivityThread");
@@ -28,60 +41,6 @@ public class ProviderManager {
 
             if (activityThread == null) return;
 
-            // ActivityThread.installContentProviders(Context, List<ProviderInfo>)
-            Method installMethod = null;
-            try {
-                installMethod = atClass.getDeclaredMethod("installContentProviders", Context.class, List.class);
-                installMethod.setAccessible(true);
-            } catch (NoSuchMethodException e) {
-                // Older versions or different signature
-            }
-
-            if (installMethod != null) {
-                installMethod.invoke(activityThread, app, providers);
-                Logger.d(TAG, "System installContentProviders called successfully");
-                return;
-            }
-
-            // Manual fallback if installation method is not found
-            for (ProviderInfo info : providers) {
-                try {
-                    Logger.d(TAG, "Installing provider manually: " + info.name);
-                    ClassLoader cl = app.getClassLoader();
-                    ContentProvider provider = (ContentProvider) cl.loadClass(info.name).newInstance();
-                    
-                    // Attach context accurately
-                    try {
-                        Method attachInfo = ContentProvider.class.getDeclaredMethod("attachInfo", Context.class, ProviderInfo.class);
-                        attachInfo.setAccessible(true);
-                        attachInfo.invoke(provider, app, info);
-                        Logger.v(TAG, "attachInfo successful for " + info.name);
-                    } catch (Exception e) {
-                        Logger.w(TAG, "Standard attachInfo failed for " + info.name + ", attempting fallback");
-                        // Fallback: manually set mContext if possible or just call onCreate
-                        try {
-                            Field contextField = ContentProvider.class.getDeclaredField("mContext");
-                            contextField.setAccessible(true);
-                            contextField.set(provider, app);
-                        } catch (Exception ignored) {}
-                        provider.onCreate();
-                    }
-                    
-                    registerProviderLocally(activityThread, provider, info);
-                } catch (Exception e) {
-                    Logger.e(TAG, "Failed to install provider manually: " + info.name, e);
-                }
-            }
-        } catch (Exception e) {
-            Logger.e(TAG, "Failed during provider installation", e);
-        }
-    }
-
-    private static void registerProviderLocally(Object activityThread, ContentProvider provider, ProviderInfo info) {
-        try {
-            // In Android, ActivityThread maintains mLocalProviders and mProviderMap
-            // We want to insert our virtual provider here so local ContentResolver.acquireProvider() finds it.
-            
             Object transport = getProviderTransport(provider);
             if (transport == null) return;
 
@@ -96,8 +55,6 @@ public class ProviderManager {
             mProviderMapField.setAccessible(true);
             java.util.Map mProviderMap = (java.util.Map) mProviderMapField.get(activityThread);
             
-            // On some versions mProviderMap uses authority as key, on others it uses component name or IBinder
-            // We try to add it for all authorities
             if (info.authority != null) {
                 String[] auths = info.authority.split(";");
                 for (String auth : auths) {
@@ -105,9 +62,9 @@ public class ProviderManager {
                 }
             }
             
-            Logger.i(TAG, "Provider " + info.name + " (" + info.authority + ") installed in ActivityThread.");
+            Logger.i(TAG, "Provider " + info.name + " (" + info.authority + ") registered locally.");
         } catch (Exception e) {
-            Logger.w(TAG, "Failed to register provider locally: " + e.getMessage());
+            Logger.w(TAG, "Failed to register provider in ActivityThread maps: " + e.getMessage());
         }
     }
 
