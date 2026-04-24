@@ -181,6 +181,15 @@ public class CloneManager {
 
     private ClassLoader guestClassLoader;
     private android.content.res.Resources guestResources;
+    private Context hostContext;
+
+    public Context getHostContext() {
+        return hostContext;
+    }
+
+    public void setHostContext(Context hostContext) {
+        this.hostContext = hostContext;
+    }
 
     public ClassLoader getClassLoader() {
         return guestClassLoader;

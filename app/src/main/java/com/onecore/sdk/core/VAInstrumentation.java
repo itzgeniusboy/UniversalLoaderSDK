@@ -53,9 +53,8 @@ public class VAInstrumentation extends Instrumentation {
                 }
                 intent.setClassName(targetPackage, targetActivity);
 
-                // 🔥 Direct instantiation ensures correct loader is used
-                Class<?> activityClass = appCl.loadClass(targetActivity);
-                return (Activity) activityClass.newInstance();
+                // Revert to super.newActivity as H Hook handles intent fixing
+                return super.newActivity(appCl, targetActivity, intent);
 
             } catch (Throwable e) {
                 Logger.e(TAG, "Redirection failed: " + e.getMessage());

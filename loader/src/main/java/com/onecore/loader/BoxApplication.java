@@ -3,6 +3,7 @@ package com.onecore.loader;
 import android.app.Application;
 import com.onecore.sdk.OneCoreSDK;
 import com.onecore.sdk.utils.Logger;
+import com.onecore.sdk.core.hook.ActivityThreadHandlerHook;
 
 /**
  * Main Application class for OneCore Loader.
@@ -25,6 +26,7 @@ public class BoxApplication extends Application {
             
             // 3. Early Instrumentation Hook (User requested global hook)
             hookInstrumentation();
+            ActivityThreadHandlerHook.hook();
             
             Logger.i(TAG, "SUCCESS: Virtualization Core and Hooks initialized in Application process.");
         } catch (Exception e) {

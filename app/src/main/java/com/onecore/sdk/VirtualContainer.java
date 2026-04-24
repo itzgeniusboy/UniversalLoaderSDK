@@ -106,7 +106,7 @@ public class VirtualContainer {
                 dexPath,
                 optimizedDir,
                 libPath,
-                context.getClassLoader().getParent() 
+                context.getClassLoader() 
             );
             CloneManager.getInstance().setClassLoader(this.guestClassLoader);
             com.onecore.sdk.core.LoadedApkHook.hook(this.guestClassLoader);
