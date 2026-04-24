@@ -25,7 +25,7 @@ public class ActivityThreadHandlerHook {
             Field mCallbackField = Handler.class.getDeclaredField("mCallback");
             mCallbackField.setAccessible(true);
 
-            mCallbackField.set(mH, new HCallback(mH));
+            mCallbackField.set(mH, new HandlerCallback(mH));
             Logger.i(TAG, "ActivityThread.mH.mCallback HOOKED SUCCESS.");
 
         } catch (Throwable e) {
