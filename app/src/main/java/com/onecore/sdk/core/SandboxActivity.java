@@ -104,16 +104,15 @@ public class SandboxActivity extends Activity {
                 return;
             }
 
-            // 3. Hand over to StubActivity for virtualized class loading
-            Logger.i(TAG, "Handing over to StubActivity for: " + mainActivity);
-            Intent stubIntent = new Intent(this, StubActivity.class);
-            stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            stubIntent.putExtra("target_package", targetPackage);
-            stubIntent.putExtra("target_activity", mainActivity);
+            // 3. Hand over to system startActivity for virtualized execution
+            Logger.i(TAG, "Launching Guest Activity via system: " + mainActivity);
+            Intent guestIntent = new Intent();
+            guestIntent.setClassName(targetPackage, mainActivity);
+            guestIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             
-            startActivity(stubIntent);
+            startActivity(guestIntent);
             
-            Logger.i(TAG, "Stub Handover Successful. Sandbox shell retiring.");
+            Logger.i(TAG, "System-driven launch initiated.");
             
             // Self-destruct this activity after handover
             new Handler(Looper.getMainLooper()).postDelayed(this::finish, 2000);

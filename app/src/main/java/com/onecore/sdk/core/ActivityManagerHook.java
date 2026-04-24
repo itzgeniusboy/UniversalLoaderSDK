@@ -29,33 +29,41 @@ public class ActivityManagerHook implements InvocationHandler {
 
         if (methodName.equals("startActivity") || methodName.equals("bindService")) {
             int intentIdx = -1;
-            for (int i = 0; i < args.length; i++) {
-                if (args[i] instanceof android.content.Intent) {
-                    intentIdx = i;
-                    break;
+            if (args != null) {
+                for (int i = 0; i < args.length; i++) {
+                    if (args[i] instanceof android.content.Intent) {
+                        intentIdx = i;
+                        break;
+                    }
                 }
             }
 
             if (intentIdx != -1) {
                 android.content.Intent intent = (android.content.Intent) args[intentIdx];
-                if (intent.getComponent() != null) {
+                if (intent != null && intent.getComponent() != null) {
                     String pkgName = intent.getComponent().getPackageName();
                     String className = intent.getComponent().getClassName();
 
                     // If it's a guest activity/service launch, wrap it
                     if (com.onecore.sdk.VirtualContainer.getInstance().getClonedPackage(pkgName) != null) {
-                        Logger.i("ActivityManagerHook", "Redirecting " + methodName + " for: " + className);
+                        Logger.i("ActivityManagerHook", "AMS Interception: " + methodName + " for " + className);
                         
                         if (methodName.equals("startActivity")) {
                             android.content.Intent stubIntent = new android.content.Intent();
                             stubIntent.setClassName(com.onecore.sdk.OneCoreSDK.getContext().getPackageName(), "com.onecore.sdk.core.StubActivity");
+                            
+                            // Important: Use flags from original intent and ensure NEW_TASK if needed
+                            stubIntent.addFlags(intent.getFlags());
                             stubIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                            
                             stubIntent.putExtra("target_package", pkgName);
                             stubIntent.putExtra("target_activity", className);
+                            stubIntent.putExtra("original_intent", intent);
+                            
                             args[intentIdx] = stubIntent;
+                            Logger.d("ActivityManagerHook", "Redirected to StubActivity");
                         } else {
                             // bindService redirection logic - usually we'd have a ProxyService
-                            // For now, let the system try, but we might need a StubService.
                         }
                     }
                 }

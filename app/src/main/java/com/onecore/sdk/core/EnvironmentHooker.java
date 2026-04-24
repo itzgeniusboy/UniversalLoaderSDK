@@ -31,6 +31,7 @@ public class EnvironmentHooker {
 
             // 2.5 Hook Activity Manager Service
             hookActivityManager();
+            hookActivityTaskManager();
 
             // 3. Hook Instrumentation (Interception of Activity Creation)
             hookInstrumentation(activityThread, activityThreadClass);
@@ -97,6 +98,30 @@ public class EnvironmentHooker {
         mInstanceField.set(gDefault, proxyAm);
         
         Logger.d(TAG, "IActivityManager hooked.");
+    }
+
+    private static void hookActivityTaskManager() {
+        try {
+            Class<?> atmClass = Class.forName("android.app.ActivityTaskManager");
+            Field singletonField = atmClass.getDeclaredField("IActivityTaskManagerSingleton");
+            singletonField.setAccessible(true);
+            Object singleton = singletonField.get(null);
+
+            Class<?> singletonClass = Class.forName("android.util.Singleton");
+            Method getMethod = singletonClass.getDeclaredMethod("get");
+            getMethod.setAccessible(true);
+            Object originalAtm = getMethod.invoke(singleton);
+
+            if (originalAtm != null) {
+                Object proxyAtm = ActivityManagerHook.createProxy(originalAtm);
+                Field mInstanceField = singletonClass.getDeclaredField("mInstance");
+                mInstanceField.setAccessible(true);
+                mInstanceField.set(singleton, proxyAtm);
+                Logger.d(TAG, "IActivityTaskManager hooked.");
+            }
+        } catch (Exception e) {
+            Logger.d(TAG, "ActivityTaskManager not supported or hook failed: " + e.getMessage());
+        }
     }
 
     private static void hookPackageManager(Class<?> activityThreadClass, String fakeName, String virtualPath) throws Exception {

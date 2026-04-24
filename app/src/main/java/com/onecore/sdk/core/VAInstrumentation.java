@@ -25,24 +25,36 @@ public class VAInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
+        Intent originalIntent = intent.getParcelableExtra("original_intent");
         String targetActivity = intent.getStringExtra("target_activity");
+
         if (targetActivity != null) {
             Logger.i(TAG, "Restoring Virtual Activity: " + targetActivity);
             try {
-                // Restore original intent for the guest activity
                 String targetPackage = intent.getStringExtra("target_package");
-                intent.setClassName(targetPackage, targetActivity);
+                
+                // Restore original intent for the guest activity if it exists
+                if (originalIntent != null) {
+                    intent.fillIn(originalIntent, Intent.FILL_IN_COMPONENT | Intent.FILL_IN_ACTION | Intent.FILL_IN_DATA | Intent.FILL_IN_CATEGORIES | Intent.FILL_IN_FLAGS);
+                    // Ensure the target remains explicitly set to avoid loops or system misses
+                    intent.setClassName(targetPackage, targetActivity);
+                } else {
+                    intent.setClassName(targetPackage, targetActivity);
+                }
+
                 intent.removeExtra("target_activity");
                 intent.removeExtra("target_package");
+                intent.removeExtra("original_intent");
 
                 ClassLoader guestLoader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
                 if (guestLoader != null) {
-                    // System-driven instantiation using the guest class loader
+                    // System-driven instantiation using the guest class loader via the base instrumentation
                     Activity activity = base.newActivity(guestLoader, targetActivity, intent);
                     
                     // Hook into ActivityThread records to fix rendering/metadata
                     patchActivityThreadRecord(activity, targetPackage, targetActivity);
                     
+                    Logger.d(TAG, "Activity instantiated by system: " + activity.getClass().getName());
                     return activity;
                 }
             } catch (Exception e) {
