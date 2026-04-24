@@ -28,37 +28,19 @@ public class VAInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
-        String targetActivity = intent.getStringExtra("target_activity");
-
-        if (targetActivity != null) {
+        Intent target = intent.getParcelableExtra("_VA_TARGET_");
+        if (target != null && target.getComponent() != null) {
+            String targetActivity = target.getComponent().getClassName();
             try {
                 ClassLoader appCl = CloneManager.getInstance().getClassLoader();
-                Logger.i("VA", "Redirecting to: " + targetActivity);
-
-                // Restore original intent for the guest activity if it exists
-                Intent originalIntent = intent.getParcelableExtra("original_intent");
-                if (originalIntent != null) {
-                    intent.fillIn(originalIntent, Intent.FILL_IN_COMPONENT | Intent.FILL_IN_ACTION | Intent.FILL_IN_DATA | Intent.FILL_IN_CATEGORIES);
-                }
+                Logger.i("VA", "Instrumentation redirecting to: " + targetActivity);
                 
-                // Cleanup virtual platform extras
-                intent.removeExtra("target_activity");
-                intent.removeExtra("target_package");
-                intent.removeExtra("original_intent");
+                // Ensure target remains set to the correct class
+                target.setExtrasClassLoader(appCl);
                 
-                // Ensure correct component is set
-                String targetPackage = intent.getComponent() != null ? intent.getComponent().getPackageName() : null;
-                if (targetPackage == null) {
-                    targetPackage = com.onecore.sdk.OneCoreSDK.getContext().getPackageName();
-                }
-                intent.setClassName(targetPackage, targetActivity);
-
-                // Revert to super.newActivity as H Hook handles intent fixing
-                return super.newActivity(appCl, targetActivity, intent);
-
+                return super.newActivity(appCl, targetActivity, target);
             } catch (Throwable e) {
-                Logger.e(TAG, "Redirection failed: " + e.getMessage());
-                e.printStackTrace();
+                Logger.e(TAG, "newActivity redirection failed: " + e.getMessage());
             }
         }
         
@@ -176,7 +158,7 @@ public class VAInstrumentation extends Instrumentation {
                 stubIntent.setClassName(who.getPackageName(), "com.onecore.sdk.core.StubActivity");
                 stubIntent.putExtra("target_activity", className);
                 stubIntent.putExtra("target_package", packageName);
-                stubIntent.putExtra("original_intent", new Intent(intent));
+                stubIntent.putExtra("_VA_TARGET_", new Intent(intent));
                 stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 
                 intent = stubIntent;

@@ -41,33 +41,15 @@ public class HCallback implements Handler.Callback {
             intentField.setAccessible(true);
 
             Intent stubIntent = (Intent) intentField.get(r);
-            String targetActivity = stubIntent.getStringExtra("target_activity");
-            String targetPackage = stubIntent.getStringExtra("target_package");
+            Intent target = stubIntent.getParcelableExtra("_VA_TARGET_");
 
-            if (targetActivity != null) {
-                // ✅ Fix Intent
-                stubIntent.setClassName(
-                        CloneManager.getInstance().getHostContext().getPackageName(),
-                        targetActivity
-                );
+            if (target != null) {
+                intentField.set(r, target);
 
-                // 🔥 Inject ActivityInfo
-                Field activityInfoField = r.getClass().getDeclaredField("activityInfo");
-                activityInfoField.setAccessible(true);
-
-                android.content.pm.ActivityInfo ai = com.onecore.sdk.core.pm.VirtualPackageManager.resolveActivity(targetPackage, targetActivity);
-
-                if (ai != null) {
-                    // Update metadata to match host so system handles it
-                    String hostPkg = CloneManager.getInstance().getHostContext().getPackageName();
-                    ai.packageName = hostPkg;
-                    if (ai.applicationInfo != null) {
-                        ai.applicationInfo.packageName = hostPkg;
-                    }
-                    
-                    activityInfoField.set(r, ai);
-                    Logger.i("VA", "Injected ActivityInfo → " + targetActivity);
-                }
+                Field infoField = r.getClass().getDeclaredField("activityInfo");
+                infoField.setAccessible(true);
+                android.content.pm.ActivityInfo ai = (android.content.pm.ActivityInfo) infoField.get(r);
+                fixActivityInfo(ai, target);
             }
 
         } catch (Throwable e) {
@@ -89,38 +71,45 @@ public class HCallback implements Handler.Callback {
                     intentField.setAccessible(true);
 
                     Intent stubIntent = (Intent) intentField.get(item);
-                    String targetActivity = stubIntent.getStringExtra("target_activity");
-                    String targetPackage = stubIntent.getStringExtra("target_package");
+                    Intent target = stubIntent.getParcelableExtra("_VA_TARGET_");
 
-                    if (targetActivity != null) {
-                        // Fix Intent
-                        stubIntent.setClassName(
-                                CloneManager.getInstance().getHostContext().getPackageName(),
-                                targetActivity
-                        );
+                    if (target != null) {
+                        intentField.set(item, target);
 
-                        // Fix ActivityInfo
-                        Field aiField = item.getClass().getDeclaredField("mInfo");
-                        aiField.setAccessible(true);
-
-                        android.content.pm.ActivityInfo ai = com.onecore.sdk.core.pm.VirtualPackageManager.resolveActivity(targetPackage, targetActivity);
-
-                        if (ai != null) {
-                            String hostPkg = CloneManager.getInstance().getHostContext().getPackageName();
-                            ai.packageName = hostPkg;
-                            if (ai.applicationInfo != null) {
-                                ai.applicationInfo.packageName = hostPkg;
-                            }
-                            
-                            aiField.set(item, ai);
-                            Logger.i("VA", "Transaction ActivityInfo injected → " + targetActivity);
-                        }
+                        Field infoField = item.getClass().getDeclaredField("mInfo");
+                        infoField.setAccessible(true);
+                        android.content.pm.ActivityInfo ai = (android.content.pm.ActivityInfo) infoField.get(item);
+                        fixActivityInfo(ai, target);
                     }
                 }
             }
 
         } catch (Throwable e) {
             Logger.e(TAG, "handleTransaction FAILED: " + e.getMessage());
+        }
+    }
+
+    private void fixActivityInfo(android.content.pm.ActivityInfo info, Intent target) {
+        if (info == null || target.getComponent() == null) return;
+        
+        String targetActivity = target.getComponent().getClassName();
+        String targetPackage = target.getComponent().getPackageName();
+        
+        android.content.pm.ActivityInfo realAi = com.onecore.sdk.core.pm.VirtualPackageManager.resolveActivity(targetPackage, targetActivity);
+        if (realAi != null) {
+            // Hijack the existing info object to avoid breaking ActivityThread references
+            info.name = realAi.name;
+            info.packageName = CloneManager.getInstance().getHostContext().getPackageName(); // Use host for some checks
+            info.theme = realAi.theme;
+            info.launchMode = realAi.launchMode;
+            info.applicationInfo = realAi.applicationInfo;
+            if (info.applicationInfo != null) {
+                info.applicationInfo.packageName = info.packageName;
+            }
+            info.flags = realAi.flags;
+            info.screenOrientation = realAi.screenOrientation;
+            
+            Logger.i("VA", "HCallback fixed ActivityInfo for → " + targetActivity);
         }
     }
 }
