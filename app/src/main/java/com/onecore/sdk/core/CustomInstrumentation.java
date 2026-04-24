@@ -31,21 +31,20 @@ public class CustomInstrumentation extends Instrumentation {
         Intent targetIntent = intent.getParcelableExtra("EXTRA_TARGET_INTENT");
         if (targetIntent != null && targetIntent.getComponent() != null) {
             String realClassName = targetIntent.getComponent().getClassName();
+            String realPackageName = targetIntent.getComponent().getPackageName();
             Logger.i(TAG, "Intercepting Activity Creation: " + className + " -> " + realClassName);
             
             // 2. LOAD USING GUEST CLASSLOADER (DexClassLoader)
-            // IGNORE incoming ClassLoader cl as requested
             ClassLoader guestLoader = CloneManager.getInstance().getClassLoader();
             if (guestLoader != null) {
                 Logger.d(TAG, "Forcing DexClassLoader for: " + realClassName);
-                // Manually load and instantiate to ensure isolation
                 try {
+                    // Force using the guest loader specifically for the target activity
                     Class<?> activityClass = guestLoader.loadClass(realClassName);
                     Activity activity = (Activity) activityClass.newInstance();
                     return activity;
                 } catch (Exception e) {
-                    Logger.e(TAG, "Manual Class Loading FAILED: " + realClassName, e);
-                    // Fallback to super with guestLoader
+                    Logger.e(TAG, "Manual instantiation failed, falling back to super.newActivity", e);
                     return super.newActivity(guestLoader, realClassName, targetIntent);
                 }
             }
@@ -58,50 +57,30 @@ public class CustomInstrumentation extends Instrumentation {
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
         Logger.i(TAG, ">>> callActivityOnCreate: " + activity.getClass().getName());
         
-        // 3. SECURE CONTEXT FIX (Resources/ClassLoader/LoadedApk injection)
-        // This is the most critical part to remove the Black Screen!
-        fixContext(activity);
+        // 3. SECURE CONTEXT FIX (Resources/ClassLoader/PackageName injection)
+        try {
+            Intent intent = activity.getIntent();
+            Intent targetIntent = intent.getParcelableExtra("EXTRA_TARGET_INTENT");
+            if (targetIntent != null && targetIntent.getComponent() != null) {
+                String pkgName = targetIntent.getComponent().getPackageName();
+                ClassLoader guestLoader = CloneManager.getInstance().getClassLoader();
+                android.content.res.Resources guestResources = CloneManager.getInstance().getResources();
+
+                // Advanced Fix: Inject resources and classloader into the base context
+                ContextFixer.fix(activity.getBaseContext(), pkgName, guestLoader, guestResources);
+                
+                // Also fix the activity instance's own fields
+                ResourceInjector.inject(activity, guestResources);
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, "Dynamic Context Fix Failed", e);
+        }
         
         try {
             mBase.callActivityOnCreate(activity, icicle);
         } catch (Throwable e) {
-            Logger.e(TAG, "Activity Creation CRASHED: " + e.getMessage(), e);
+            Logger.e(TAG, "Activity callActivityOnCreate CRASHED", e);
             throw e;
-        }
-    }
-
-    private void fixContext(Activity activity) {
-        try {
-            Context baseContext = activity.getBaseContext();
-            android.content.res.Resources guestResources = CloneManager.getInstance().getResources();
-            ClassLoader guestLoader = CloneManager.getInstance().getClassLoader();
-
-            if (guestResources != null && guestLoader != null) {
-                Logger.d(TAG, "Patching Activity Context with Guest Resources and ClassLoader.");
-
-                // Patch ContextImpl fields
-                Field mResources = getField(baseContext.getClass(), "mResources");
-                if (mResources != null) mResources.set(baseContext, guestResources);
-
-                // Patch LoadedApk (mPackageInfo) - This ensures all future resource lookups are correct
-                Field mPackageInfo = getField(baseContext.getClass(), "mPackageInfo");
-                if (mPackageInfo != null) {
-                    Object loadedApk = mPackageInfo.get(baseContext);
-                    if (loadedApk != null) {
-                        Field mClassLoader = getField(loadedApk.getClass(), "mClassLoader");
-                        if (mClassLoader != null) mClassLoader.set(loadedApk, guestLoader);
-
-                        Field mRes = getField(loadedApk.getClass(), "mResources");
-                        if (mRes != null) mRes.set(loadedApk, guestResources);
-                    }
-                }
-                
-                // Patch Activity class resource cache
-                Field mActivityRes = getField(Activity.class, "mResources");
-                if (mActivityRes != null) mActivityRes.set(activity, guestResources);
-            }
-        } catch (Exception e) {
-            Logger.e(TAG, "Context Fix FAILED", e);
         }
     }
 
