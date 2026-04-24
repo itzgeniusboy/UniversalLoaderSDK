@@ -104,27 +104,59 @@ public class ContentResolverHook implements InvocationHandler {
 
     private Object handleQuery(Object[] args) {
         android.net.Uri uri = findUri(args);
-        // Simplification for brevity: extracting standard fields
-        // In a full SDK we'd check API level and extract projection, selection, etc.
-        return localProvider.query(uri, null, null, null, null);
+        String[] projection = null;
+        String selection = null;
+        String[] selectionArgs = null;
+        String sortOrder = null;
+        // In newer versions, indices for query are (callingPkg, uri, projection, queryArgs, cancellationSignal)
+        // or (attributionTag, uri, projection, queryArgs, cancellationSignal)
+        
+        for (Object arg : args) {
+            if (arg instanceof String[]) projection = (String[]) arg;
+            else if (arg instanceof android.os.CancellationSignal) { /* skip */ }
+        }
+        
+        // For simple apps, just passing the URI is often 80% of the way there.
+        // In a Production SDK, we would use introspection to map exactly based on API Level.
+        try {
+            return localProvider.query(uri, projection, selection, selectionArgs, sortOrder);
+        } catch (Exception e) {
+            Logger.e(TAG, "Local query failed: " + uri, e);
+            return null;
+        }
     }
 
     private Object handleInsert(Object[] args) {
         android.net.Uri uri = findUri(args);
         android.content.ContentValues values = null;
-        for (Object arg : args) if (arg instanceof android.content.ContentValues) values = (android.content.ContentValues) arg;
+        for (Object arg : args) {
+            if (arg instanceof android.content.ContentValues) values = (android.content.ContentValues) arg;
+        }
         return localProvider.insert(uri, values);
     }
 
     private Object handleUpdate(Object[] args) {
         android.net.Uri uri = findUri(args);
         android.content.ContentValues values = null;
-        for (Object arg : args) if (arg instanceof android.content.ContentValues) values = (android.content.ContentValues) arg;
-        return localProvider.update(uri, values, null, null);
+        String selection = null;
+        String[] selectionArgs = null;
+        for (Object arg : args) {
+            if (arg instanceof android.content.ContentValues) values = (android.content.ContentValues) arg;
+            else if (arg instanceof String && selection == null && !((String)arg).contains(".")) selection = (String) arg;
+            else if (arg instanceof String[]) selectionArgs = (String[]) arg;
+        }
+        return localProvider.update(uri, values, selection, selectionArgs);
     }
 
     private Object handleDelete(Object[] args) {
-        return localProvider.delete(findUri(args), null, null);
+        android.net.Uri uri = findUri(args);
+        String selection = null;
+        String[] selectionArgs = null;
+        for (Object arg : args) {
+            if (arg instanceof String && selection == null) selection = (String) arg;
+            else if (arg instanceof String[]) selectionArgs = (String[]) arg;
+        }
+        return localProvider.delete(uri, selection, selectionArgs);
     }
 
     private Object handleCall(Object[] args) {
@@ -136,12 +168,20 @@ public class ContentResolverHook implements InvocationHandler {
         
         for (int i = 0; i < args.length; i++) {
             if (args[i] instanceof String) {
-                if (method == null && i >= 2 && !((String)args[i]).contains(".")) method = (String) args[i];
-                else if (method != null && argText == null) argText = (String) args[i];
+                // Heuristic: method name usually doesn't have package structure
+                String s = (String) args[i];
+                if (i >= 2 && method == null && !s.contains(".")) method = s;
+                else if (method != null && argText == null) argText = s;
             } else if (args[i] instanceof Bundle) {
                 extras = (Bundle) args[i];
             }
         }
-        return localProvider.call(method, argText, extras);
+        
+        try {
+            return localProvider.call(method, argText, extras);
+        } catch (Exception e) {
+            Logger.e(TAG, "Local call failed: " + method, e);
+            return null;
+        }
     }
 }

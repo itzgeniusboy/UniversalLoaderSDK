@@ -17,13 +17,14 @@ public class ProviderInstaller {
     private static final Map<String, ContentProvider> sProviders = new HashMap<>();
 
     public static ContentProvider install(Context virtualContext, ProviderInfo info) {
+        String cacheKey = info.packageName + "/" + info.name;
         synchronized (sProviders) {
-            if (sProviders.containsKey(info.name)) {
-                return sProviders.get(info.name);
+            if (sProviders.containsKey(cacheKey)) {
+                return sProviders.get(cacheKey);
             }
 
             try {
-                Logger.d(TAG, "Installing virtual provider: " + info.name);
+                Logger.d(TAG, "Installing virtual provider: " + info.name + " for " + info.packageName);
                 ClassLoader cl = virtualContext.getClassLoader();
                 ContentProvider provider = (ContentProvider) cl.loadClass(info.name).newInstance();
 
@@ -38,7 +39,7 @@ public class ProviderInstaller {
                     provider.onCreate();
                 }
 
-                sProviders.put(info.name, provider);
+                sProviders.put(cacheKey, provider);
                 return provider;
             } catch (Exception e) {
                 Logger.e(TAG, "Failed to install provider: " + info.name, e);
@@ -55,7 +56,7 @@ public class ProviderInstaller {
         } catch (Exception ignored) {}
     }
 
-    public static ContentProvider getInstalledProvider(String className) {
-        return sProviders.get(className);
+    public static ContentProvider getInstalledProvider(String packageName, String className) {
+        return sProviders.get(packageName + "/" + className);
     }
 }

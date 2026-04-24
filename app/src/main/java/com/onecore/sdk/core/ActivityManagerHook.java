@@ -84,7 +84,7 @@ public class ActivityManagerHook implements InvocationHandler {
                 if (pi != null) {
                     Logger.d("ActivityManagerHook", "IActivityManager." + methodName + " spoof: " + authority);
                     
-                    android.content.ContentProvider localProvider = ProviderInstaller.getInstalledProvider(pi.name);
+                    android.content.ContentProvider localProvider = ProviderInstaller.getInstalledProvider(pi.packageName, pi.name);
                     if (localProvider == null) {
                         // Attempt lazy install if not already installed
                         android.app.Application app = ApplicationManager.getVirtualApp(pi.packageName);
