@@ -121,6 +121,12 @@ public class ContentResolverHook implements InvocationHandler {
                 return localProvider.refresh(findUri(args), findBundle(args), null);
             case "applyBatch":
                 return handleApplyBatch(args);
+            case "createCancellationSignal":
+                try {
+                    return Class.forName("android.os.ICancellationSignal$Stub").newInstance();
+                } catch (Exception e) {
+                    return null;
+                }
         }
         
         return null; 
@@ -129,12 +135,25 @@ public class ContentResolverHook implements InvocationHandler {
     private Object handleApplyBatch(Object[] args) {
         String authority = null;
         java.util.ArrayList<android.content.ContentProviderOperation> operations = null;
+        
+        // Android 11+: applyBatch(attributionTag, authority, operations)
+        // Android 10: applyBatch(callingPkg, authority, operations)
+        // Older: applyBatch(callingPkg, operations) or applyBatch(operations)
+        
         for (Object arg : args) {
-            if (arg instanceof String) authority = (String) arg;
+            if (arg instanceof String && authority == null && ((String)arg).contains(".")) authority = (String) arg;
             else if (arg instanceof java.util.ArrayList) operations = (java.util.ArrayList) arg;
         }
+        
+        if (operations == null && args != null && args.length > 0) {
+             for (Object arg : args) if (arg instanceof java.util.List) operations = new java.util.ArrayList((java.util.List)arg);
+        }
+
         try {
-            return localProvider.applyBatch(operations);
+            if (operations != null) {
+                return localProvider.applyBatch(operations);
+            }
+            return null;
         } catch (Exception e) {
             Logger.e(TAG, "Local applyBatch failed for " + authority, e);
             return null;

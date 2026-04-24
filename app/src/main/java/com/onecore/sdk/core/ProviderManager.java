@@ -58,7 +58,23 @@ public class ProviderManager {
             if (info.authority != null) {
                 String[] auths = info.authority.split(";");
                 for (String auth : auths) {
-                    mProviderMap.put(auth, transport);
+                    // On newer Android, mProviderMap values are ProviderClientRecord
+                    // On older, they might be direct IContentProvider
+                    // We try to find the correct value for the map to stay crash-free
+                    Object mapValue = transport; // Default
+                    
+                    // Heuristic: check if there's any existing entry to see what type is expected
+                    if (!mProviderMap.isEmpty()) {
+                        Object firstVal = mProviderMap.values().iterator().next();
+                        if (firstVal != null && !firstVal.getClass().getName().contains("IContentProvider")) {
+                             // It's likely a ProviderClientRecord or similar intermediate holder
+                             // We could try to create one, but it's risky.
+                             // Instead, we just put our transport. If it fails, the next access will use IActivityManager.getContentProvider
+                             // which we already hooked and serves our proxied provider correctly.
+                        }
+                    }
+                    
+                    mProviderMap.put(auth, mapValue);
                     // Register in our mapper for redirection help
                     AuthorityMapper.registerAuthority(auth, auth); 
                     Logger.v(TAG, "Authority registered: " + auth);

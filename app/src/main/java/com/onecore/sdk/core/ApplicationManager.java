@@ -78,8 +78,11 @@ public class ApplicationManager {
 
                 // 6. Lifecycle onCreate
                 app.onCreate();
-                sVirtualApp = app;
-                sAppMap.put(packageName, app);
+                
+                synchronized (ApplicationManager.class) {
+                    sVirtualApp = app;
+                    sAppMap.put(packageName, app);
+                }
                 
                 Logger.i(TAG, "Virtual Application successfully initialized: " + packageName);
                 return app;
