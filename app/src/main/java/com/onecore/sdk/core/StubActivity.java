@@ -21,19 +21,9 @@ public class StubActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // DO NOTHING
-        // Instrumentation will replace this Activity automatically
-    }
-
-    @Override
-    public android.content.res.Resources getResources() {
-        android.content.res.Resources guestRes = VirtualContainer.getInstance().getGuestResources();
-        return guestRes != null ? guestRes : super.getResources();
-    }
-
-    @Override
-    public ClassLoader getClassLoader() {
-        ClassLoader guestLoader = VirtualContainer.getInstance().getGuestClassLoader();
-        return guestLoader != null ? guestLoader : super.getClassLoader();
+        // This is a placeholder. Instrumentation will replace this activity before it ever fully starts.
+        // If we reach here, it means redirection failed.
+        Logger.w(TAG, "Redirection failed: StubActivity.onCreate reached!");
+        finish();
     }
 }
