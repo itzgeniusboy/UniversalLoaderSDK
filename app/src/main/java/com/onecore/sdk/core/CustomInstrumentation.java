@@ -26,23 +26,17 @@ public class CustomInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
-        Logger.d(TAG, "newActivity check: " + className);
-
-        // 1. Resolve REAL Activity from Intent if it was redirected
+        // 1. Check for REDIRECTION
         Intent targetIntent = intent.getParcelableExtra("EXTRA_TARGET_INTENT");
         if (targetIntent != null && targetIntent.getComponent() != null) {
             String realClassName = targetIntent.getComponent().getClassName();
-            Logger.i(TAG, "Redirection Detected: " + className + " -> " + realClassName);
+            Logger.i(TAG, "Intercepting Activity Creation: " + className + " -> " + realClassName);
             
-            // 2. LOAD USING GUEST CLASSLOADER (DexClassLoader)
+            // 2. USE GUEST CLASSLOADER (DexClassLoader)
             ClassLoader guestLoader = CloneManager.getInstance().getClassLoader();
             if (guestLoader != null) {
-                cl = guestLoader;
-                className = realClassName;
+                return super.newActivity(guestLoader, realClassName, targetIntent);
             }
-        } else if (className.contains("StubActivity")) {
-             // Fallback: If we missed the intent part but it's our stub
-             Logger.w(TAG, "newActivity reached with Stub but NO target intent!");
         }
 
         return super.newActivity(cl, className, intent);

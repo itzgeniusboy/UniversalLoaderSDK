@@ -53,55 +53,55 @@ public class HandlerCallback implements Handler.Callback {
     }
 
     private void handleTransaction(Object transaction) {
+        if (transaction == null) return;
         try {
-            Method getCallbacks = transaction.getClass().getDeclaredMethod("getCallbacks");
-            getCallbacks.setAccessible(true);
-            List callbacks = (List) getCallbacks.invoke(transaction);
+            // ClientTransaction.getCallbacks()
+            List<?> callbacks = null;
+            try {
+                Method getCallbacks = transaction.getClass().getDeclaredMethod("getCallbacks");
+                getCallbacks.setAccessible(true);
+                callbacks = (List<?>) getCallbacks.invoke(transaction);
+            } catch (Exception e) {
+                Field callbacksField = transaction.getClass().getDeclaredField("mActivityCallbacks");
+                callbacksField.setAccessible(true);
+                callbacks = (List<?>) callbacksField.get(transaction);
+            }
 
             if (callbacks != null) {
                 for (Object item : callbacks) {
-                    if (item.getClass().getName().contains("LaunchActivityItem")) {
+                    if (item != null && item.getClass().getName().contains("LaunchActivityItem")) {
                         processLaunchItem(item);
                     }
                 }
             }
         } catch (Exception e) {
-            // Android 9/10/11+ often use field access for mActivityCallbacks
-            try {
-                Field callbacksField = transaction.getClass().getDeclaredField("mActivityCallbacks");
-                callbacksField.setAccessible(true);
-                List callbacks = (List) callbacksField.get(transaction);
-                if (callbacks != null) {
-                    for (Object item : callbacks) {
-                        if (item.getClass().getName().contains("LaunchActivityItem")) {
-                            processLaunchItem(item);
-                        }
-                    }
-                }
-            } catch (Exception ex) {
-                Logger.e(TAG, "Modern Transaction Interception Failed", ex);
-            }
+            Logger.e(TAG, "handleTransaction CRITICAL FAILURE", e);
         }
     }
 
     private void processLaunchItem(Object item) {
         try {
+            // LaunchActivityItem.mIntent
             Field intentField = item.getClass().getDeclaredField("mIntent");
             intentField.setAccessible(true);
             Intent stubIntent = (Intent) intentField.get(item);
 
-            Intent target = stubIntent.getParcelableExtra("EXTRA_TARGET_INTENT");
-            if (target != null) {
-                intentField.set(item, target);
+            if (stubIntent != null) {
+                Intent target = stubIntent.getParcelableExtra("EXTRA_TARGET_INTENT");
+                if (target != null) {
+                    intentField.set(item, target);
 
-                Field infoField = item.getClass().getDeclaredField("mInfo");
-                infoField.setAccessible(true);
-                android.content.pm.ActivityInfo ai = (android.content.pm.ActivityInfo) infoField.get(item);
-                fixActivityInfo(ai, target);
-                Logger.i(TAG, "Successfully restored Intent for transaction launch");
+                    // LaunchActivityItem.mInfo (ActivityInfo)
+                    Field infoField = item.getClass().getDeclaredField("mInfo");
+                    infoField.setAccessible(true);
+                    android.content.pm.ActivityInfo ai = (android.content.pm.ActivityInfo) infoField.get(item);
+                    fixActivityInfo(ai, target);
+                    
+                    Logger.i(TAG, "Restored Transaction Intent: " + target.getComponent().getClassName());
+                }
             }
         } catch (Exception e) {
-            Logger.e(TAG, "LaunchItem Restoration Failed", e);
+            Logger.e(TAG, "processLaunchItem FAILED", e);
         }
     }
 
