@@ -2,7 +2,6 @@ package com.onecore.sdk.core;
 
 import android.app.Application;
 import android.content.pm.ApplicationInfo;
-import android.content.res.CompatibilityInfo;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
