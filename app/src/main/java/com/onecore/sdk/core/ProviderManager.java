@@ -59,6 +59,8 @@ public class ProviderManager {
                 String[] auths = info.authority.split(";");
                 for (String auth : auths) {
                     mProviderMap.put(auth, transport);
+                    // Register in our mapper for redirection help
+                    AuthorityMapper.registerAuthority(auth, auth); // For now original=virtual
                 }
             }
             

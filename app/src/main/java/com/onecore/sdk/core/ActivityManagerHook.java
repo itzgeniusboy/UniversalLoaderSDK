@@ -34,23 +34,36 @@ public class ActivityManagerHook implements InvocationHandler {
 
     private Object createContentProviderHolder(android.content.pm.ProviderInfo info, Object providerProxy) {
         try {
-            Class<?> holderClass = Class.forName("android.app.ContentProviderHolder");
-            Object holder = holderClass.getConstructor(android.content.pm.ProviderInfo.class).newInstance(info);
+            Class<?> holderClass;
+            try {
+                holderClass = Class.forName("android.app.ContentProviderHolder");
+            } catch (ClassNotFoundException e) {
+                holderClass = Class.forName("android.app.IActivityManager$ContentProviderHolder");
+            }
+            
+            Object holder;
+            try {
+                holder = holderClass.getConstructor(android.content.pm.ProviderInfo.class).newInstance(info);
+            } catch (Exception e) {
+                holder = holderClass.newInstance();
+                java.lang.reflect.Field infoField = holderClass.getDeclaredField("info");
+                infoField.setAccessible(true);
+                infoField.set(holder, info);
+            }
             
             java.lang.reflect.Field providerField = holderClass.getDeclaredField("provider");
             providerField.setAccessible(true);
             providerField.set(holder, providerProxy);
             
-            java.lang.reflect.Field noReleaseField = holderClass.getDeclaredField("noReleaseNeeded");
-            noReleaseField.setAccessible(true);
-            noReleaseField.set(holder, true);
+            try {
+                java.lang.reflect.Field noReleaseField = holderClass.getDeclaredField("noReleaseNeeded");
+                noReleaseField.setAccessible(true);
+                noReleaseField.set(holder, true);
+            } catch (Exception ignored) {}
             
             return holder;
         } catch (Exception e) {
             Logger.e("ActivityManagerHook", "Failed to create ContentProviderHolder", e);
-            // On older Android versions, ContentProviderHolder might not exist or be different
-            // In those cases, the return type of getContentProvider might be IContentProvider directly
-            // or an IContentProvider.ContentProviderHolder inner class
             return null;
         }
     }

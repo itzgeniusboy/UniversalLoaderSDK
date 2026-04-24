@@ -57,13 +57,20 @@ public class ContentResolverHook implements InvocationHandler {
                 case "refresh":
                 case "canonicalize":
                 case "uncanonicalize":
+                case "applyBatch":
                     return invokeLocal(name, args);
                 
                 // Binder specific methods
                 case "asBinder":
-                    return null; // Or a fake IBinder
+                    return proxy; 
                 case "getInterfaceDescriptor":
                     return "android.content.IContentProvider";
+                case "pingBinder":
+                    return true;
+                case "isBinderAlive":
+                    return true;
+                case "queryLocalInterface":
+                    return proxy;
             }
         } catch (Exception e) {
             Logger.e(TAG, "Error in IContentProvider proxy: " + name, e);
@@ -106,8 +113,26 @@ public class ContentResolverHook implements InvocationHandler {
                 return localProvider.uncanonicalize(findUri(args));
             case "refresh":
                 return localProvider.refresh(findUri(args), findBundle(args), null);
+            case "applyBatch":
+                return handleApplyBatch(args);
+        }
         
         return null; 
+    }
+
+    private Object handleApplyBatch(Object[] args) {
+        String authority = null;
+        java.util.ArrayList<android.content.ContentProviderOperation> operations = null;
+        for (Object arg : args) {
+            if (arg instanceof String) authority = (String) arg;
+            else if (arg instanceof java.util.ArrayList) operations = (java.util.ArrayList) arg;
+        }
+        try {
+            return localProvider.applyBatch(operations);
+        } catch (Exception e) {
+            Logger.e(TAG, "Local applyBatch failed for " + authority, e);
+            return null;
+        }
     }
 
     private android.net.Uri findUri(Object[] args) {
