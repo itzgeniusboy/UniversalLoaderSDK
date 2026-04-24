@@ -12,7 +12,7 @@ import java.lang.reflect.Method;
 
 /**
  * FINAL Instrumentation Hook for Phase 1.
- * Ensures ClassLoader isolation and proper activity creation.
+ * Ensures REAL Activity is loaded using the guest ClassLoader (DexClassLoader).
  */
 public class CustomInstrumentation extends Instrumentation {
     private static final String TAG = "OneCore-Instrumentation";
@@ -26,15 +26,17 @@ public class CustomInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
-        // 1. Check for REDIRECTION
+        // 1. Resolve REAL Activity from Intent if it was redirected
         Intent targetIntent = intent.getParcelableExtra("EXTRA_TARGET_INTENT");
         if (targetIntent != null && targetIntent.getComponent() != null) {
             String realClassName = targetIntent.getComponent().getClassName();
             Logger.i(TAG, "Intercepting Activity Creation: " + className + " -> " + realClassName);
             
-            // 2. USE GUEST CLASSLOADER (DexClassLoader)
+            // 2. LOAD USING GUEST CLASSLOADER (DexClassLoader)
+            // MUST use the isolated loader to avoid "Class Not Found" or "Wrong Class" errors
             ClassLoader guestLoader = CloneManager.getInstance().getClassLoader();
             if (guestLoader != null) {
+                Logger.d(TAG, "Using DexClassLoader for " + realClassName);
                 return super.newActivity(guestLoader, realClassName, targetIntent);
             }
         }
@@ -46,7 +48,7 @@ public class CustomInstrumentation extends Instrumentation {
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
         Logger.i(TAG, ">>> callActivityOnCreate: " + activity.getClass().getName());
         
-        // 3. SECURE CONTEXT FIX (Resources/ClassLoader)
+        // 3. SECURE CONTEXT FIX (Resources/ClassLoader injection into the instance)
         fixContext(activity);
         
         try {
@@ -82,9 +84,9 @@ public class CustomInstrumentation extends Instrumentation {
                         mClassLoader.setAccessible(true);
                         mClassLoader.set(loadedApk, guestLoader);
 
-                        Field mLoadedApkResources = loadedApk.getClass().getDeclaredField("mResources");
-                        mLoadedApkResources.setAccessible(true);
-                        mLoadedApkResources.set(loadedApk, guestResources);
+                        Field mResourcesField = loadedApk.getClass().getDeclaredField("mResources");
+                        mResourcesField.setAccessible(true);
+                        mResourcesField.set(loadedApk, guestResources);
                     }
                 } catch (Exception ignored) {}
             }
@@ -93,7 +95,7 @@ public class CustomInstrumentation extends Instrumentation {
         }
     }
 
-    // Support for multiple execStartActivity signatures
+    // Capture startActivity calls to redirect them to StubActivity (Reflection proxy to mBase)
     public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
