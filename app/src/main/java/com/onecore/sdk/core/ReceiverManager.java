@@ -38,11 +38,11 @@ public class ReceiverManager {
         // Manual dispatch to local virtual receivers if we want isolation
         synchronized (sReceivers) {
             for (ReceiverRecord record : sReceivers) {
-                if (record.filter.matchAction(intent.getAction())) {
+                if (record.filter != null && record.filter.matchAction(intent.getAction())) {
                     try {
                         record.receiver.onReceive(context, intent);
                     } catch (Exception e) {
-                        Logger.e(TAG, "Local broadcast dispatch failed", e);
+                        Logger.e(TAG, "Local broadcast dispatch failed for " + record.receiver.getClass().getName(), e);
                     }
                 }
             }

@@ -29,11 +29,13 @@ public class VirtualStorage {
         String dataPrefix = "/data/data/" + pkgName;
         String userPrefix = "/data/user/0/" + pkgName;
         String mntPrefix = "/mnt/sdcard/Android/data/" + pkgName;
+        String obbPrefix = "/storage/emulated/0/Android/obb/" + pkgName;
 
-        if (originalPath.startsWith(dataPrefix) || originalPath.startsWith(userPrefix) || originalPath.startsWith(mntPrefix)) {
+        if (originalPath.startsWith(dataPrefix) || originalPath.startsWith(userPrefix) || originalPath.startsWith(mntPrefix) || originalPath.startsWith(obbPrefix)) {
             String suffix = "";
             if (originalPath.startsWith(dataPrefix)) suffix = originalPath.substring(dataPrefix.length());
             else if (originalPath.startsWith(userPrefix)) suffix = originalPath.substring(userPrefix.length());
+            else if (originalPath.startsWith(obbPrefix)) suffix = originalPath.substring(obbPrefix.length());
             else suffix = originalPath.substring(mntPrefix.length());
 
             String redirected = new File(sVirtualRoot, pkgName + "/data" + suffix).getAbsolutePath();

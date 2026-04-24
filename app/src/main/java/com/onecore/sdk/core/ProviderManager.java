@@ -43,7 +43,9 @@ public class ProviderManager {
                 return;
             }
 
-                    // Manual fallback if installation method is not found
+            // Manual fallback if installation method is not found
+            for (ProviderInfo info : providers) {
+                try {
                     Logger.d(TAG, "Installing provider manually: " + info.name);
                     ClassLoader cl = app.getClassLoader();
                     ContentProvider provider = (ContentProvider) cl.loadClass(info.name).newInstance();
@@ -59,6 +61,7 @@ public class ProviderManager {
                 } catch (Exception e) {
                     Logger.e(TAG, "Failed to install provider manually: " + info.name, e);
                 }
+            }
         } catch (Exception e) {
             Logger.e(TAG, "Failed during provider installation", e);
         }

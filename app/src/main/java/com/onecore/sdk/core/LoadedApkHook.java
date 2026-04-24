@@ -60,7 +60,7 @@ public class LoadedApkHook {
 
                 // Fix library and data paths for native code loading and file system access
                 try {
-                    String[] fields = {"mLibDir", "mBaseLibDir", "mAppDir", "mResDir", "mDataDir"};
+                    String[] fields = {"mLibDir", "mBaseLibDir", "mAppDir", "mResDir", "mDataDir", "mPrimaryCpuAbi"};
                     for (String field : fields) {
                         try {
                             Field f = loadedApk.getClass().getDeclaredField(field);
@@ -69,6 +69,8 @@ public class LoadedApkHook {
                                 f.set(loadedApk, guestAi.nativeLibraryDir);
                             } else if (field.equals("mDataDir")) {
                                 f.set(loadedApk, guestAi.dataDir);
+                            } else if (field.equals("mPrimaryCpuAbi")) {
+                                f.set(loadedApk, guestAi.primaryCpuAbi);
                             } else if (field.equals("mAppDir") || field.equals("mResDir")) {
                                 f.set(loadedApk, guestAi.sourceDir);
                             }
