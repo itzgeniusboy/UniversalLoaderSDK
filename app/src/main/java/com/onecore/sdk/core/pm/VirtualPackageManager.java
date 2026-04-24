@@ -66,6 +66,73 @@ public class VirtualPackageManager {
         return null; // Placeholder
     }
     
+    public static android.content.pm.ServiceInfo resolveService(String packageName, String className) {
+        try {
+            PackageInfo info = CloneManager.getInstance().getClonedPackage(packageName);
+            if (info != null && info.services != null) {
+                for (android.content.pm.ServiceInfo si : info.services) {
+                    if (si.name.equals(className)) {
+                        return si;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, "resolveService failed: " + e.getMessage());
+        }
+        return null;
+    }
+
+    public static android.content.pm.ActivityInfo resolveReceiver(String packageName, String className) {
+        try {
+            PackageInfo info = CloneManager.getInstance().getClonedPackage(packageName);
+            if (info != null && info.receivers != null) {
+                for (android.content.pm.ActivityInfo ai : info.receivers) {
+                    if (ai.name.equals(className)) {
+                        return ai;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, "resolveReceiver failed: " + e.getMessage());
+        }
+        return null;
+    }
+
+    public static android.content.pm.ProviderInfo resolveProvider(String packageName, String className) {
+        try {
+            PackageInfo info = CloneManager.getInstance().getClonedPackage(packageName);
+            if (info != null && info.providers != null) {
+                for (android.content.pm.ProviderInfo pi : info.providers) {
+                    if (pi.name.equals(className)) {
+                        return pi;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, "resolveProvider failed: " + e.getMessage());
+        }
+        return null;
+    }
+
+    public static java.util.List<android.content.pm.ResolveInfo> queryIntentActivities(android.content.Intent intent) {
+        // Simple implementation: resolve the specific component if present
+        if (intent.getComponent() != null) {
+            android.content.pm.ActivityInfo ai = resolveActivity(intent.getComponent().getPackageName(), intent.getComponent().getClassName());
+            if (ai != null) {
+                android.content.pm.ResolveInfo ri = new android.content.pm.ResolveInfo();
+                ri.activityInfo = ai;
+                return java.util.Collections.singletonList(ri);
+            }
+        }
+        return null;
+    }
+
+    public static android.content.pm.ResolveInfo resolveIntent(android.content.Intent intent) {
+        java.util.List<android.content.pm.ResolveInfo> list = queryIntentActivities(intent);
+        if (list != null && !list.isEmpty()) return list.get(0);
+        return null;
+    }
+
     public static ActivityInfo resolveActivity(String packageName, String className) {
         try {
             PackageInfo info = CloneManager.getInstance().getClonedPackage(packageName);

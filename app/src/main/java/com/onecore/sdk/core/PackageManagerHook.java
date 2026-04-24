@@ -80,6 +80,31 @@ public class PackageManagerHook implements InvocationHandler {
             }
         }
 
+        if ("getServiceInfo".equals(name)) {
+            android.content.ComponentName component = (android.content.ComponentName) args[0];
+            if (component != null) {
+                // Return virtual service info if available
+                android.content.pm.ServiceInfo si = VirtualPackageManager.resolveService(component.getPackageName(), component.getClassName());
+                if (si != null) return si;
+            }
+        }
+
+        if ("getReceiverInfo".equals(name)) {
+            android.content.ComponentName component = (android.content.ComponentName) args[0];
+            if (component != null) {
+                android.content.pm.ActivityInfo ai = VirtualPackageManager.resolveReceiver(component.getPackageName(), component.getClassName());
+                if (ai != null) return ai;
+            }
+        }
+
+        if ("getProviderInfo".equals(name)) {
+            android.content.ComponentName component = (android.content.ComponentName) args[0];
+            if (component != null) {
+                android.content.pm.ProviderInfo pi = VirtualPackageManager.resolveProvider(component.getPackageName(), component.getClassName());
+                if (pi != null) return pi;
+            }
+        }
+
         if ("queryIntentActivities".equals(name)) {
             Intent intent = (Intent) args[0];
             if (intent != null) {

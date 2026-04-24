@@ -36,7 +36,7 @@ public class ActivityManagerHook implements InvocationHandler {
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String methodName = method.getName();
 
-        if (methodName.equals("startActivity") || methodName.equals("bindService")) {
+        if (methodName.equals("startActivity") || methodName.equals("bindService") || methodName.equals("startService") || methodName.equals("stopService")) {
             int intentIdx = -1;
             if (args != null) {
                 for (int i = 0; i < args.length; i++) {
@@ -71,7 +71,11 @@ public class ActivityManagerHook implements InvocationHandler {
                             
                             args[intentIdx] = stubIntent;
                             Logger.d("ActivityManagerHook", "Redirected to StubActivity");
-                        } else {
+                        } else if (methodName.equals("startService")) {
+                            // Run the service in the virtual environment
+                            ServiceManager.startService(com.onecore.sdk.OneCoreSDK.getContext(), intent);
+                            return null; // Don't let AMS handle it yet as we handle it ourselves
+                        } else if (methodName.equals("bindService")) {
                             // bindService redirection logic - usually we'd have a ProxyService
                         }
                     }

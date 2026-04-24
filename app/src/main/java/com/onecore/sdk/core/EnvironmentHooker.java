@@ -20,6 +20,9 @@ public class EnvironmentHooker {
         try {
             Logger.i(TAG, "Applying Environment Hooks for " + fakePackageName);
 
+            // 0. Initialize Virtual Storage
+            VirtualStorage.init(virtualPath);
+
             // 1. Install Global Service & ActivityThread Hooks
              BinderHookManager.installHooks(context, fakePackageName, virtualPath);
 

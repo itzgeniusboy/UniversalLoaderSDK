@@ -32,8 +32,6 @@ public class ContextFixer {
 
     private static void patchContextImpl(Context context, String pkg, ClassLoader cl, Resources res) {
         Class<?> clazz = context.getClass();
-        
-        // Basic fields
         setFieldValue(context, clazz, "mResources", res);
         setFieldValue(context, clazz, "mClassLoader", cl);
         setFieldValue(context, clazz, "mBasePackageName", pkg);
@@ -44,6 +42,14 @@ public class ContextFixer {
             Field mAssets = clazz.getDeclaredField("mAssets");
             mAssets.setAccessible(true);
             mAssets.set(context, res.getAssets());
+        } catch (Exception ignored) {}
+
+        // Storage redirection (Hooking mFilesDir, mCacheDir etc if needed or just patching them)
+        // Note: Real storage hooking usually happens at the syscall or File object level, 
+        // but patching these fields helps for many apps.
+        try {
+            setFieldValue(context, clazz, "mFilesDir", VirtualStorage.getVirtualDir(pkg, "files"));
+            setFieldValue(context, clazz, "mCacheDir", VirtualStorage.getVirtualDir(pkg, "cache"));
         } catch (Exception ignored) {}
 
         // Android 12+ AttributionSource handling

@@ -14,10 +14,11 @@ public class ServiceManager {
     private static final String TAG = "OneCore-ServiceMgr";
     private static final Map<String, Service> mServices = new HashMap<>();
 
-    public static void startService(Intent intent) {
+    public static void startService(android.content.Context context, Intent intent) {
         if (intent == null || intent.getComponent() == null) return;
         
         String className = intent.getComponent().getClassName();
+        String pkgName = intent.getComponent().getPackageName();
         Logger.d(TAG, "Starting virtual service: " + className);
         
         if (mServices.containsKey(className)) {
@@ -27,13 +28,36 @@ public class ServiceManager {
 
         try {
             ClassLoader cl = CloneManager.getInstance().getClassLoader();
+            android.content.res.Resources res = CloneManager.getInstance().getResources();
             Service service = (Service) cl.loadClass(className).newInstance();
-            // In a real implementation, we'd need to call service.attach() with a fake context
+            
+            // Apply ContextFixer before onCreate
+            Context virtualContext = ContextManager.createVirtualContext(context, pkgName, cl, res);
+            
+            // Use reflection to call attach
+            try {
+                java.lang.reflect.Method attach = Service.class.getDeclaredMethod("attach",
+                    android.content.Context.class,
+                    Class.forName("android.app.ActivityThread"),
+                    String.class,
+                    android.os.IBinder.class,
+                    android.app.Application.class,
+                    Object.class);
+                attach.setAccessible(true);
+                
+                // We need activity thread and more... simplified for now
+                // Real implementation would pass valid objects
+                attach.invoke(service, virtualContext, null, className, null, ApplicationManager.getVirtualApp(), null);
+            } catch (Exception e) {
+                Logger.w(TAG, "Standard attach failed, using context binding fallback");
+                ContextManager.bindContext(service, pkgName, cl, res);
+            }
+
             service.onCreate();
             service.onStartCommand(intent, 0, 0);
             mServices.put(className, service);
         } catch (Exception e) {
-            Logger.e(TAG, "Failed to start virtual service", e);
+            Logger.e(TAG, "Failed to start virtual service " + className, e);
         }
     }
 
