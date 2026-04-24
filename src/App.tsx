@@ -22,11 +22,11 @@ const FILES = [
   { id: 'admin-js', name: 'admin.js', path: 'admin/admin.js', icon: <Terminal size={18} />, lang: 'javascript' },
   { id: 'verify-php', name: 'verify.php', path: 'server/verify.php', icon: <Cpu size={18} />, lang: 'php' },
   { id: 'customers-json', name: 'customers.json', path: 'admin/data/customers.json', icon: <Database size={18} />, lang: 'json' },
-  { id: 'entry', name: 'OneCoreSDK.java', path: 'app/src/main/java/com/onecore/sdk/OneCoreSDK.java', icon: <Smartphone size={18} />, lang: 'java' },
-  { id: 'license', name: 'SDKLicense.java', path: 'app/src/main/java/com/onecore/sdk/SDKLicense.java', icon: <ShieldCheck size={18} />, lang: 'java' },
-  { id: 'container', name: 'VirtualContainer.java', path: 'app/src/main/java/com/onecore/sdk/VirtualContainer.java', icon: <Box size={18} />, lang: 'java' },
-  { id: 'build', name: 'build.gradle', path: 'app/build.gradle', icon: <Settings size={18} />, lang: 'groovy' },
-  { id: 'manifest', name: 'AndroidManifest.xml', path: 'app/src/main/AndroidManifest.xml', icon: <Package size={18} />, lang: 'xml' },
+  { id: 'entry', name: 'OneCoreSDK.java', path: 'sdk/src/main/java/com/onecore/sdk/OneCoreSDK.java', icon: <Smartphone size={18} />, lang: 'java' },
+  { id: 'license', name: 'SDKLicense.java', path: 'sdk/src/main/java/com/onecore/sdk/SDKLicense.java', icon: <ShieldCheck size={18} />, lang: 'java' },
+  { id: 'container', name: 'VirtualContainer.java', path: 'sdk/src/main/java/com/onecore/sdk/VirtualContainer.java', icon: <Box size={18} />, lang: 'java' },
+  { id: 'build', name: 'build.gradle', path: 'sdk/build.gradle', icon: <Settings size={18} />, lang: 'groovy' },
+  { id: 'manifest', name: 'AndroidManifest.xml', path: 'sdk/src/main/AndroidManifest.xml', icon: <Package size={18} />, lang: 'xml' },
 ];
 
 export default function App() {
@@ -203,8 +203,8 @@ export default function App() {
                   <div>
                     <div className="text-[#F27D26] text-xs font-bold uppercase mb-3 tracking-widest">Compilation Log</div>
                     <div className="bg-black p-4 rounded text-[10px] font-mono text-green-400 border border-[#1F1F1F] leading-relaxed">
-                      {"> Task :app:bundleReleaseAar UP-TO-DATE"}<br />
-                      {"> Task :app:assembleRelease"}<br />
+                      {"> Task :sdk:bundleReleaseAar UP-TO-DATE"}<br />
+                      {"> Task :sdk:assembleRelease"}<br />
                       BUILD SUCCESSFUL in 12s<br />
                       25 actionable tasks: 2 up-to-date
                     </div>

@@ -49,7 +49,7 @@ jobs:
       run: chmod +x gradlew
 
     - name: Build SDK and Loader
-      run: ./gradlew :app:assembleRelease :loader:assembleRelease --no-daemon --stacktrace
+      run: ./gradlew :sdk:assembleRelease :loader:assembleRelease --no-daemon --stacktrace
 
     - name: Create GitHub Release
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -59,7 +59,7 @@ jobs:
         name: OneCore Release v1.0.${{ github.run_number }}
         files: |
           loader/build/outputs/apk/release/*.apk
-          app/build/outputs/aar/*.aar
+          sdk/build/outputs/aar/*.aar
         draft: false
         prerelease: false
       env:
@@ -69,7 +69,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: OneCore-SDK-AAR
-        path: app/build/outputs/aar/*.aar
+        path: sdk/build/outputs/aar/*.aar
 
     - name: Upload Loader APK
       uses: actions/upload-artifact@v4
