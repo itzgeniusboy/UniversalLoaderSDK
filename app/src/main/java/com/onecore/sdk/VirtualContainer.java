@@ -209,7 +209,7 @@ public class VirtualContainer {
         context.startActivity(realIntent);
     }
 
-    private void fallbackLaunch(Context context, String packageName) {
+    public void fallbackLaunch(Context context, String packageName) {
         try {
             Intent intent = context.getPackageManager().getLaunchIntentForPackage(packageName);
             if (intent != null) context.startActivity(intent);
