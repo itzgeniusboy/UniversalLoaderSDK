@@ -93,7 +93,7 @@ public class VAInstrumentation extends Instrumentation {
         if (guestLoader != null && app.getClass().getClassLoader() == guestLoader) {
             Logger.i(TAG, "Guest Application OnCreate: " + app.getClass().getName());
             try {
-                Object activityThread = java.lang.reflect.Method.forName("android.app.ActivityThread")
+                Object activityThread = Class.forName("android.app.ActivityThread")
                         .getDeclaredMethod("currentActivityThread").invoke(null);
                 EnvironmentHooker.setInitialApplication(activityThread, app);
             } catch (Exception e) {
