@@ -27,7 +27,7 @@ public class ActivityManagerHook implements InvocationHandler {
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String methodName = method.getName();
 
-        if (methodName.equals("startActivity")) {
+        if (methodName.equals("startActivity") || methodName.equals("bindService")) {
             int intentIdx = -1;
             for (int i = 0; i < args.length; i++) {
                 if (args[i] instanceof android.content.Intent) {
@@ -42,16 +42,21 @@ public class ActivityManagerHook implements InvocationHandler {
                     String pkgName = intent.getComponent().getPackageName();
                     String className = intent.getComponent().getClassName();
 
-                    // If it's a guest activity launch, wrap it
+                    // If it's a guest activity/service launch, wrap it
                     if (com.onecore.sdk.VirtualContainer.getInstance().getClonedPackage(pkgName) != null) {
-                        Logger.i("ActivityManagerHook", "Redirecting Intent to StubActivity: " + className);
-                        android.content.Intent stubIntent = new android.content.Intent();
-                        stubIntent.setClassName(com.onecore.sdk.OneCoreSDK.getContext().getPackageName(), "com.onecore.sdk.core.StubActivity");
-                        stubIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                        stubIntent.putExtra("target_package", pkgName);
-                        stubIntent.putExtra("target_activity", className);
+                        Logger.i("ActivityManagerHook", "Redirecting " + methodName + " for: " + className);
                         
-                        args[intentIdx] = stubIntent;
+                        if (methodName.equals("startActivity")) {
+                            android.content.Intent stubIntent = new android.content.Intent();
+                            stubIntent.setClassName(com.onecore.sdk.OneCoreSDK.getContext().getPackageName(), "com.onecore.sdk.core.StubActivity");
+                            stubIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                            stubIntent.putExtra("target_package", pkgName);
+                            stubIntent.putExtra("target_activity", className);
+                            args[intentIdx] = stubIntent;
+                        } else {
+                            // bindService redirection logic - usually we'd have a ProxyService
+                            // For now, let the system try, but we might need a StubService.
+                        }
                     }
                 }
             }
