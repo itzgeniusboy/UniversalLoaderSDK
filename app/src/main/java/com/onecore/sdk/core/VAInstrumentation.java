@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Intent;
 import android.os.Bundle;
+import java.util.Map;
 import com.onecore.sdk.utils.Logger;
 
 /**
