@@ -45,11 +45,16 @@ public class ServiceManager {
                     Object.class);
                 attach.setAccessible(true);
                 
-                // We need activity thread and more... simplified for now
-                // Real implementation would pass valid objects
-                attach.invoke(service, virtualContext, null, className, null, ApplicationManager.getVirtualApp(), null);
+                // Try to find activity thread
+                Object at = null;
+                try {
+                    Class<?> atClass = Class.forName("android.app.ActivityThread");
+                    at = atClass.getDeclaredMethod("currentActivityThread").invoke(null);
+                } catch (Exception ignored) {}
+
+                attach.invoke(service, virtualContext, at, className, null, ApplicationManager.getVirtualApp(), null);
             } catch (Exception e) {
-                Logger.w(TAG, "Standard attach failed, using context binding fallback");
+                Logger.w(TAG, "Standard attach failed, using context binding fallback: " + e.getMessage());
                 ContextManager.bindContext(service, pkgName, cl, res);
             }
 

@@ -55,6 +55,14 @@ public class ContextFixer {
         setFieldValue(context, clazz, "mBasePackageName", pkg);
         setFieldValue(context, clazz, "mOpPackageName", pkg);
         
+        // Android 10+ identity
+        try {
+            setFieldValue(context, clazz, "mOpPackageName", pkg);
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                // AttributionSource handling is already in patchContextImpl but let's double check
+            }
+        } catch (Exception ignored) {}
+        
         // PackageManager patch
         try {
             Field mPackageManager = getField(clazz, "mPackageManager");

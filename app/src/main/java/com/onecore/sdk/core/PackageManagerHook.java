@@ -54,9 +54,15 @@ public class PackageManagerHook implements InvocationHandler {
         if (args != null && args.length > 0) {
             if ("getPackageInfo".equals(name) || "getPackageInfoAsUser".equals(name)) {
                 String pkgName = (String) args[0];
+                int flags = 0;
+                if (args.length > 1 && args[1] instanceof Integer) {
+                    flags = (int) args[1];
+                }
+                
                 PackageInfo info = VirtualPackageManager.get().getClonedPackage(pkgName);
                 if (info != null) {
-                    Logger.v(TAG, "Spoofing " + name + " for: " + pkgName);
+                    Logger.v(TAG, "Spoofing " + name + " for: " + pkgName + " (flags: " + flags + ")");
+                    // In a real implementation we would filter fields based on flags
                     return info;
                 }
             }
@@ -128,11 +134,37 @@ public class PackageManagerHook implements InvocationHandler {
             }
         }
 
+        if ("resolveContentProvider".equals(name)) {
+            String authority = (String) args[0];
+            android.content.pm.ProviderInfo pi = VirtualPackageManager.resolveProviderByAuthority(authority);
+            if (pi != null) {
+                Logger.v(TAG, "Spoofing resolveContentProvider for: " + authority);
+                return pi;
+            }
+        }
+
         if ("getInstallerPackageName".equals(name)) {
             return "com.android.vending";
         }
 
+        if ("getPackagesForUid".equals(name)) {
+            int uid = (int) args[0];
+            if (uid == android.os.Process.myUid()) {
+                return new String[]{BinderHookManager.sCurrentPackage};
+            }
+        }
+
+        if ("getNameForUid".equals(name)) {
+            int uid = (int) args[0];
+            if (uid == android.os.Process.myUid()) {
+                return BinderHookManager.sCurrentPackage;
+            }
+        }
+
         if ("checkPermission".equals(name)) {
+            String permName = (String) args[0];
+            // Grant mostly all permissions for virtual app to avoid crashes
+            Logger.v(TAG, "checkPermission spoof: " + permName);
             return android.content.pm.PackageManager.PERMISSION_GRANTED;
         }
 

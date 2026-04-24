@@ -58,6 +58,13 @@ public class LoadedApkHook {
                 mApplicationInfoField.setAccessible(true);
                 mApplicationInfoField.set(loadedApk, guestAi);
 
+                // Fix library paths for native code loading
+                try {
+                    Field mLibDirField = loadedApk.getClass().getDeclaredField("mLibDir");
+                    mLibDirField.setAccessible(true);
+                    mLibDirField.set(loadedApk, guestAi.nativeLibraryDir);
+                } catch (Exception ignored) {}
+
                 try {
                     Field mResField = loadedApk.getClass().getDeclaredField("mResources");
                     mResField.setAccessible(true);

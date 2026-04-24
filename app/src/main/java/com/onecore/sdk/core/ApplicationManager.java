@@ -58,7 +58,17 @@ public class ApplicationManager {
                 // 4. Update ActivityThread.mInitialApplication to point to our virtual app
                 updateActivityThreadApp(app);
                 
-                // 5. Lifecycle onCreate
+                // 5. Install Providers (Before Application.onCreate is standard)
+                try {
+                    android.content.pm.PackageInfo pi = com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(packageName);
+                    if (pi != null && pi.providers != null) {
+                        ProviderManager.installProviders(hostContext, app, packageName, java.util.Arrays.asList(pi.providers));
+                    }
+                } catch (Exception e) {
+                    Logger.e(TAG, "Provider installation FAILED", e);
+                }
+
+                // 6. Lifecycle onCreate
                 app.onCreate();
                 sVirtualApp = app;
                 

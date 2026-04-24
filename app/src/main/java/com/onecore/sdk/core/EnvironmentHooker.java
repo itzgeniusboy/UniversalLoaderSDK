@@ -52,11 +52,12 @@ public class EnvironmentHooker {
             android.content.pm.PackageInfo info = com.onecore.sdk.VirtualContainer.getInstance().getClonedPackage(packageName);
             if (info == null || info.providers == null) return;
 
-            Method installContentProviders = atClass.getDeclaredMethod("installContentProviders", android.content.Context.class, java.util.List.class);
-            installContentProviders.setAccessible(true);
-            
-            java.util.List<android.content.pm.ProviderInfo> providers = java.util.Arrays.asList(info.providers);
-            installContentProviders.invoke(at, com.onecore.sdk.OneCoreSDK.getContext(), providers);
+            android.app.Application app = ApplicationManager.getVirtualApp();
+            if (app != null) {
+                ProviderManager.installProviders(com.onecore.sdk.OneCoreSDK.getContext(), app, packageName, java.util.Arrays.asList(info.providers));
+            } else {
+                Logger.w(TAG, "Cannot install guest providers: Application not yet initialized.");
+            }
             
             Logger.d(TAG, "Guest Providers installed: " + info.providers.length);
         } catch (Exception e) {

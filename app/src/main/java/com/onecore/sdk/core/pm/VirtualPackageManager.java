@@ -139,6 +139,28 @@ public class VirtualPackageManager {
         return null;
     }
 
+    public static android.content.pm.ProviderInfo resolveProviderByAuthority(String authority) {
+        try {
+            // We search in all packages. For now we only have one main one.
+            // In a real system we would iterate over all clones.
+            // Since we don't have a list of all clones, we search for the one in BinderHookManager.sCurrentPackage
+            PackageInfo info = CloneManager.getInstance().getClonedPackage(com.onecore.sdk.core.BinderHookManager.sCurrentPackage);
+            if (info != null && info.providers != null) {
+                for (android.content.pm.ProviderInfo pi : info.providers) {
+                    if (pi.authority != null && pi.authority.contains(authority)) {
+                        String[] authorities = pi.authority.split(";");
+                        for (String auth : authorities) {
+                            if (auth.equals(authority)) return pi;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, "resolveProviderByAuthority failed: " + e.getMessage());
+        }
+        return null;
+    }
+
     public static ActivityInfo resolveActivity(String packageName, String className) {
         try {
             PackageInfo info = CloneManager.getInstance().getClonedPackage(packageName);

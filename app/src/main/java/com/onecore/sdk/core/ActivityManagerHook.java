@@ -36,7 +36,7 @@ public class ActivityManagerHook implements InvocationHandler {
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String methodName = method.getName();
 
-        if (methodName.equals("startActivity") || methodName.equals("bindService") || methodName.equals("startService") || methodName.equals("stopService")) {
+        if (methodName.equals("startActivity") || methodName.equals("bindService") || methodName.equals("startService") || methodName.equals("stopService") || methodName.equals("registerReceiver") || methodName.equals("sendBroadcast")) {
             int intentIdx = -1;
             if (args != null) {
                 for (int i = 0; i < args.length; i++) {
@@ -45,6 +45,12 @@ public class ActivityManagerHook implements InvocationHandler {
                         break;
                     }
                 }
+            }
+
+            if (methodName.equals("registerReceiver")) {
+                // Track receivers for isolation if needed
+            } else if (methodName.equals("sendBroadcast")) {
+                // If it's a broadcast from guest app, we might want to redirect or modify it
             }
 
             if (intentIdx != -1) {
