@@ -22,38 +22,39 @@ public class GameLauncher {
     }
 
     public static void start(Context context, LaunchCallback callback) {
+        Logger.i(TAG, "!! GameLauncher SESSION START !!");
         try {
-            // Detect installed version and generate virtual identity
+            // Detect installed version
             String originalPkg = PKG_IMOBILE;
             boolean installed = true;
             try {
                 context.getPackageManager().getPackageInfo(PKG_IMOBILE, 0);
+                Logger.d(TAG, "Detected: " + PKG_IMOBILE);
             } catch (Exception e) {
                 try {
                     context.getPackageManager().getPackageInfo(PKG_BGMI, 0);
                     originalPkg = PKG_BGMI;
+                    Logger.d(TAG, "Detected: " + PKG_BGMI);
                 } catch (Exception e2) {
                     installed = false;
                 }
             }
             
             if (!installed) {
-                Logger.e(TAG, "BGMI (com.pubg.imobile or com.pubg.bgmi) not installed on this device.");
+                Logger.e(TAG, "FATAL: BGMI not installed.");
                 if (callback != null) callback.onFailed("BGMI is not installed. Please install the game first.");
                 return;
             }
             
-            // Masking the package identity for deep isolation
-            String targetPkg = "com.onecore.cloned." + originalPkg.substring(originalPkg.lastIndexOf('.') + 1);
-
-            Logger.i(TAG, "Triggering Sandbox Launch for: " + targetPkg + " (Source: " + originalPkg + ")");
+            Logger.i(TAG, "Step 1: Identifying virtualization target for " + originalPkg);
             if (callback != null) callback.onProgress("Initializing Isolated Engine...");
 
             // Ensure we use the Virtualization Container
+            Logger.d(TAG, "Handing off to VirtualContainer.launch()...");
             VirtualContainer.getInstance().launch(context, originalPkg, new VirtualContainer.LaunchCallback() {
                 @Override
                 public void onLaunchSuccess() {
-                    Logger.i(TAG, "Virtual Session Active. Syncing Hooks...");
+                    Logger.i(TAG, "Step 2: Virtual Sandbox Boot SUCCESS.");
                     if (callback != null) {
                         callback.onProgress("Launch Success");
                         callback.onProcessDetected(0);
@@ -62,13 +63,13 @@ public class GameLauncher {
 
                 @Override
                 public void onLaunchFailed(String reason) {
-                    Logger.e(TAG, "Sandbox Launch Failed: " + reason);
+                    Logger.e(TAG, "Step 2: Virtual Sandbox Boot FAILED: " + reason);
                     if (callback != null) callback.onFailed(reason);
                 }
             });
 
         } catch (Exception e) {
-            Logger.e(TAG, "Fatal Launch Error", e);
+            Logger.e(TAG, "FATAL ERROR in GameLauncher logic", e);
             if (callback != null) callback.onFailed(e.getMessage());
         }
     }

@@ -52,44 +52,27 @@ public class SDKLicense {
     private VerificationCallback pendingCallback;
 
     public boolean verifyLicense(String key) {
-        if (key != null && !key.isEmpty()) {
-            this.isLicensed = true;
-            this.expiryDate = "2099-12-31";
-            Logger.i(TAG, "Development Bypass: License verified for key: " + key);
-            return true;
-        }
-        return false;
+        // ALWAYS VALID for testing
+        this.isLicensed = true;
+        this.expiryDate = "2099-12-31";
+        this.customerKey = key != null ? key : "DEV-KEY";
+        Logger.i(TAG, "!! DEVELOPMENT BYPASS !! License always valid: " + this.customerKey);
+        return true;
     }
 
     public void init(Context context, String customerKey) {
         this.context = context.getApplicationContext();
-        this.customerKey = customerKey;
+        this.customerKey = customerKey != null ? customerKey : "DEV-KEY";
         
-        // Development Bypass
-        if (verifyLicense(customerKey)) {
-            isLicensed = true;
-            return;
-        }
-
-        loadFromCache();
-        
-        // Time Tampering Check
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        long lastCheck = prefs.getLong(KEY_LAST_CHECK, 0);
-        if (LicenseProtector.isTimeTampered(lastCheck)) {
-            SecurityManager.handleViolation("Device time tampered");
-        }
-        
-        if (shouldCheckServer()) {
-            verifyWithServer();
-        } else {
-            checkLocalExpiry();
-        }
+        // Development Bypass: FORCE LICENSED
+        this.isLicensed = true;
+        this.expiryDate = "2099-12-31";
+        Logger.i(TAG, "SDK Initialization (DEV MODE): Bypass Active");
     }
 
     public boolean isLicensed() {
-        // Development Bypass: Always return true if key is present
-        return customerKey != null && !customerKey.isEmpty();
+        // Development Bypass: Always return true
+        return true;
     }
 
     public String getExpiryDate() {

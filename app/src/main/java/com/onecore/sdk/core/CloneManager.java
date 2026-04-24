@@ -28,12 +28,21 @@ public class CloneManager {
     }
 
     public boolean prepareClone(Context context, String packageName) {
+        Logger.i(TAG, "prepareClone: Starting for package: " + packageName);
         try {
             PackageManager pm = context.getPackageManager();
-            PackageInfo info = pm.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES | PackageManager.GET_SERVICES | PackageManager.GET_PROVIDERS);
+            PackageInfo info;
+            try {
+                info = pm.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES | PackageManager.GET_SERVICES | PackageManager.GET_PROVIDERS);
+                Logger.d(TAG, "Source package found: " + packageName);
+            } catch (PackageManager.NameNotFoundException e) {
+                Logger.e(TAG, "Source package NOT FOUND: " + packageName);
+                return false;
+            }
             
             // 1. Generate Virtual Identity
-            String virtualPkg = "com.onecore.cloned." + packageName.substring(packageName.lastIndexOf('.') + 1);
+            String virtualPkg = "com.onecore.cloned." + (packageName.contains(".") ? packageName.substring(packageName.lastIndexOf('.') + 1) : packageName);
+            Logger.d(TAG, "Generated Virtual Package Name: " + virtualPkg);
             
             // CRITICAL: Preserve original sourceDir for ClassLoader
             info.packageName = virtualPkg;
@@ -41,6 +50,7 @@ public class CloneManager {
             
             // 2. Define Isolated Sandbox Paths
             String virtualRoot = context.getFilesDir().getAbsolutePath() + "/virtual/" + packageName;
+            Logger.i(TAG, "Isolated Workspace Path: " + virtualRoot);
             info.applicationInfo.dataDir = virtualRoot;
             info.applicationInfo.nativeLibraryDir = virtualRoot + "/lib";
             
@@ -49,23 +59,28 @@ public class CloneManager {
             // 3. Initialize Physical Sandbox Directories
             File dataDir = new File(virtualRoot);
             if (!dataDir.exists()) {
+                Logger.d(TAG, "Creating new virtual directories...");
                 dataDir.mkdirs();
                 new File(virtualRoot, "data/files").mkdirs();
                 new File(virtualRoot, "data/cache").mkdirs();
                 new File(virtualRoot, "lib").mkdirs();
                 new File(virtualRoot, "obb").mkdirs();
+            } else {
+                Logger.d(TAG, "Virtual directories already exist.");
             }
 
             // Map OBBs
+            Logger.i(TAG, "Triggering OBB Mapping sequence...");
             mapObb(context, packageName, virtualRoot);
             
             // 4. Setup Virtual Environment
+            Logger.i(TAG, "Triggering Native Library Mapping sequence...");
             setupVirtualEnv(context, packageName, info.applicationInfo);
             
-            Logger.i(TAG, "Deep Clone Prepared successfully: " + packageName);
+            Logger.i(TAG, "!! CLONE PREPARATION COMPLETE !! Result: SUCCESS");
             return true;
         } catch (Throwable e) {
-            Logger.e(TAG, "Clone Preparation Error: " + e.getMessage(), e);
+            Logger.e(TAG, "FATAL ERROR during clone preparation: " + e.getMessage(), e);
             return false;
         }
     }

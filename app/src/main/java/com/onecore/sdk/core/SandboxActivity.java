@@ -32,6 +32,7 @@ public class SandboxActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Logger.i(TAG, "!! SANDBOX ACTIVATED !! Setting up guest environment...");
         
         // Premium Stealth UI for Sandbox Host
         LinearLayout layout = new LinearLayout(this);
@@ -48,19 +49,22 @@ public class SandboxActivity extends Activity {
         setContentView(layout);
         
         String originalPkg = getIntent().getStringExtra("target_package");
+        Logger.d(TAG, "Target Package: " + originalPkg);
         this.libPath = getIntent().getStringExtra("library_path");
 
         try {
-            // Early native initialization before any guest code runs
+            // Early native initialization
             String virtualRoot = getFilesDir().getAbsolutePath() + "/virtual/" + originalPkg;
+            Logger.d(TAG, "Installing Native Hooks at " + virtualRoot);
             NativeHookManager.setupIsolation(this, virtualRoot, originalPkg);
-            Logger.i(TAG, "Native Isolation Installed Successfully.");
+            Logger.i(TAG, "Step 1: Native Isolation SUCCESS");
 
+            Logger.d(TAG, "Resolving guest metadata...");
             guestInfo = CloneManager.getInstance().getClonedPackage(originalPkg);
             
-            // FALLBACK: If CloneManager cache is empty (due to separate process), use Intent Data
+            // FALLBACK: If CloneManager cache is empty
             if (guestInfo == null) {
-                Logger.w(TAG, "Metadata cache empty in sandbox process. Using Intent Data fallback.");
+                Logger.w(TAG, "Cache miss. Syncing metadata from IPC intent data...");
                 String sourceDir = getIntent().getStringExtra("source_dir");
                 if (sourceDir != null) {
                     guestInfo = new PackageInfo();
@@ -70,22 +74,26 @@ public class SandboxActivity extends Activity {
                     guestInfo.applicationInfo.sourceDir = sourceDir;
                     guestInfo.applicationInfo.dataDir = getIntent().getStringExtra("data_dir");
                     guestInfo.applicationInfo.nativeLibraryDir = getIntent().getStringExtra("native_lib_dir");
+                    Logger.d(TAG, "Metadata reconstructed successfully.");
                 }
             }
 
             if (guestInfo == null) {
-                throw new Exception("Metadata not found for " + originalPkg);
+                throw new Exception("CRITICAL ERROR: Failed to resolve guest package metadata.");
             }
 
-            Logger.i(TAG, "Booting Sandbox Process for: " + guestInfo.packageName);
+            Logger.i(TAG, "Step 2: Configuration Validated for " + guestInfo.packageName);
 
             // 1. Load Resources
+            Logger.d(TAG, "Mapping guest resources...");
             AssetManager assets = AssetManager.class.newInstance();
             Method addAssetPath = assets.getClass().getMethod("addAssetPath", String.class);
             addAssetPath.invoke(assets, guestInfo.applicationInfo.sourceDir);
             guestResources = new Resources(assets, super.getResources().getDisplayMetrics(), super.getResources().getConfiguration());
+            Logger.i(TAG, "Step 3: Resources Mapped");
 
             // 2. Load Guest Code (Isolated ClassLoader)
+            Logger.d(TAG, "Initializing Isolated ClassLoader...");
             File dexDir = new File(getFilesDir(), "sandbox_dex/" + originalPkg);
             if (!dexDir.exists()) dexDir.mkdirs();
             
@@ -96,39 +104,38 @@ public class SandboxActivity extends Activity {
                     getClassLoader()
             );
             VirtualContainer.getInstance().setGuestClassLoader(guestClassLoader);
+            Logger.i(TAG, "Step 4: ClassLoader Isolated");
 
             // 3. APPLY GLOBAL HOOKS
+            Logger.d(TAG, "Applying Environment & UID Hooks...");
             EnvironmentHooker.apply(this, guestInfo.packageName);
-            UidSpoofing.apply(this, 10000 + (int)(Math.random() * 5000)); // Sandbox UID
+            UidSpoofing.apply(this, 10000 + (int)(Math.random() * 5000));
+            Logger.i(TAG, "Step 5: Virtual Hooks SYNCED");
 
-            // 3.5 Force Application Creation for Guest
-            try {
-                Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-                Method currentActivityThreadMethod = activityThreadClass.getDeclaredMethod("currentActivityThread");
-                currentActivityThreadMethod.setAccessible(true);
-                Object activityThread = currentActivityThreadMethod.invoke(null);
-                
-                // We're essentially telling the system: "The guest app is the main app now"
-                // This is a deeper hook than EnvironmentHooker's loadedApk spoof
-            } catch (Exception ignored) {}
-
-            // 4. LOAD ESP LIBRARY IN GUEST NAMESPACE
+            // 4. LOAD ESP LIBRARY
             if (libPath != null && new File(libPath).exists()) {
+                Logger.i(TAG, "Injecting Custom Library: " + libPath);
                 System.load(libPath);
-                Logger.d(TAG, "Guest Library linked successfully.");
+                Logger.d(TAG, "Step 6: Library Linked");
             }
 
-            // 5. Start Heartbeat to monitor Loader process
+            // 5. Start Heartbeat
+            Logger.d(TAG, "Launching service heartbeat...");
             startService(new Intent(this, SandboxHeartbeatService.class));
             startSandboxHeartbeat();
 
             // 6. Jump to Guest Entry Point
+            Logger.i(TAG, "Step 7: RELAYING TO GUEST ENTRY POINT...");
             launchGuestViaStub();
+            
+            Logger.i(TAG, "!! SANDBOX BOOT COMPLETE !! Handing off to StubActivity.");
             sendLaunchResult(true, null);
 
         } catch (Exception e) {
-            Logger.e(TAG, "Sandbox Boot Failure", e);
+            Logger.e(TAG, "!! SANDBOX FAILURE !! REASON: " + e.getMessage(), e);
+            Logger.i(TAG, "Attempting Fallback Direct Launch to prevent black screen...");
             sendLaunchResult(false, e.getMessage());
+            VirtualContainer.getInstance().fallbackLaunch(this, originalPkg);
             finish();
         }
     }
