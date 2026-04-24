@@ -60,11 +60,12 @@ public class ProviderManager {
                 for (String auth : auths) {
                     mProviderMap.put(auth, transport);
                     // Register in our mapper for redirection help
-                    AuthorityMapper.registerAuthority(auth, auth); // For now original=virtual
+                    AuthorityMapper.registerAuthority(auth, auth); 
+                    Logger.v(TAG, "Authority registered: " + auth);
                 }
             }
             
-            Logger.i(TAG, "Provider " + info.name + " (" + info.authority + ") registered locally.");
+            Logger.i(TAG, "Provider " + info.name + " (" + info.authority + ") registered locally in ActivityThread.");
         } catch (Exception e) {
             Logger.w(TAG, "Failed to register provider in ActivityThread maps: " + e.getMessage());
         }

@@ -33,9 +33,11 @@ public class ProviderInstaller {
                     Method attachInfo = ContentProvider.class.getDeclaredMethod("attachInfo", Context.class, ProviderInfo.class);
                     attachInfo.setAccessible(true);
                     attachInfo.invoke(provider, virtualContext, info);
+                    Logger.v(TAG, "attachInfo successful for " + info.name);
                 } catch (Exception e) {
-                    Logger.w(TAG, "attachInfo failed for " + info.name + ", trying context injection");
+                    Logger.w(TAG, "attachInfo failed for " + info.name + ", trying context/authority injection");
                     injectContext(provider, virtualContext);
+                    injectAuthority(provider, info.authority);
                     provider.onCreate();
                 }
 
@@ -46,6 +48,14 @@ public class ProviderInstaller {
                 return null;
             }
         }
+    }
+
+    private static void injectAuthority(ContentProvider provider, String authority) {
+        try {
+            Field authField = ContentProvider.class.getDeclaredField("mAuthority");
+            authField.setAccessible(true);
+            authField.set(provider, authority);
+        } catch (Exception ignored) {}
     }
 
     private static void injectContext(ContentProvider provider, Context context) {

@@ -52,12 +52,14 @@ public class ContentResolverHook implements InvocationHandler {
                 case "call":
                 case "getType":
                 case "openFile":
+                case "openAssetFile":
                 case "openTypedAssetFile":
                 case "getStreamTypes":
                 case "refresh":
                 case "canonicalize":
                 case "uncanonicalize":
                 case "applyBatch":
+                case "createCancellationSignal":
                     return invokeLocal(name, args);
                 
                 // Binder specific methods
@@ -171,22 +173,43 @@ public class ContentResolverHook implements InvocationHandler {
 
     private Object handleQuery(Object[] args) {
         android.net.Uri uri = findUri(args);
+        if (uri == null) return null;
+
         String[] projection = null;
         String selection = null;
         String[] selectionArgs = null;
         String sortOrder = null;
         Bundle queryArgs = null;
         
-        // Android 10+ uses queryArgs Bundle
-        for (Object arg : args) {
-            if (arg instanceof String[]) {
-                if (projection == null) projection = (String[]) arg;
-                else if (selectionArgs == null) selectionArgs = (String[]) arg;
-            } else if (arg instanceof Bundle) {
-                queryArgs = (Bundle) arg;
-            } else if (arg instanceof String) {
-                if (selection == null) selection = (String) arg;
-                else if (sortOrder == null) sortOrder = (String) arg;
+        // Find Uri index to use as an anchor
+        int uriIndex = -1;
+        for (int i = 0; i < args.length; i++) {
+            if (args[i] instanceof android.net.Uri) {
+                uriIndex = i;
+                break;
+            }
+        }
+
+        if (uriIndex != -1) {
+            // After Uri, the order is usually: projection, queryArgs (or selection, selectionArgs, sortOrder)
+            if (uriIndex + 1 < args.length && args[uriIndex + 1] instanceof String[]) {
+                projection = (String[]) args[uriIndex + 1];
+            }
+            
+            // Check for queryArgs (Bundle) or legacy selection fields
+            int nextIdx = uriIndex + 2;
+            if (nextIdx < args.length) {
+                if (args[nextIdx] instanceof Bundle) {
+                    queryArgs = (Bundle) args[nextIdx];
+                } else if (args[nextIdx] instanceof String) {
+                    selection = (String) args[nextIdx];
+                    if (nextIdx + 1 < args.length && args[nextIdx + 1] instanceof String[]) {
+                        selectionArgs = (String[]) args[nextIdx + 1];
+                    }
+                    if (nextIdx + 2 < args.length && args[nextIdx + 2] instanceof String) {
+                        sortOrder = (String) args[nextIdx + 2];
+                    }
+                }
             }
         }
         
@@ -203,34 +226,71 @@ public class ContentResolverHook implements InvocationHandler {
 
     private Object handleInsert(Object[] args) {
         android.net.Uri uri = findUri(args);
+        if (uri == null) return null;
+        
         android.content.ContentValues values = null;
-        for (Object arg : args) {
-            if (arg instanceof android.content.ContentValues) values = (android.content.ContentValues) arg;
+        int uriIndex = -1;
+        for (int i = 0; i < args.length; i++) if (args[i] instanceof android.net.Uri) { uriIndex = i; break; }
+        
+        if (uriIndex != -1 && uriIndex + 1 < args.length && args[uriIndex + 1] instanceof android.content.ContentValues) {
+            values = (android.content.ContentValues) args[uriIndex + 1];
+        } else {
+            // fallback heuristic
+            for (Object arg : args) if (arg instanceof android.content.ContentValues) values = (android.content.ContentValues) arg;
         }
         return localProvider.insert(uri, values);
     }
 
     private Object handleUpdate(Object[] args) {
         android.net.Uri uri = findUri(args);
+        if (uri == null) return null;
+        
         android.content.ContentValues values = null;
         String selection = null;
         String[] selectionArgs = null;
-        for (Object arg : args) {
-            if (arg instanceof android.content.ContentValues) values = (android.content.ContentValues) arg;
-            else if (arg instanceof String && selection == null && !((String)arg).contains(".")) selection = (String) arg;
-            else if (arg instanceof String[]) selectionArgs = (String[]) arg;
+        
+        int uriIndex = -1;
+        for (int i = 0; i < args.length; i++) if (args[i] instanceof android.net.Uri) { uriIndex = i; break; }
+        
+        if (uriIndex != -1) {
+            if (uriIndex + 1 < args.length && args[uriIndex + 1] instanceof android.content.ContentValues) {
+                values = (android.content.ContentValues) args[uriIndex + 1];
+            }
+            if (uriIndex + 2 < args.length && args[uriIndex + 2] instanceof String) {
+                selection = (String) args[uriIndex + 2];
+            }
+            if (uriIndex + 3 < args.length && args[uriIndex + 3] instanceof String[]) {
+                selectionArgs = (String[]) args[uriIndex + 3];
+            }
         }
+        
+        // Fallback
+        if (values == null) {
+            for (Object arg : args) if (arg instanceof android.content.ContentValues) values = (android.content.ContentValues) arg;
+        }
+        
         return localProvider.update(uri, values, selection, selectionArgs);
     }
 
     private Object handleDelete(Object[] args) {
         android.net.Uri uri = findUri(args);
+        if (uri == null) return null;
+        
         String selection = null;
         String[] selectionArgs = null;
-        for (Object arg : args) {
-            if (arg instanceof String && selection == null) selection = (String) arg;
-            else if (arg instanceof String[]) selectionArgs = (String[]) arg;
+        
+        int uriIndex = -1;
+        for (int i = 0; i < args.length; i++) if (args[i] instanceof android.net.Uri) { uriIndex = i; break; }
+        
+        if (uriIndex != -1) {
+            if (uriIndex + 1 < args.length && args[uriIndex + 1] instanceof String) {
+                selection = (String) args[uriIndex + 1];
+            }
+            if (uriIndex + 2 < args.length && args[uriIndex + 2] instanceof String[]) {
+                selectionArgs = (String[]) args[uriIndex + 2];
+            }
         }
+        
         return localProvider.delete(uri, selection, selectionArgs);
     }
 
