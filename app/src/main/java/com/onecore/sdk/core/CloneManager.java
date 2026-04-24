@@ -31,14 +31,33 @@ public class CloneManager {
         Logger.i(TAG, "prepareClone: Starting for package: " + packageName);
         try {
             PackageManager pm = context.getPackageManager();
-            PackageInfo info;
+            ApplicationInfo appInfo;
             try {
-                info = pm.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES | PackageManager.GET_SERVICES | PackageManager.GET_PROVIDERS);
-                Logger.d(TAG, "Source package found: " + packageName);
+                appInfo = pm.getPackageInfo(packageName, 0).applicationInfo;
             } catch (PackageManager.NameNotFoundException e) {
                 Logger.e(TAG, "Source package NOT FOUND: " + packageName);
                 return false;
             }
+
+            // Task 1: Proper APK Parsing using getPackageArchiveInfo
+            PackageInfo info = pm.getPackageArchiveInfo(appInfo.sourceDir, 
+                PackageManager.GET_ACTIVITIES | PackageManager.GET_SERVICES | PackageManager.GET_PROVIDERS);
+            
+            if (info == null) {
+                Logger.e(TAG, "Failed to parse APK archive: " + appInfo.sourceDir);
+                return false;
+            }
+            
+            // Sync ApplicationInfo since getPackageArchiveInfo might have empty applicationInfo in some Android versions
+            if (info.applicationInfo == null) {
+                info.applicationInfo = appInfo;
+            } else {
+                // Ensure paths are synced from the real installation if we are using an installed app
+                info.applicationInfo.sourceDir = appInfo.sourceDir;
+                info.applicationInfo.publicSourceDir = appInfo.publicSourceDir;
+            }
+
+            Logger.d(TAG, "Source package metadata parsed: " + packageName);
             
             // 1. Generate Virtual Identity
             String virtualPkg = "com.onecore.cloned." + (packageName.contains(".") ? packageName.substring(packageName.lastIndexOf('.') + 1) : packageName);
@@ -52,7 +71,10 @@ public class CloneManager {
             String virtualRoot = context.getFilesDir().getAbsolutePath() + "/virtual/" + packageName;
             Logger.i(TAG, "Isolated Workspace Path: " + virtualRoot);
             info.applicationInfo.dataDir = virtualRoot;
-            info.applicationInfo.nativeLibraryDir = virtualRoot + "/lib";
+            
+            // Task 5: Native Library Fix - Extract all .so files
+            String libDirStr = virtualRoot + "/lib";
+            info.applicationInfo.nativeLibraryDir = libDirStr;
             
             cache.put(packageName, info);
             
@@ -63,7 +85,7 @@ public class CloneManager {
                 dataDir.mkdirs();
                 new File(virtualRoot, "data/files").mkdirs();
                 new File(virtualRoot, "data/cache").mkdirs();
-                new File(virtualRoot, "lib").mkdirs();
+                new File(libDirStr).mkdirs();
                 new File(virtualRoot, "obb").mkdirs();
             } else {
                 Logger.d(TAG, "Virtual directories already exist.");
@@ -73,9 +95,9 @@ public class CloneManager {
             Logger.i(TAG, "Triggering OBB Mapping sequence...");
             mapObb(context, packageName, virtualRoot);
             
-            // 4. Setup Virtual Environment
-            Logger.i(TAG, "Triggering Native Library Mapping sequence...");
-            setupVirtualEnv(context, packageName, info.applicationInfo);
+            // Task 5: Extraction
+            Logger.i(TAG, "Triggering Native Library Extraction...");
+            extractNativeLibs(appInfo.nativeLibraryDir, libDirStr);
             
             Logger.i(TAG, "!! CLONE PREPARATION COMPLETE !! Result: SUCCESS");
             return true;
@@ -123,41 +145,29 @@ public class CloneManager {
         }
     }
 
-    private void setupVirtualEnv(Context context, String originalPkg, ApplicationInfo virtualApp) {
-        try {
-            PackageManager pm = context.getPackageManager();
-            ApplicationInfo originalApp = pm.getApplicationInfo(originalPkg, 0);
-            
-            File sourceLibDir = new File(originalApp.nativeLibraryDir);
-            File virtualLibDir = new File(virtualApp.nativeLibraryDir);
-            
-            if (!virtualLibDir.exists()) virtualLibDir.mkdirs();
-            
-            if (sourceLibDir.exists() && sourceLibDir.isDirectory()) {
-                File[] libs = sourceLibDir.listFiles();
-                if (libs != null) {
-                    for (File lib : libs) {
+    private void extractNativeLibs(String sourceDir, String targetDir) {
+        File src = new File(sourceDir);
+        File dst = new File(targetDir);
+        if (!dst.exists()) dst.mkdirs();
+
+        if (src.exists() && src.isDirectory()) {
+            File[] files = src.listFiles();
+            if (files != null) {
+                for (File f : files) {
+                    if (f.getName().endsWith(".so")) {
                         try {
-                            File target = new File(virtualLibDir, lib.getName());
-                            if (target.exists()) target.delete();
-                            
-                            // Physical copy for better isolation and to handle RO filesystems
-                            java.nio.file.Files.copy(
-                                java.nio.file.Paths.get(lib.getAbsolutePath()),
-                                java.nio.file.Paths.get(target.getAbsolutePath())
-                            );
-                            
-                            Logger.d(TAG, "Extracted Library: " + lib.getName());
+                            File targetFile = new File(dst, f.getName());
+                            if (targetFile.exists()) targetFile.delete();
+                            java.nio.file.Files.copy(f.toPath(), targetFile.toPath());
+                            Logger.d(TAG, "Extracted lib: " + f.getName());
                         } catch (Exception e) {
-                            Logger.e(TAG, "Failed to extract lib " + lib.getName(), e);
+                            Logger.e(TAG, "Extraction failed for " + f.getName() + ": " + e.getMessage());
                         }
                     }
                 }
-            } else {
-                Logger.e(TAG, "Source native library directory NOT FOUND: " + originalApp.nativeLibraryDir);
             }
-        } catch (Throwable e) {
-            Logger.e(TAG, "Virtual Lib Mapping Failure", e);
+        } else {
+            Logger.e(TAG, "Source lib dir missing: " + sourceDir);
         }
     }
 

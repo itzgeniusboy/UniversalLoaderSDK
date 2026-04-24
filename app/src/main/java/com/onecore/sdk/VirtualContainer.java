@@ -64,6 +64,12 @@ public class VirtualContainer {
         this.virtualMode = mode;
     }
 
+    private android.content.res.Resources guestResources;
+
+    public android.content.res.Resources getGuestResources() {
+        return guestResources;
+    }
+
     /**
      * Initializes the guest environment: metadata, filesystem, and classloader.
      */
@@ -84,18 +90,39 @@ public class VirtualContainer {
                 return false;
             }
 
-            // 2. Initialize Isolated ClassLoader
+            // Task 2: Initialize Isolated ClassLoader
             Logger.d(TAG, "Booting Isolated ClassLoader...");
             String dexPath = info.applicationInfo.sourceDir;
             String optimizedDir = context.getDir("dex_opt", Context.MODE_PRIVATE).getAbsolutePath();
             String libPath = info.applicationInfo.nativeLibraryDir;
             
+            File dexFile = new File(dexPath);
+            if (!dexFile.exists()) {
+                Logger.e(TAG, "ABORT: APK Path does not exist: " + dexPath);
+                return false;
+            }
+
             this.guestClassLoader = new DexClassLoader(
                 dexPath,
                 optimizedDir,
                 libPath,
-                context.getClassLoader().getParent() // Isolate from host app classes as much as possible
+                context.getClassLoader().getParent() 
             );
+
+            // Task 6: Resource Loading - Load AssetManager with addAssetPath(apkPath)
+            Logger.d(TAG, "Initializing Guest Resources...");
+            try {
+                android.content.res.AssetManager am = android.content.res.AssetManager.class.newInstance();
+                Method addAssetPath = am.getClass().getMethod("addAssetPath", String.class);
+                addAssetPath.invoke(am, dexPath);
+                
+                android.content.res.Resources hostRes = context.getResources();
+                this.guestResources = new android.content.res.Resources(am, hostRes.getDisplayMetrics(), hostRes.getConfiguration());
+                Logger.i(TAG, "Guest Resources LOADED.");
+            } catch (Exception e) {
+                Logger.e(TAG, "Failed to load Guest Resources: " + e.getMessage());
+                // This is a major cause of black screens
+            }
 
             Logger.i(TAG, "Environment Sync: SUCCESS");
             return true;

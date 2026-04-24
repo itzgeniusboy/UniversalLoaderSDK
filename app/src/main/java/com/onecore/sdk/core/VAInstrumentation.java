@@ -24,27 +24,9 @@ public class VAInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
-        // Redirection check for unregistered guest activities
-        String targetActivity = intent.getStringExtra("target_activity");
-        if (targetActivity != null) {
-            Logger.i(TAG, "Redirection triggered for: " + targetActivity);
-            cl = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
-            
-            // Critical: If cl is null, the sandbox isn't ready
-            if (cl == null) {
-                Logger.e(TAG, "Guest ClassLoader is null! Sandbox boot sequence out of order.");
-                return base.newActivity(cl, className, intent);
-            }
-            
-            try {
-                // Return instance of the REAL game activity
-                Activity activity = (Activity) cl.loadClass(targetActivity).newInstance();
-                Logger.d(TAG, "Successfully instantiated guest activity: " + targetActivity);
-                return activity;
-            } catch (Exception e) {
-                Logger.e(TAG, "Failed to instantiate guest activity: " + targetActivity, e);
-            }
-        }
+        // Redirection check disabled in favor of StubActivity Proxy pattern
+        // String targetActivity = intent.getStringExtra("target_activity");
+        // if (targetActivity != null) { ... }
         
         return base.newActivity(cl, className, intent);
     }

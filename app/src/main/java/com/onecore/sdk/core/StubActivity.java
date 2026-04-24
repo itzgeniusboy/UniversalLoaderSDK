@@ -17,9 +17,17 @@ import android.os.Build;
  */
 public class StubActivity extends Activity {
     private static final String TAG = "OneCore-Stub";
+    private Activity targetActivity;
+    private boolean isProxy = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Task 3: ClassLoader Binding
+        ClassLoader loader = VirtualContainer.getInstance().getGuestClassLoader();
+        if (loader != null) {
+            Thread.currentThread().setContextClassLoader(loader);
+        }
+
         super.onCreate(savedInstanceState);
         
         // Setup Transparent UI
@@ -28,55 +36,118 @@ public class StubActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         
         String targetPackage = getIntent().getStringExtra("target_package");
-        int displayId = getIntent().getIntExtra("display_id", 0);
+        String targetActivityClass = getIntent().getStringExtra("target_activity");
         
-        if (targetPackage == null) {
-            Logger.e(TAG, "No target package found for virtualization.");
+        if (targetPackage == null || targetActivityClass == null) {
+            Logger.e(TAG, "Missing launch metadata.");
             finish();
             return;
         }
 
-        Logger.i(TAG, "Virtual Core activating for: " + targetPackage);
+        Logger.i(TAG, "Virtual startup for: " + targetActivityClass);
 
-        // Crucial: Start the game from THIS activity context on THIS display
-        launchTargetInVirtualSpace(targetPackage, displayId);
-    }
-
-    private void launchTargetInVirtualSpace(String packageName, int displayId) {
+        // Task 4: StubActivity Upgrade
         try {
-            String targetActivity = getIntent().getStringExtra("target_activity");
-            if (targetActivity == null) {
-                Logger.e(TAG, "No target activity specified for handoff.");
+            if (loader == null) {
+                Logger.e(TAG, "Guest ClassLoader is NULL.");
                 finish();
                 return;
             }
 
-            Logger.d(TAG, "Triggering Redirected Launch via Shadow Intent: " + targetActivity);
+            Class<?> clazz = loader.loadClass(targetActivityClass);
+            targetActivity = (Activity) clazz.newInstance();
+            isProxy = true;
             
-            // We launch StubActivity AGAIN, but our Instrumentation will intercept
-            // and swap the class to the targetActivity.
-            Intent intent = new Intent(this, StubActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.putExtra("target_activity", targetActivity); // Metadata for Instrumentation
+            // Inject StubActivity's context and window into targetActivity
+            injectContextAndWindow(targetActivity);
             
-            // IMPORTANT: VAInstrumentation needs this intent to know what to swap
-            startActivity(intent);
+            // Task 7: Rendering Fix - Inject resources
+            patchActivityResources(targetActivity);
             
-            Logger.i(TAG, "Shadow Redirect Sent. Shell transition in progress...");
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                if (!isFinishing()) finish(); 
-            }, 500); 
+            // Task 4: Manually invoke lifecycle
+            Method onCreate = Activity.class.getDeclaredMethod("onCreate", Bundle.class);
+            onCreate.setAccessible(true);
             
+            Logger.i(TAG, "Triggering Guest Lifecycle...");
+            onCreate.invoke(targetActivity, savedInstanceState);
+            
+            Logger.i(TAG, "Handover SUCCESS.");
+
         } catch (Exception e) {
-            Logger.e(TAG, "Direct Load Failed: " + e.getMessage());
-            // No fallback to original app as per sandbox architecture
+            Logger.e(TAG, "Lifecycle Failure: " + e.getMessage(), e);
             finish();
         }
+    }
+
+    private void injectContextAndWindow(Activity activity) {
+        try {
+            // Task 7: Rendering Fix - Link window for setContentView to work
+            Field mWindowField = Activity.class.getDeclaredField("mWindow");
+            mWindowField.setAccessible(true);
+            mWindowField.set(activity, getWindow());
+            
+            // Link Base Context or use reflection to set mBase
+            Field mBaseField = android.content.ContextWrapper.class.getDeclaredField("mBase");
+            mBaseField.setAccessible(true);
+            mBaseField.set(activity, this);
+            
+            // Application instance
+            Field mApplicationField = Activity.class.getDeclaredField("mApplication");
+            mApplicationField.setAccessible(true);
+            mApplicationField.set(activity, getApplication());
+
+            Logger.d(TAG, "Window and Context Injected to Guest Activity.");
+        } catch (Exception e) {
+            Logger.e(TAG, "Injection Error: " + e.getMessage());
+        }
+    }
+
+    private void patchActivityResources(Activity activity) {
+        try {
+            android.content.res.Resources guestRes = VirtualContainer.getInstance().getGuestResources();
+            if (guestRes != null) {
+                Field mResourcesField = android.view.ContextThemeWrapper.class.getDeclaredField("mResources");
+                mResourcesField.setAccessible(true);
+                mResourcesField.set(activity, guestRes);
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, "Resource Patching Failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public android.content.res.Resources getResources() {
+        android.content.res.Resources guestRes = VirtualContainer.getInstance().getGuestResources();
+        return guestRes != null ? guestRes : super.getResources();
     }
 
     @Override
     public ClassLoader getClassLoader() {
         ClassLoader guestLoader = VirtualContainer.getInstance().getGuestClassLoader();
         return guestLoader != null ? guestLoader : super.getClassLoader();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (isProxy && targetActivity != null) {
+            try {
+                Method onResume = Activity.class.getDeclaredMethod("onResume");
+                onResume.setAccessible(true);
+                onResume.invoke(targetActivity);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (isProxy && targetActivity != null) {
+            try {
+                Method onDestroy = Activity.class.getDeclaredMethod("onDestroy");
+                onDestroy.setAccessible(true);
+                onDestroy.invoke(targetActivity);
+            } catch (Exception ignored) {}
+        }
+        super.onDestroy();
     }
 }
