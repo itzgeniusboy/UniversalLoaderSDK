@@ -4,9 +4,7 @@ import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.IBinder;
 import com.onecore.sdk.utils.Logger;
-import java.lang.reflect.Method;
 
 /**
  * Custom Instrumentation for OneCore Sandbox.
@@ -24,25 +22,56 @@ public class VAInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
-        // Redirection check disabled in favor of StubActivity Proxy pattern
-        // String targetActivity = intent.getStringExtra("target_activity");
-        // if (targetActivity != null) { ... }
+        String targetActivity = intent.getStringExtra("target_activity");
+        if (targetActivity != null) {
+            Logger.i(TAG, "Swapping Stub for Guest Activity: " + targetActivity);
+            ClassLoader guestLoader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
+            if (guestLoader != null) {
+                return (Activity) guestLoader.loadClass(targetActivity).newInstance();
+            }
+        }
         
         return base.newActivity(cl, className, intent);
     }
 
     @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
-        // Redirection check for resources
-        if (activity.getClass().getName().startsWith("com.pubg") || 
-            activity.getClass().getName().startsWith("com.epicgames")) {
-            
-            Logger.i(TAG, "Patching resources for activity: " + activity.getClass().getName());
-            // In a real sandbox, we would replace the activity's mResources/mContext here
-            // But we already patched LoadedApk, which should cover getResources() calls.
+        ClassLoader guestLoader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
+        
+        if (guestLoader != null && activity.getClass().getClassLoader() == guestLoader) {
+            Logger.i(TAG, "Lifecycle: guest.onCreate -> " + activity.getClass().getName());
+            patchActivityMetadata(activity);
         }
         
         base.callActivityOnCreate(activity, icicle);
+    }
+
+    private void patchActivityMetadata(Activity activity) {
+        try {
+            android.content.res.Resources guestRes = com.onecore.sdk.VirtualContainer.getInstance().getGuestResources();
+            if (guestRes != null) {
+                java.lang.reflect.Field mResourcesField = Activity.class.getDeclaredField("mResources");
+                mResourcesField.setAccessible(true);
+                mResourcesField.set(activity, guestRes);
+            }
+        } catch (Exception e) {
+            Logger.w(TAG, "Failed to patch activity metadata: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void callActivityOnResume(Activity activity) {
+        base.callActivityOnResume(activity);
+    }
+
+    @Override
+    public void callActivityOnStop(Activity activity) {
+        base.callActivityOnStop(activity);
+    }
+
+    @Override
+    public void callActivityOnPause(Activity activity) {
+        base.callActivityOnPause(activity);
     }
 
     @Override
@@ -56,5 +85,21 @@ public class VAInstrumentation extends Instrumentation {
         }
         
         return base.newApplication(cl, className, context);
+    }
+
+    @Override
+    public void callApplicationOnCreate(android.app.Application app) {
+        ClassLoader guestLoader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
+        if (guestLoader != null && app.getClass().getClassLoader() == guestLoader) {
+            Logger.i(TAG, "Guest Application OnCreate: " + app.getClass().getName());
+            try {
+                Object activityThread = java.lang.reflect.Method.forName("android.app.ActivityThread")
+                        .getDeclaredMethod("currentActivityThread").invoke(null);
+                EnvironmentHooker.setInitialApplication(activityThread, app);
+            } catch (Exception e) {
+                Logger.w(TAG, "Failed to sync guest application to ActivityThread: " + e.getMessage());
+            }
+        }
+        base.callApplicationOnCreate(app);
     }
 }
