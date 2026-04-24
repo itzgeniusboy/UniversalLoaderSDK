@@ -2,233 +2,111 @@ package com.onecore.sdk.core;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
-import android.content.res.AssetManager;
-import android.content.res.Resources;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
+import com.onecore.sdk.LauncherOrchestrator;
 import com.onecore.sdk.NativeHookManager;
 import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.Logger;
 import java.io.File;
-import java.lang.reflect.Method;
-import dalvik.system.DexClassLoader;
 
-/**
- * Sandbox Host: The Process that runs the Cloned App.
- * Solves: Context Mismatch and Namespace Isolation.
- */
 public class SandboxActivity extends Activity {
     private static final String TAG = "SandboxActivity";
-    private PackageInfo guestInfo;
-    private DexClassLoader guestClassLoader;
-    private Resources guestResources;
-    private String libPath;
-    private long lastHeartbeat = 0;
+    private String targetPackage;
+    private String mainActivityClass;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Logger.i(TAG, "!! SANDBOX ACTIVATED !! Setting up guest environment...");
+        Logger.i(TAG, "--- Sandboxed Environment Activated ---");
+
+        targetPackage = getIntent().getStringExtra("target_package");
+        mainActivityClass = getIntent().getStringExtra("main_activity");
+
+        setupLoadingUI();
         
-        // Premium Stealth UI for Sandbox Host
+        // Start launch logic with tiny delay to allow UI to render (avoid total black screen)
+        new Handler(Looper.getMainLooper()).postDelayed(this::continueLaunch, 500);
+    }
+
+    private void setupLoadingUI() {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setGravity(android.view.Gravity.CENTER);
-        layout.setBackgroundColor(0xFF000000);
-        
+        layout.setGravity(Gravity.CENTER);
+        layout.setBackgroundColor(0xFF121212); // Dark iOS gray
+
+        ProgressBar pb = new ProgressBar(this);
+        layout.addView(pb);
+
         TextView tv = new TextView(this);
-        tv.setText("VIRTUAL KERNEL BOOTING...");
+        tv.setText("PREPARING VIRTUAL SPACE...");
         tv.setTextColor(0xFFFFFFFF);
-        tv.setTextSize(14);
+        tv.setPadding(0, 40, 0, 0);
         layout.addView(tv);
-        
+
         setContentView(layout);
-        
-        String originalPkg = getIntent().getStringExtra("target_package");
-        Logger.d(TAG, "Target Package: " + originalPkg);
-        this.libPath = getIntent().getStringExtra("library_path");
+    }
 
+    private void continueLaunch() {
+        Logger.i(TAG, "Executing Step: Environment Synchronization");
         try {
-            // Early native initialization
-            String virtualRoot = getFilesDir().getAbsolutePath() + "/virtual/" + originalPkg;
-            Logger.d(TAG, "Installing Native Hooks at " + virtualRoot);
-            NativeHookManager.setupIsolation(this, virtualRoot, originalPkg);
-            Logger.i(TAG, "Step 1: Native Isolation SUCCESS");
-
-            Logger.d(TAG, "Resolving guest metadata...");
-            guestInfo = CloneManager.getInstance().getClonedPackage(originalPkg);
+            // 1. Basic hooks (UID, Filesystem redirection)
+            String virtualRoot = getFilesDir().getAbsolutePath() + "/virtual/" + targetPackage;
+            NativeHookManager.setupIsolation(this, virtualRoot, targetPackage);
             
-            // FALLBACK: If CloneManager cache is empty
-            if (guestInfo == null) {
-                Logger.w(TAG, "Cache miss in sandbox process. Reconstructing metadata...");
-                String sourceDir = getIntent().getStringExtra("source_dir");
-                if (sourceDir != null) {
-                    guestInfo = new PackageInfo();
-                    guestInfo.packageName = originalPkg;
-                    guestInfo.applicationInfo = new ApplicationInfo();
-                    guestInfo.applicationInfo.packageName = originalPkg;
-                    guestInfo.applicationInfo.sourceDir = sourceDir;
-                    guestInfo.applicationInfo.dataDir = getIntent().getStringExtra("data_dir");
-                    guestInfo.applicationInfo.nativeLibraryDir = getIntent().getStringExtra("native_lib_dir");
-                    
-                    // Reconstruct a minimal activities list if we have a main_activity
-                    String mainActivityExtra = getIntent().getStringExtra("main_activity");
-                    if (mainActivityExtra != null) {
-                        android.content.pm.ActivityInfo ai = new android.content.pm.ActivityInfo();
-                        ai.name = mainActivityExtra;
-                        ai.packageName = originalPkg;
-                        guestInfo.activities = new android.content.pm.ActivityInfo[]{ai};
-                        Logger.d(TAG, "Reconstructed basic activities list with: " + mainActivityExtra);
-                    }
-                    Logger.d(TAG, "Metadata reconstructed successfully.");
-                }
+            // 2. Resolve target intent
+            Logger.d(TAG, "Identifying Guest Entry Point...");
+            PackageManager pm = getPackageManager();
+            Intent launchIntent = pm.getLaunchIntentForPackage(targetPackage);
+
+            if (launchIntent == null) {
+                Logger.e(TAG, "Launch Resolution Failed: GetLaunchIntent returned null");
+                handleLaunchFailure("Package Metadata Inaccessible");
+                return;
             }
 
-            if (guestInfo == null) {
-                throw new Exception("CRITICAL ERROR: Failed to resolve guest package metadata.");
-            }
-
-            Logger.i(TAG, "Step 2: Configuration Validated for " + guestInfo.packageName);
-
-            // 1. Load Resources
-            Logger.d(TAG, "Mapping guest resources...");
-            AssetManager assets = AssetManager.class.newInstance();
-            Method addAssetPath = assets.getClass().getMethod("addAssetPath", String.class);
-            addAssetPath.invoke(assets, guestInfo.applicationInfo.sourceDir);
-            guestResources = new Resources(assets, super.getResources().getDisplayMetrics(), super.getResources().getConfiguration());
-            Logger.i(TAG, "Step 3: Resources Mapped");
-
-            // 2. Load Guest Code (Isolated ClassLoader)
-            Logger.d(TAG, "Initializing Isolated ClassLoader...");
-            File dexDir = new File(getFilesDir(), "sandbox_dex/" + originalPkg);
-            if (!dexDir.exists()) dexDir.mkdirs();
+            // 3. Launch inside this process/environment
+            Logger.i(TAG, "Triggering Guest Transition...");
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             
-            guestClassLoader = new DexClassLoader(
-                    guestInfo.applicationInfo.sourceDir,
-                    dexDir.getAbsolutePath(),
-                    guestInfo.applicationInfo.nativeLibraryDir,
-                    getClassLoader()
-            );
-            VirtualContainer.getInstance().setGuestClassLoader(guestClassLoader);
-            Logger.i(TAG, "Step 4: ClassLoader Isolated");
-
-            // 3. APPLY GLOBAL HOOKS
-            Logger.d(TAG, "Applying Environment & UID Hooks...");
-            EnvironmentHooker.apply(this, guestInfo.packageName);
-            UidSpoofing.apply(this, 10000 + (int)(Math.random() * 5000));
-            Logger.i(TAG, "Step 5: Virtual Hooks SYNCED");
-
-            // 4. LOAD ESP LIBRARY
-            if (libPath != null && new File(libPath).exists()) {
-                Logger.i(TAG, "Injecting Custom Library: " + libPath);
-                System.load(libPath);
-                Logger.d(TAG, "Step 6: Library Linked");
-            }
-
-            // 5. Start Heartbeat
-            Logger.d(TAG, "Launching service heartbeat...");
-            startService(new Intent(this, SandboxHeartbeatService.class));
-            startSandboxHeartbeat();
-
-            // 6. Jump to Guest Entry Point
-            Logger.i(TAG, "Step 7: RELAYING TO GUEST ENTRY POINT...");
-            launchGuestViaStub();
+            // Note: Since this process has EnvironmentHooker/VAInstrumentation applied,
+            // starting this intent should stay within the virtualized context.
+            startActivity(launchIntent);
             
-            Logger.i(TAG, "!! SANDBOX BOOT COMPLETE !! Handing off to StubActivity.");
-            sendLaunchResult(true, null);
+            Logger.i(TAG, "Launch Command Emitted. Sandbox standby for handover.");
+            
+            // Self-destruct this activity after successful handover
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                Logger.i(TAG, "Sandbox Task Completed. Closing Shell.");
+                finish();
+            }, 3000);
 
         } catch (Exception e) {
-            Logger.e(TAG, "!! SANDBOX FAILURE !! REASON: " + e.getMessage(), e);
-            Logger.i(TAG, "Attempting Fallback Direct Launch to prevent black screen...");
-            sendLaunchResult(false, e.getMessage());
-            VirtualContainer.getInstance().fallbackLaunch(this, originalPkg);
-            finish();
+            Logger.e(TAG, "Sandbox Execution Failure: " + e.getMessage());
+            handleLaunchFailure(e.getMessage());
         }
     }
 
-    private void startSandboxHeartbeat() {
-        new Thread(() -> {
-            while (!isFinishing()) {
-                try {
-                    // If loader process disappears, sandbox should self-destruct
-                    // For demo, we check if original parent PID is still 1 (after host dies) 
-                    // or use a more complex Binder-based check in real scenarios.
-                    Thread.sleep(2000);
-                } catch (InterruptedException e) {
-                    break;
-                }
-            }
-        }).start();
-    }
-
-    private void sendLaunchResult(boolean success, String error) {
+    private void handleLaunchFailure(String reason) {
+        Logger.e(TAG, "!! VIRTUAL LAUNCH FAILED !! Reason: " + reason);
+        Logger.i(TAG, "Auto-Initiating Fallback Bridge...");
+        
+        // Use the orchestrator to launch it directly
+        LauncherOrchestrator.launchFallback(this, targetPackage);
+        
+        // Broadcoast failure if needed
         Intent result = new Intent(VirtualContainer.ACTION_LAUNCH_RESULT);
-        result.putExtra("success", success);
-        if (error != null) result.putExtra("error", error);
+        result.putExtra("success", false);
+        result.putExtra("error", reason);
         sendBroadcast(result);
-    }
-
-    private void launchGuestViaStub() throws Exception {
-        String mainActivity = getIntent().getStringExtra("main_activity");
         
-        // Find Launch Activity in metadata if not explicitly passed
-        if (mainActivity == null && guestInfo.activities != null) {
-            for (android.content.pm.ActivityInfo ai : guestInfo.activities) {
-                if (ai.name.toLowerCase().contains("splash") || ai.name.toLowerCase().contains("launcher")) {
-                    mainActivity = ai.name;
-                    break;
-                }
-            }
-        }
-        
-        // Final attempt via system resolution
-        if (mainActivity == null) {
-            try {
-                Intent launchIntent = getPackageManager().getLaunchIntentForPackage(guestInfo.packageName);
-                if (launchIntent != null && launchIntent.getComponent() != null) {
-                    mainActivity = launchIntent.getComponent().getClassName();
-                    Logger.i(TAG, "Resolved Launch Activity via PackageManager: " + mainActivity);
-                }
-            } catch (Exception e) {
-                Logger.w(TAG, "PackageManager resolution failed: " + e.getMessage());
-            }
-        }
-
-        if (mainActivity == null) throw new Exception("Could not resolve guest main activity.");
-        
-        Logger.i(TAG, "!! LAUNCHING GUEST !! -> " + mainActivity);
-        
-        // We use the StubActivity as a proxy to stay within the sandbox process
-        Intent stubIntent = new Intent(this, StubActivity.class);
-        stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        stubIntent.putExtra("target_activity", mainActivity);
-        stubIntent.putExtra("target_package", guestInfo.packageName);
-        stubIntent.putExtra("library_path", libPath);
-        
-        startActivity(stubIntent);
-        
-        Logger.i(TAG, "Handover to StubActivity initiated. Transitioning...");
-        
-        // Keep this activity alive long enough to ensure transition success
-        new Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-            if (!isFinishing()) {
-                Logger.d(TAG, "Sandbox shell lifecycle completed.");
-                finish();
-            }
-        }, 5000); // 5 second buffer for heavy Unreal Engine games
-    }
-
-    @Override
-    public ClassLoader getClassLoader() {
-        return guestClassLoader != null ? guestClassLoader : super.getClassLoader();
-    }
-
-    @Override
-    public Resources getResources() {
-        return guestResources != null ? guestResources : super.getResources();
+        finish();
     }
 }

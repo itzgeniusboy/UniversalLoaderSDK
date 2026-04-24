@@ -16,7 +16,7 @@ import java.lang.reflect.Proxy;
 public class EnvironmentHooker {
     private static final String TAG = "EnvironmentHooker";
 
-    public static void apply(Context context, String fakePackageName) {
+    public static void apply(Context context, String fakePackageName, String virtualPath) {
         try {
             Logger.i(TAG, "Applying Environment Hooks for " + fakePackageName);
 
@@ -27,7 +27,7 @@ public class EnvironmentHooker {
             Object activityThread = currentActivityThreadMethod.invoke(null);
 
             // 2. Hook Package Manager Service
-            hookPackageManager(activityThreadClass, fakePackageName);
+            hookPackageManager(activityThreadClass, fakePackageName, virtualPath);
 
             // 3. Hook Instrumentation (Interception of Activity Creation)
             hookInstrumentation(activityThread, activityThreadClass);
@@ -41,12 +41,13 @@ public class EnvironmentHooker {
         }
     }
 
-    private static void hookPackageManager(Class<?> activityThreadClass, String fakeName) throws Exception {
+    private static void hookPackageManager(Class<?> activityThreadClass, String fakeName, String virtualPath) throws Exception {
         Method getPackageManager = activityThreadClass.getDeclaredMethod("getPackageManager");
         getPackageManager.setAccessible(true);
         Object originalPm = getPackageManager.invoke(null);
+        if (originalPm == null) return;
 
-        Object proxyPm = PackageManagerHook.createProxy(originalPm, fakeName);
+        Object proxyPm = PackageManagerHook.createProxy(originalPm, fakeName, virtualPath);
         
         Field sPackageManagerField = activityThreadClass.getDeclaredField("sPackageManager");
         sPackageManagerField.setAccessible(true);
@@ -101,5 +102,17 @@ public class EnvironmentHooker {
         Field mInitialApplicationField = activityThreadClass.getDeclaredField("mInitialApplication");
         mInitialApplicationField.setAccessible(true);
         // We don't set it to null, but we could replace it later if needed.
+    }
+
+    public static void setInitialApplication(Object activityThread, android.app.Application app) {
+        try {
+            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+            Field mInitialApplicationField = activityThreadClass.getDeclaredField("mInitialApplication");
+            mInitialApplicationField.setAccessible(true);
+            mInitialApplicationField.set(activityThread, app);
+            Logger.i(TAG, "mInitialApplication swapped to Guest instance.");
+        } catch (Exception e) {
+            Logger.w(TAG, "Failed to swap mInitialApplication: " + e.getMessage());
+        }
     }
 }

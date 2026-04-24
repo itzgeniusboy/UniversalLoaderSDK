@@ -17,17 +17,19 @@ public class PackageManagerHook implements InvocationHandler {
     private static final String TAG = "PackageManagerHook";
     private final Object base;
     private final String virtualPackageName;
+    private final String virtualPath;
 
-    public PackageManagerHook(Object base, String virtualPackageName) {
+    public PackageManagerHook(Object base, String virtualPackageName, String virtualPath) {
         this.base = base;
         this.virtualPackageName = virtualPackageName;
+        this.virtualPath = virtualPath;
     }
 
-    public static Object createProxy(Object base, String virtualPackageName) {
+    public static Object createProxy(Object base, String virtualPackageName, String virtualPath) {
         return Proxy.newProxyInstance(
             base.getClass().getClassLoader(),
             base.getClass().getInterfaces(),
-            new PackageManagerHook(base, virtualPackageName)
+            new PackageManagerHook(base, virtualPackageName, virtualPath)
         );
     }
 
@@ -45,24 +47,13 @@ public class PackageManagerHook implements InvocationHandler {
             if (result instanceof ApplicationInfo && pkgName.equals(virtualPackageName)) {
                 ApplicationInfo info = (ApplicationInfo) result;
                 // Redirect data paths
-                String vPath = "/data/data/com.onecore/virtual/" + virtualPackageName;
-                info.dataDir = vPath;
+                info.dataDir = virtualPath;
                 
                 // A/B Package Support (Split APKs)
-                info.sourceDir = vPath + "/base.apk";
-                info.publicSourceDir = vPath + "/base.apk";
+                // Note: sourceDir should point to the REAL APK, but dataDir is virtualized
+                // In some cases we might want to redirect sourceDir to base.apk in virtual space too
                 
-                // Handle Split APKs if they exist in virtual space
-                if (info.splitSourceDirs != null) {
-                    String[] virtualSplits = new String[info.splitSourceDirs.length];
-                    for (int i = 0; i < info.splitSourceDirs.length; i++) {
-                        virtualSplits[i] = vPath + "/split_" + i + ".apk";
-                    }
-                    info.splitSourceDirs = virtualSplits;
-                    info.splitPublicSourceDirs = virtualSplits;
-                }
-                
-                Logger.d(TAG, "ApplicationInfo virtualized for A/B package.");
+                Logger.d(TAG, "ApplicationInfo virtualized for: " + virtualPackageName);
                 return info;
             }
             return result;

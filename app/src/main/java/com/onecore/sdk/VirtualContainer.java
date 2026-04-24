@@ -60,33 +60,73 @@ public class VirtualContainer {
         this.virtualMode = mode;
     }
 
-    public boolean launch(Context context, String packageName, LaunchCallback callback) {
-        Logger.i(TAG, "!! LAUNCH SEQUENCE START !! Target: " + packageName);
+    /**
+     * Entry point for LauncherOrchestrator. 
+     * Performs pre-launch validations and environment setup.
+     * @return true if pre-checks pass and sandbox is triggered.
+     */
+    public boolean prepareAndLaunch(Context context, String packageName) {
+        Logger.i(TAG, "--- VIRTUAL PRE-CHECK START ---");
+        
         if (context == null || packageName == null) {
-            Logger.e(TAG, "Launch Aborted: Null context or package name.");
-            if (callback != null) callback.onLaunchFailed("Invalid Parameters");
+            Logger.e(TAG, "Virtual Launch ABORTED: Null context/pkg");
             return false;
         }
-        
-        this.pendingCallback = callback;
-        Logger.d(TAG, "Registering Launch Outcome Broadcast Receiver...");
+
+        try {
+            // 1. Validate Cloned Metadata
+            Logger.d(TAG, "Validating Cloned Metadata...");
+            PackageInfo info = CloneManager.getInstance().getClonedPackage(packageName);
+            if (info == null || info.applicationInfo == null) {
+                Logger.e(TAG, "Metadata VALIDATION FAILED: No cloned package found for " + packageName);
+                return false;
+            }
+
+            // 2. Validate Paths
+            File apkFile = new File(info.applicationInfo.sourceDir);
+            if (!apkFile.exists()) {
+                Logger.e(TAG, "APK Path VALIDATION FAILED: " + info.applicationInfo.sourceDir);
+                return false;
+            }
+
+            // 3. Validate Native Libs (optional but recommended)
+            File libDir = new File(info.applicationInfo.nativeLibraryDir);
+            if (!libDir.exists()) {
+                Logger.w(TAG, "Native Lib Path missing: " + info.applicationInfo.nativeLibraryDir);
+                // We proceed but log it
+            }
+
+            // 4. Register Broadcast for feedback (for UI updates, not for core flow)
+            registerLaunchResultReceiver(context);
+
+            Logger.i(TAG, "Pre-checks successful. Booting sandbox process...");
+            setVirtualMode(true);
+            
+            // Bypass restrictions
+            bypassHiddenApiRestrictions();
+            
+            // Ensure IO redirection
+            IORedirector.ensureVirtualEnv(context, packageName);
+            
+            // Start Sandbox Activity
+            launchInVirtualSandbox(context, packageName);
+            
+            return true;
+
+        } catch (Exception e) {
+            Logger.e(TAG, "Virtual Pre-check CRASH: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private void registerLaunchResultReceiver(Context context) {
         IntentFilter filter = new IntentFilter(ACTION_LAUNCH_RESULT);
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 boolean success = intent.getBooleanExtra("success", false);
                 String error = intent.getStringExtra("error");
-                Logger.i(TAG, "Received Launch Outcome: Success=" + success + (error != null ? ", Error=" + error : ""));
-                
-                if (pendingCallback != null) {
-                    if (success) {
-                        Logger.i(TAG, "!! SANDBOX BOOT SUCCESSFUL !!");
-                        pendingCallback.onLaunchSuccess();
-                    } else {
-                        Logger.e(TAG, "Sandbox Boot Failed: " + error);
-                        pendingCallback.onLaunchFailed(error);
-                    }
-                }
+                Logger.i(TAG, "Sandbox Status Update: Success=" + success + (error != null ? " Error=" + error : ""));
                 try { context.unregisterReceiver(this); } catch (Exception ignored) {}
             }
         };
@@ -95,46 +135,6 @@ public class VirtualContainer {
             context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
             context.registerReceiver(receiver, filter);
-        }
-
-        // License is now always valid in dev mode
-        Logger.d(TAG, "System License Status: VERIFIED (Dev Mode)");
-
-        try {
-            Logger.i(TAG, "Initiating Virtual Session...");
-            setVirtualMode(true);
-            
-            // 1. Prepare Metadata and Sandbox (Deep Clone)
-            Logger.d(TAG, "Step 1: Preparing Deep Clone Workspace...");
-            boolean prepared = CloneManager.getInstance().prepareClone(context, packageName);
-            if (!prepared) {
-                Logger.e(TAG, "Clone Preparation Failed for Package: " + packageName);
-                Logger.i(TAG, "!! FAILSAFE TRIGGERED !! Attempting Traditional Launch...");
-                fallbackLaunch(context, packageName);
-                if (callback != null) callback.onLaunchFailed("Virtual Prep Failed. Using Fallback.");
-                return true; // Return true as we handled it via fallback
-            }
-
-            // 2. Bypass restrictions
-            Logger.d(TAG, "Step 2: Bypassing Hidden API Restrictions...");
-            bypassHiddenApiRestrictions();
-
-            // 3. Isolated Context & Hooks Setup
-            Logger.d(TAG, "Step 3: Synchronizing Virtual Environment...");
-            IORedirector.ensureVirtualEnv(context, packageName);
-            
-            // 4. Sandbox Launch (Host Process)
-            Logger.i(TAG, "Step 4: Booting Virtual Sandbox Host...");
-            launchInVirtualSandbox(context, packageName);
-            Logger.i(TAG, "!! LAUNCH COMMAND EMITTED !! Awaiting process detection...");
-            return true;
-            
-        } catch (Throwable e) {
-            Logger.e(TAG, "SANDBOX CRASH: VirtualContainer launch exception: " + e.getMessage(), e);
-            Logger.i(TAG, "!! FAILSAFE TRIGGERED !! Manual Engine Bypassing...");
-            fallbackLaunch(context, packageName);
-            if (callback != null) callback.onLaunchFailed("Sandbox Crash: " + e.getMessage());
-            return true; // We attempted fallback
         }
     }
 

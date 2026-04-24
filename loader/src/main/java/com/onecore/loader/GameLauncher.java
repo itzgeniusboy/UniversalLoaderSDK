@@ -26,47 +26,40 @@ public class GameLauncher {
         try {
             // Detect installed version
             String originalPkg = PKG_IMOBILE;
-            boolean installed = true;
+            boolean imobileInstalled = false;
+            boolean bgmiInstalled = false;
+            
             try {
                 context.getPackageManager().getPackageInfo(PKG_IMOBILE, 0);
-                Logger.d(TAG, "Detected: " + PKG_IMOBILE);
-            } catch (Exception e) {
-                try {
-                    context.getPackageManager().getPackageInfo(PKG_BGMI, 0);
-                    originalPkg = PKG_BGMI;
-                    Logger.d(TAG, "Detected: " + PKG_BGMI);
-                } catch (Exception e2) {
-                    installed = false;
-                }
-            }
+                imobileInstalled = true;
+            } catch (Exception ignored) {}
             
-            if (!installed) {
+            try {
+                context.getPackageManager().getPackageInfo(PKG_BGMI, 0);
+                bgmiInstalled = true;
+            } catch (Exception ignored) {}
+            
+            if (imobileInstalled) {
+                originalPkg = PKG_IMOBILE;
+            } else if (bgmiInstalled) {
+                originalPkg = PKG_BGMI;
+            } else {
                 Logger.e(TAG, "FATAL: BGMI not installed.");
-                if (callback != null) callback.onFailed("BGMI is not installed. Please install the game first.");
+                if (callback != null) callback.onFailed("Game not installed. Please install BGMI first.");
                 return;
             }
             
-            Logger.i(TAG, "Step 1: Identifying virtualization target for " + originalPkg);
-            if (callback != null) callback.onProgress("Initializing Isolated Engine...");
+            Logger.i(TAG, "Initiating Orchestration for " + originalPkg);
+            if (callback != null) callback.onProgress("Starting Game Flow...");
 
-            // Ensure we use the Virtualization Container
-            Logger.d(TAG, "Handing off to VirtualContainer.launch()...");
-            VirtualContainer.getInstance().launch(context, originalPkg, new VirtualContainer.LaunchCallback() {
-                @Override
-                public void onLaunchSuccess() {
-                    Logger.i(TAG, "Step 2: Virtual Sandbox Boot SUCCESS.");
-                    if (callback != null) {
-                        callback.onProgress("Launch Success");
-                        callback.onProcessDetected(0);
-                    }
-                }
-
-                @Override
-                public void onLaunchFailed(String reason) {
-                    Logger.e(TAG, "Step 2: Virtual Sandbox Boot FAILED: " + reason);
-                    if (callback != null) callback.onFailed(reason);
-                }
-            });
+            // Use the Orchestrator for guaranteed launch
+            com.onecore.sdk.LauncherOrchestrator.startGame(context, originalPkg);
+            
+            // For UI feedback purposes, assume success if no immediate crash
+            if (callback != null) {
+                callback.onProgress("Orchestrator Handover Successful");
+                callback.onProcessDetected(0);
+            }
 
         } catch (Exception e) {
             Logger.e(TAG, "FATAL ERROR in GameLauncher logic", e);

@@ -67,8 +67,12 @@ public class VAInstrumentation extends Instrumentation {
     public android.app.Application newApplication(ClassLoader cl, String className, android.content.Context context) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
-        // If we are in the sandbox process, we want to return the REAL game Application class
-        // This is usually called when the process starts, but we might need to trigger it manually
+        ClassLoader guestLoader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
+        if (guestLoader != null) {
+            Logger.i(TAG, "Virtual application mapping for: " + className);
+            return base.newApplication(guestLoader, className, context);
+        }
+        
         return base.newApplication(cl, className, context);
     }
 }
