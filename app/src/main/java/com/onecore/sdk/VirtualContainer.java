@@ -60,6 +60,11 @@ public class VirtualContainer {
         this.virtualMode = mode;
     }
 
+    public boolean launch(Context context, String packageName, LaunchCallback callback) {
+        this.pendingCallback = callback;
+        return prepareAndLaunch(context, packageName);
+    }
+
     /**
      * Entry point for LauncherOrchestrator. 
      * Performs pre-launch validations and environment setup.
@@ -302,7 +307,8 @@ public class VirtualContainer {
      */
     public Object proxyService(Object realService, final String serviceName, String packageName) {
         if ("package".equals(serviceName)) {
-            return PackageManagerHook.createProxy(realService, packageName);
+            String vPath = OneCoreSDK.getContext().getFilesDir().getAbsolutePath() + "/virtual/" + packageName;
+            return PackageManagerHook.createProxy(realService, packageName, vPath);
         } else if ("activity".equals(serviceName)) {
             return ActivityManagerHook.createProxy(realService);
         }

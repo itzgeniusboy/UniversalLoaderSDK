@@ -13,17 +13,19 @@ import java.lang.reflect.Proxy;
 public class PackageManagerHook implements InvocationHandler {
     private final Object realService;
     private final String fakePackageName;
+    private final String virtualPath;
 
-    private PackageManagerHook(Object realService, String fakePackageName) {
+    private PackageManagerHook(Object realService, String fakePackageName, String virtualPath) {
         this.realService = realService;
         this.fakePackageName = fakePackageName;
+        this.virtualPath = virtualPath;
     }
 
-    public static Object createProxy(Object realService, String fakePackageName) {
+    public static Object createProxy(Object realService, String fakePackageName, String virtualPath) {
         return Proxy.newProxyInstance(
                 realService.getClass().getClassLoader(),
                 realService.getClass().getInterfaces(),
-                new PackageManagerHook(realService, fakePackageName)
+                new PackageManagerHook(realService, fakePackageName, virtualPath)
         );
     }
 
@@ -39,7 +41,9 @@ public class PackageManagerHook implements InvocationHandler {
         // Lie about ApplicationInfo (Path redirection)
         if (methodName.equals("getApplicationInfo")) {
             ApplicationInfo info = (ApplicationInfo) method.invoke(realService, args);
-            // Redirection logic to sandbox paths can be added here
+            if (info != null && info.packageName.equals(fakePackageName)) {
+                info.dataDir = virtualPath;
+            }
             return info;
         }
 
