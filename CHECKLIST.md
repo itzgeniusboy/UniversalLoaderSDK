@@ -14,8 +14,6 @@ Ensure the directory structure matches accurately:
 
 ## 2. Code Verification [ ]
 - [ ] Check `LoaderSDK.java`: Generic imports removed, local package stubs only.
-- [ ] Check `FloatingMenu.java`: Verify `TYPE_APPLICATION_OVERLAY` for 26+.
-- [ ] Check `Updater.java`: Ensure `HttpURLConnection` uses background threads.
 - [ ] No `TODO` comments or `System.out.println` remain.
 
 ## 3. Common Build Failures & Fixes

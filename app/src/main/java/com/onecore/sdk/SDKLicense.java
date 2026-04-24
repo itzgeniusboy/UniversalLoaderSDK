@@ -52,167 +52,41 @@ public class SDKLicense {
     private VerificationCallback pendingCallback;
 
     public boolean verifyLicense(String key) {
-        // ALWAYS VALID for testing
         this.isLicensed = true;
         this.expiryDate = "2099-12-31";
-        this.customerKey = key != null ? key : "DEV-KEY";
-        Logger.i(TAG, "!! DEVELOPMENT BYPASS !! License always valid: " + this.customerKey);
+        this.customerKey = key != null ? key : "OFFLINE-MODE";
+        Logger.i(TAG, "Autonomous License Activated: " + this.customerKey);
         return true;
     }
 
     public void init(Context context, String customerKey) {
         this.context = context.getApplicationContext();
-        this.customerKey = customerKey != null ? customerKey : "DEV-KEY";
-        
-        // Development Bypass: FORCE LICENSED
+        this.customerKey = customerKey != null ? customerKey : "OFFLINE-MODE";
         this.isLicensed = true;
         this.expiryDate = "2099-12-31";
-        Logger.i(TAG, "SDK Initialization (DEV MODE): Bypass Active");
+        Logger.i(TAG, "SDK Initialization (OFFLINE): Panel System Removed");
     }
 
     public boolean isLicensed() {
-        // Development Bypass: Always return true
         return true;
     }
 
     public String getExpiryDate() {
-        return expiryDate;
+        return "2099-12-31";
     }
 
     public long getDaysLeft() {
-        if (expiryDate == null) return 0;
-        try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-            Date expiry = sdf.parse(expiryDate);
-            Date now = new Date();
-            long diff = expiry.getTime() - now.getTime();
-            return diff / (24 * 60 * 60 * 1000);
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-
-    private void loadFromCache() {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        this.expiryDate = prefs.getString(KEY_EXPIRY, null);
-        this.isLicensed = prefs.getBoolean(KEY_IS_VALID, false);
-    }
-
-    private boolean shouldCheckServer() {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        long lastCheck = prefs.getLong(KEY_LAST_CHECK, 0);
-        return (System.currentTimeMillis() - lastCheck) > CACHE_DURATION;
+        return 36500;
     }
 
     public void setVerificationCallback(VerificationCallback callback) {
-        this.pendingCallback = callback;
-        // If already checked, notify immediately
-        if (isLicensed) {
-            callback.onResult(true, expiryDate, null);
-        }
-    }
-
-    private void verifyWithServer() {
-        executor.execute(() -> {
-            try {
-                String devId = LicenseProtector.getDeviceId(context);
-                URL url = new URL("https://darkdevel.dynamicflash.xyz/connect?key=" + customerKey + "&hwid=" + devId);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(10000);
-                
-                int responseCode = conn.getResponseCode();
-                if (responseCode != 200) {
-                     mainHandler.post(() -> {
-                         if (pendingCallback != null) pendingCallback.onResult(false, null, "Server Error: " + responseCode);
-                     });
-                     return;
-                }
-
-                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    response.append(line);
-                }
-                reader.close();
-
-                String result = response.toString().toLowerCase();
-                boolean valid = false;
-                String expiry = "2099-12-31";
-
-                if (result.startsWith("{")) {
-                    JSONObject json = new JSONObject(result);
-                    valid = json.optBoolean("valid", result.contains("success"));
-                    expiry = json.optString("expiry", expiry);
-                } else {
-                    valid = result.contains("true") || result.contains("success") || result.contains("valid") || result.contains("1");
-                }
-
-                boolean finalValid = valid;
-                String finalExpiry = expiry;
-                mainHandler.post(() -> {
-                    updateStatus(finalValid, finalExpiry);
-                    if (pendingCallback != null) {
-                        pendingCallback.onResult(finalValid, finalExpiry, finalValid ? null : "Key Rejected by Server");
-                    }
-                });
-                
-            } catch (Exception e) {
-                Logger.e(TAG, "Server verification failed: " + e.getMessage());
-                mainHandler.post(() -> {
-                    checkLocalExpiry();
-                    if (pendingCallback != null) {
-                        if (isLicensed) pendingCallback.onResult(true, expiryDate, null);
-                        else pendingCallback.onResult(false, null, "Connection Error: " + e.getMessage());
-                    }
-                });
-            }
-        });
-    }
-
-    private void updateStatus(boolean valid, String expiry) {
-        this.isLicensed = valid;
-        this.expiryDate = expiry;
-        
-        checkLocalExpiry();
-
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit()
-            .putBoolean(KEY_IS_VALID, isLicensed)
-            .putString(KEY_EXPIRY, expiryDate)
-            .putLong(KEY_LAST_CHECK, System.currentTimeMillis())
-            .apply();
-            
-        if (!isLicensed) {
-            showExpiryDialog();
-        }
-    }
-
-    private void checkLocalExpiry() {
-        if (expiryDate == null) {
-            isLicensed = false;
-            return;
-        }
-        
-        try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-            Date expiry = sdf.parse(expiryDate);
-            Date now = new Date();
-            
-            if (now.after(expiry)) {
-                isLicensed = false;
-            }
-        } catch (Exception e) {
-            isLicensed = false;
+        if (callback != null) {
+            callback.onResult(true, "2099-12-31", null);
         }
     }
 
     public void showExpiryDialog() {
-        if (context instanceof Activity) {
-            ExpiryDialog.show((Activity) context, expiryDate);
-        } else {
-            Logger.e(TAG, "Cannot show dialog: Context is not an Activity");
-        }
+        // Feature removed as per "without panel" requirement
+        Logger.d(TAG, "Expiry dialog suppressed (Offline Mode)");
     }
 }

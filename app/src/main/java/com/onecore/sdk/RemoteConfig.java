@@ -27,28 +27,9 @@ public class RemoteConfig {
     }
 
     public void fetchRemoteConfig() {
-        if (!SDKLicense.getInstance().isLicensed()) return;
-        new Thread(() -> {
-            try {
-                URL url = new URL("https://api.onecore.sdk/config?sdk_version=1.0.4");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(5000);
-                
-                if (conn.getResponseCode() == 200) {
-                    InputStream in = conn.getInputStream();
-                    Scanner scanner = new Scanner(in).useDelimiter("\\A");
-                    String response = scanner.hasNext() ? scanner.next() : "";
-                    
-                    // Simplified parsing for demo. Real app would use JSONObject.
-                    parseConfig(response);
-                    lastFetch = System.currentTimeMillis();
-                    Logger.d(TAG, "Config synced.");
-                }
-                conn.disconnect();
-            } catch (Exception e) {
-                Logger.e(TAG, "Config fetch failed", e);
-            }
-        }).start();
+        // No-op: Autonomous mode
+        Logger.d(TAG, "Config sync skipped (Offline Mode). Using local defaults.");
+        lastFetch = System.currentTimeMillis();
     }
 
     private void parseConfig(String raw) {

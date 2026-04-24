@@ -1,26 +1,6 @@
-# OneCore SDK Engine
+# OneCore SDK Engine (Autonomous Edition)
 
-A comprehensive, pure Java Android Loader SDK designed for stealth, virtualization, and advanced instrumentation. Supports Android 8.0 (API 26) through Android 14 (API 34).
-
-## 🛠️ Admin & Deployment
-
-This project includes a complete license management system and admin dashboard.
-
-### 1. Admin Panel
-Located in `/admin/`. You can host this using **GitHub Pages**.
-- **Login**: `admin` / `admin123` (editable in `admin/index.html`)
-- **Features**: Customer CRUD, Sales tracking, Backup/Restore, Revenue analytics.
-
-### 2. Server API
-Located in `/server/`. Upload the contents of this folder to any **PHP hosting** provider.
-- **Verification Endpoint**: `https://darkdevel.dynamicflash.xyz/connect?key=YOUR_KEY`
-- **Panel Support**: Works with standard external panels (returns SUCCESS/TRUE/VALID)
-- **Database**: Uses `admin/data/customers.json` as a flat-file database.
-
-### 3. SDK Configuration
-In `app/src/main/java/com/onecore/sdk/SDKLicense.java`, update the `URL` to point to your hosted `verify.php` endpoint.
-
----
+A comprehensive, pure Java Android Loader SDK designed for stealth, virtualization, and advanced instrumentation. This edition is fully autonomous and operates without any external panel or server control.
 
 ## 🚀 Features (Core SDK)
 
@@ -30,8 +10,7 @@ In `app/src/main/java/com/onecore/sdk/SDKLicense.java`, update the `URL` to poin
 - **GPS Mocking**: Native system-level location spoofing via `setTestProviderLocation`.
 - **Memory Operations**: High-speed memory read/write access via `/proc/[pid]/mem`.
 - **Anti-Detection**: Built-in guards against debuggers, emulators, root access, and system tampering.
-- **Floating Overlay**: In-game control menu for real-time feature toggling.
-- **Production Utilities**: Global crash handling, remote configuration, and version auto-updating.
+- **Production Utilities**: Global crash handling, local configuration, and offline operation.
 
 ## 📦 Integration
 

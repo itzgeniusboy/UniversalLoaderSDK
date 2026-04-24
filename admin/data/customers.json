@@ -1,5 +1,0 @@
-[
-    { "id": 1, "name": "John Developer", "key": "CUST_JOHN_001", "expiry": "2025-06-01", "status": "active", "plan": "Pro", "amount": 49 },
-    { "id": 2, "name": "Mike Modder", "key": "CUST_MIKE_002", "expiry": "2025-05-15", "status": "active", "plan": "Enterprise", "amount": 149 },
-    { "id": 3, "name": "Trial User", "key": "CUST_TRIAL_001", "expiry": "2025-03-20", "status": "expired", "plan": "Trial", "amount": 0 }
-]
