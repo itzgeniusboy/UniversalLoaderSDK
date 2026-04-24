@@ -99,17 +99,22 @@ public class HCallback implements Handler.Callback {
         if (realAi != null) {
             // Hijack the existing info object to avoid breaking ActivityThread references
             info.name = realAi.name;
-            info.packageName = CloneManager.getInstance().getHostContext().getPackageName(); // Use host for some checks
+            info.packageName = CloneManager.getInstance().getHostContext().getPackageName(); 
             info.theme = realAi.theme;
             info.launchMode = realAi.launchMode;
-            info.applicationInfo = realAi.applicationInfo;
-            if (info.applicationInfo != null) {
-                info.applicationInfo.packageName = info.packageName;
+            
+            // 🔥 CRITICAL: Fix ApplicationInfo
+            if (realAi.applicationInfo != null) {
+                // We keep some host fields but use guest paths
+                android.content.pm.ApplicationInfo guestAi = new android.content.pm.ApplicationInfo(realAi.applicationInfo);
+                guestAi.packageName = info.packageName; 
+                info.applicationInfo = guestAi;
             }
+            
             info.flags = realAi.flags;
             info.screenOrientation = realAi.screenOrientation;
             
-            Logger.i("VA", "HCallback fixed ActivityInfo for → " + targetActivity);
+            Logger.i("VA", "HCallback fixed ActivityInfo & AppInfo for → " + targetActivity);
         }
     }
 }

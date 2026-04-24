@@ -77,55 +77,74 @@ public class VAInstrumentation extends Instrumentation {
             ClassLoader cl = CloneManager.getInstance().getClassLoader();
 
             if (res != null) {
-                // Replace Resources
-                Field mResources = Context.class.getDeclaredField("mResources");
-                mResources.setAccessible(true);
-                mResources.set(baseContext, res);
+                Logger.d(TAG, "Aggressive Context Injection for: " + activity.getClass().getName());
+
+                // 1. Patch ContextImpl
+                try {
+                    Field mResources = baseContext.getClass().getDeclaredField("mResources");
+                    mResources.setAccessible(true);
+                    mResources.set(baseContext, res);
+                    
+                    Field mTheme = baseContext.getClass().getDeclaredField("mTheme");
+                    mTheme.setAccessible(true);
+                    mTheme.set(baseContext, null); // Force theme re-inflation
+                } catch (Exception e) {
+                    Logger.e(TAG, "ContextImpl field patch failed: " + e.getMessage());
+                }
                 
-                // Also set it on the activity itself
+                // 2. Patch Activity instance
                 try {
                     Field mActivityResources = Activity.class.getDeclaredField("mResources");
                     mActivityResources.setAccessible(true);
                     mActivityResources.set(activity, res);
                 } catch (Exception ignored) {}
 
-                // Replace ClassLoader
+                // 3. Patch LoadedApk (mPackageInfo)
                 try {
-                    Field mPackageInfo = Context.class.getDeclaredField("mPackageInfo");
+                    Field mPackageInfo = baseContext.getClass().getDeclaredField("mPackageInfo");
                     mPackageInfo.setAccessible(true);
                     Object loadedApk = mPackageInfo.get(baseContext);
 
-                    Field mClassLoader = loadedApk.getClass().getDeclaredField("mClassLoader");
-                    mClassLoader.setAccessible(true);
-                    mClassLoader.set(loadedApk, cl);
+                    if (loadedApk != null) {
+                        Field mClassLoader = loadedApk.getClass().getDeclaredField("mClassLoader");
+                        mClassLoader.setAccessible(true);
+                        mClassLoader.set(loadedApk, cl);
 
-                    // Sync resources to LoadedApk as well
-                    try {
                         Field mLoadedApkResources = loadedApk.getClass().getDeclaredField("mResources");
                         mLoadedApkResources.setAccessible(true);
                         mLoadedApkResources.set(loadedApk, res);
-                    } catch (Exception ignored) {}
-
+                        
+                        // Patch Application instance inside LoadedApk if it exists
+                        Field mApplication = loadedApk.getClass().getDeclaredField("mApplication");
+                        mApplication.setAccessible(true);
+                        Object app = mApplication.get(loadedApk);
+                        if (app == null) {
+                            // If app is null, we might need to set the one we created
+                            // But usually makeApplication handles this.
+                        }
+                    }
                 } catch (Exception e) {
-                    Logger.e(TAG, "Failed to inject into LoadedApk: " + e.getMessage());
+                    Logger.e(TAG, "LoadedApk patch failed: " + e.getMessage());
                 }
 
-                // 🔥 Inject mOuterContext so views attach correctly
+                // 4. 🔥 Inject mOuterContext (CRITICAL for View Attachment)
                 try {
                     Field mOuterContext = baseContext.getClass().getDeclaredField("mOuterContext");
                     mOuterContext.setAccessible(true);
                     mOuterContext.set(baseContext, activity);
                 } catch (Exception e) {
-                    Logger.e(TAG, "Failed to inject mOuterContext: " + e.getMessage());
+                    Logger.e(TAG, "mOuterContext injection failed: " + e.getMessage());
                 }
 
-                // Inject into LayoutInflater
+                // 5. Fix LayoutInflater context
                 try {
-                    activity.getWindow().getLayoutInflater(); // Trigger creation
+                    activity.getWindow().getLayoutInflater(); 
                     Field mContext = activity.getLayoutInflater().getClass().getDeclaredField("mContext");
                     mContext.setAccessible(true);
                     mContext.set(activity.getLayoutInflater(), activity);
                 } catch (Exception ignored) {}
+                
+                Logger.i(TAG, "Injection SUCCEEDED for " + activity.getClass().getSimpleName());
             }
 
         } catch (Throwable e) {

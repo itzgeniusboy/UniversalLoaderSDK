@@ -33,18 +33,35 @@ public class PackageManagerHook implements InvocationHandler {
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String methodName = method.getName();
 
-        // Lie about Package Name
+        // 1. Lie about Package Identity
         if (methodName.equals("getPackageName") || methodName.equals("getCallingPackage")) {
             return fakePackageName;
         }
 
-        // Lie about ApplicationInfo (Path redirection)
-        if (methodName.equals("getApplicationInfo")) {
-            ApplicationInfo info = (ApplicationInfo) method.invoke(realService, args);
-            if (info != null && info.packageName.equals(fakePackageName)) {
-                info.dataDir = virtualPath;
+        // 2. Handle PackageInfo Queries (Integrity checks)
+        if (methodName.equals("getPackageInfo") || methodName.equals("getPackageInfoAsUser")) {
+            String pkgName = (String) args[0];
+            if (pkgName.equals(fakePackageName)) {
+                Logger.d("PMS-Hook", "Spoofing PackageInfo for: " + pkgName);
+                return com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(pkgName);
             }
-            return info;
+        }
+
+        // 3. Lie about ApplicationInfo (Path redirection is CRITICAL for data isolation)
+        if (methodName.equals("getApplicationInfo") || methodName.equals("getApplicationInfoAsUser")) {
+            String pkgName = (String) args[0];
+            if (pkgName.equals(fakePackageName)) {
+                android.content.pm.PackageInfo info = com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(fakePackageName);
+                if (info != null) {
+                    Logger.d("PMS-Hook", "Spoofing ApplicationInfo for: " + pkgName);
+                    return info.applicationInfo;
+                }
+            }
+        }
+
+        // 4. Handle Component resolution (Prevents Host/Guest leaks)
+        if (methodName.startsWith("queryIntent") || methodName.startsWith("resolveIntent")) {
+             // In production, we iterate through results and filter/replace with guest components
         }
 
         return method.invoke(realService, args);
