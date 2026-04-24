@@ -35,7 +35,7 @@ public class VAInstrumentation extends Instrumentation {
                 
                 // Restore original intent for the guest activity if it exists
                 if (originalIntent != null) {
-                    intent.fillIn(originalIntent, Intent.FILL_IN_COMPONENT | Intent.FILL_IN_ACTION | Intent.FILL_IN_DATA | Intent.FILL_IN_CATEGORIES | Intent.FILL_IN_FLAGS);
+                    intent.fillIn(originalIntent, Intent.FILL_IN_COMPONENT | Intent.FILL_IN_ACTION | Intent.FILL_IN_DATA | Intent.FILL_IN_CATEGORIES);
                     // Ensure the target remains explicitly set to avoid loops or system misses
                     intent.setClassName(targetPackage, targetActivity);
                 } else {
