@@ -75,6 +75,8 @@ public class CloneManager {
             // Task 5: Native Library Fix - Extract all .so files
             String libDirStr = virtualRoot + "/lib";
             info.applicationInfo.nativeLibraryDir = libDirStr;
+            info.applicationInfo.primaryCpuAbi = appInfo.primaryCpuAbi;
+            info.applicationInfo.targetSdkVersion = appInfo.targetSdkVersion;
             
             cache.put(packageName, info);
             
@@ -151,23 +153,31 @@ public class CloneManager {
         if (!dst.exists()) dst.mkdirs();
 
         if (src.exists() && src.isDirectory()) {
-            File[] files = src.listFiles();
-            if (files != null) {
-                for (File f : files) {
-                    if (f.getName().endsWith(".so")) {
-                        try {
-                            File targetFile = new File(dst, f.getName());
-                            if (targetFile.exists()) targetFile.delete();
-                            java.nio.file.Files.copy(f.toPath(), targetFile.toPath());
-                            Logger.d(TAG, "Extracted lib: " + f.getName());
-                        } catch (Exception e) {
-                            Logger.e(TAG, "Extraction failed for " + f.getName() + ": " + e.getMessage());
-                        }
-                    }
-                }
-            }
+            recursiveCopyLibs(src, dst);
         } else {
             Logger.e(TAG, "Source lib dir missing: " + sourceDir);
+        }
+    }
+
+    private void recursiveCopyLibs(File src, File dst) {
+        File[] files = src.listFiles();
+        if (files == null) return;
+        
+        for (File f : files) {
+            if (f.isDirectory()) {
+                File nextDst = new File(dst, f.getName());
+                nextDst.mkdirs();
+                recursiveCopyLibs(f, nextDst);
+            } else if (f.getName().endsWith(".so")) {
+                try {
+                    File targetFile = new File(dst, f.getName());
+                    if (targetFile.exists()) targetFile.delete();
+                    java.nio.file.Files.copy(f.toPath(), targetFile.toPath());
+                    Logger.v(TAG, "Extracted lib: " + f.getName());
+                } catch (Exception e) {
+                    Logger.e(TAG, "Extraction failed for " + f.getName() + ": " + e.getMessage());
+                }
+            }
         }
     }
 
