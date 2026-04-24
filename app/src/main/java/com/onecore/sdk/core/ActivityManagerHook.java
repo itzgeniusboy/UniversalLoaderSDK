@@ -54,7 +54,7 @@ public class ActivityManagerHook implements InvocationHandler {
                     String className = intent.getComponent().getClassName();
 
                     // If it's a guest activity/service launch, wrap it
-                    if (com.onecore.sdk.VirtualContainer.getInstance().getClonedPackage(pkgName) != null) {
+                    if (CloneManager.getInstance().getClonedPackage(pkgName) != null) {
                         Logger.i("ActivityManagerHook", "AMS Interception: " + methodName + " for " + className);
                         
                         if (methodName.equals("startActivity")) {
@@ -67,7 +67,7 @@ public class ActivityManagerHook implements InvocationHandler {
                             
                             stubIntent.putExtra("target_package", pkgName);
                             stubIntent.putExtra("target_activity", className);
-                            stubIntent.putExtra("original_intent", intent);
+                            stubIntent.putExtra("_VA_TARGET_", new android.content.Intent(intent));
                             
                             args[intentIdx] = stubIntent;
                             Logger.d("ActivityManagerHook", "Redirected to StubActivity");

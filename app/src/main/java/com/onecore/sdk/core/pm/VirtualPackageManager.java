@@ -7,6 +7,24 @@ import com.onecore.sdk.utils.Logger;
 
 public class VirtualPackageManager {
     private static final String TAG = "VirtualPackageManager";
+    private static VirtualPackageManager sInstance;
+
+    private VirtualPackageManager() {}
+
+    public static VirtualPackageManager get() {
+        if (sInstance == null) {
+            synchronized (VirtualPackageManager.class) {
+                if (sInstance == null) {
+                    sInstance = new VirtualPackageManager();
+                }
+            }
+        }
+        return sInstance;
+    }
+
+    public PackageInfo getClonedPackage(String packageName) {
+        return CloneManager.getInstance().getClonedPackage(packageName);
+    }
 
     public static ActivityInfo resolveActivity(String className) {
         try {

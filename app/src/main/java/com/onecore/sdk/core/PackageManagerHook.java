@@ -1,6 +1,5 @@
 package com.onecore.sdk.core;
 
-import android.content.pm.ApplicationInfo;
 import com.onecore.sdk.utils.Logger;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -12,21 +11,21 @@ import java.lang.reflect.Proxy;
  */
 public class PackageManagerHook implements InvocationHandler {
     private final Object realService;
-    private final String fakePackageName;
-    private final String virtualPath;
 
-    private PackageManagerHook(Object realService, String fakePackageName, String virtualPath) {
+    private PackageManagerHook(Object realService) {
         this.realService = realService;
-        this.fakePackageName = fakePackageName;
-        this.virtualPath = virtualPath;
     }
 
-    public static Object createProxy(Object realService, String fakePackageName, String virtualPath) {
+    public static Object createProxy(Object realService) {
         return Proxy.newProxyInstance(
                 realService.getClass().getClassLoader(),
                 realService.getClass().getInterfaces(),
-                new PackageManagerHook(realService, fakePackageName, virtualPath)
+                new PackageManagerHook(realService)
         );
+    }
+
+    public static Object createProxy(Object realService, String unused1, String unused2) {
+        return createProxy(realService);
     }
 
     @Override
@@ -35,33 +34,32 @@ public class PackageManagerHook implements InvocationHandler {
 
         // 1. Lie about Package Identity
         if (methodName.equals("getPackageName") || methodName.equals("getCallingPackage")) {
-            return fakePackageName;
+             // In a multi-app environment, we'd check which virtual process is calling
         }
 
         // 2. Handle PackageInfo Queries (Integrity checks)
         if (methodName.equals("getPackageInfo") || methodName.equals("getPackageInfoAsUser")) {
             String pkgName = (String) args[0];
-            if (pkgName.equals(fakePackageName)) {
+            android.content.pm.PackageInfo info = com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(pkgName);
+            if (info != null) {
                 Logger.d("PMS-Hook", "Spoofing PackageInfo for: " + pkgName);
-                return com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(pkgName);
+                return info;
             }
         }
 
         // 3. Lie about ApplicationInfo (Path redirection is CRITICAL for data isolation)
         if (methodName.equals("getApplicationInfo") || methodName.equals("getApplicationInfoAsUser")) {
             String pkgName = (String) args[0];
-            if (pkgName.equals(fakePackageName)) {
-                android.content.pm.PackageInfo info = com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(fakePackageName);
-                if (info != null) {
-                    Logger.d("PMS-Hook", "Spoofing ApplicationInfo for: " + pkgName);
-                    return info.applicationInfo;
-                }
+            android.content.pm.PackageInfo info = com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(pkgName);
+            if (info != null) {
+                Logger.d("PMS-Hook", "Spoofing ApplicationInfo for: " + pkgName);
+                return info.applicationInfo;
             }
         }
 
         // 4. Handle Component resolution (Prevents Host/Guest leaks)
         if (methodName.startsWith("queryIntent") || methodName.startsWith("resolveIntent")) {
-             // In production, we iterate through results and filter/replace with guest components
+             // Redirection logic for virtual components should happen here
         }
 
         return method.invoke(realService, args);

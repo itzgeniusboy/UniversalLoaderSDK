@@ -177,6 +177,9 @@ public class VirtualContainer {
             // Ensure IO redirection
             IORedirector.ensureVirtualEnv(context, packageName);
             
+            // Install Core Hooks
+            installSystemHooks(context, packageName);
+            
             // Start Sandbox Activity
             launchInVirtualSandbox(context, packageName);
             
@@ -335,14 +338,8 @@ public class VirtualContainer {
 
     private void installSystemHooks(Context context, String packageName) {
         try {
-            // Hook Package Manager
-            // In a real Android environment, we'd use reflection to get IPackageManager 
-            // from ActivityThread.getPackageManager() and replace it.
-            Logger.d(TAG, "Installing Virtual Package Manager...");
-            
-            // Hook Activity Manager
-            // Similarly, replace IActivityManager singleton in ActivityManagerNative or ActivityManager.
-            Logger.d(TAG, "Installing Virtual Activity Manager...");
+            Logger.i(TAG, "Initiating System Hook Sequence...");
+            com.onecore.sdk.core.BinderHookManager.installHooks(context);
             
             // Isolation & Root Bypass are handled via these hooks
             Logger.d(TAG, "Root Detection Bypass active: Reporting Non-Root state.");

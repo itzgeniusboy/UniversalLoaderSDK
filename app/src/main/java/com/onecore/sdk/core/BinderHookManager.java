@@ -15,38 +15,106 @@ import java.util.Map;
 public class BinderHookManager {
     private static final String TAG = "OneCore-Binder";
 
-    /**
-     * Intercepts a system service by replacing its entry in the ServiceManager's cache.
-     * @param serviceName The name of the service (e.g., "activity", "package").
-     * @param proxyHandler The logic to handle intercepted calls.
-     */
-    public static void hookService(String serviceName, Object proxyHandler) {
+    public static void installHooks(android.content.Context context) {
         try {
-            // 1. Get the ServiceManager class
-            Class<?> smClass = Class.forName("android.os.ServiceManager");
-            Method getService = smClass.getMethod("getService", String.class);
+            Logger.i(TAG, "Installing Deep System Hooks...");
             
-            // 2. Extract original binder
-            IBinder originalBinder = (IBinder) getService.invoke(null, serviceName);
-            if (originalBinder == null) {
-                Log.w(TAG, "Service not found: " + serviceName);
-                return;
+            // 1. Hook ActivityManager
+            hookActivityManager();
+            
+            // 2. Hook ActivityTaskManager (Android 10+)
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                hookActivityTaskManager();
             }
-
-            Log.i(TAG, "Intercepting Service: " + serviceName);
-
-            // 3. Inject into ServiceManager sCache (Reflection)
-            Field cacheField = smClass.getDeclaredField("sCache");
-            cacheField.setAccessible(true);
-            Map<String, IBinder> cache = (Map<String, IBinder>) cacheField.get(null);
             
-            // In a real implementation, we create a Dynamic Proxy for the IBinder here
-            // cache.put(serviceName, createProxyBinder(originalBinder, proxyHandler));
+            // 3. Hook PackageManager
+            hookPackageManager(context);
             
-            Log.d(TAG, "Service " + serviceName + " successfully proxied in cache.");
-
+            Logger.i(TAG, "All system hooks INSTALLED.");
         } catch (Exception e) {
-            Log.e(TAG, "Binder Hook Critical Failure for " + serviceName, e);
+            Logger.e(TAG, "Failed to install system hooks: " + e.getMessage());
+        }
+    }
+
+    private static void hookActivityManager() throws Exception {
+        Object gDefault;
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            Class<?> amClass = Class.forName("android.app.ActivityManager");
+            java.lang.reflect.Field field = amClass.getDeclaredField("IActivityManagerSingleton");
+            field.setAccessible(true);
+            gDefault = field.get(null);
+        } else {
+            Class<?> amnClass = Class.forName("android.app.ActivityManagerNative");
+            java.lang.reflect.Field field = amnClass.getDeclaredField("gDefault");
+            field.setAccessible(true);
+            gDefault = field.get(null);
+        }
+
+        Class<?> singletonClass = Class.forName("android.util.Singleton");
+        java.lang.reflect.Method getMethod = singletonClass.getDeclaredMethod("get");
+        getMethod.setAccessible(true);
+        Object am = getMethod.invoke(gDefault);
+
+        Object proxy = ActivityManagerHook.createProxy(am);
+        java.lang.reflect.Field mInstanceField = singletonClass.getDeclaredField("mInstance");
+        mInstanceField.setAccessible(true);
+        mInstanceField.set(gDefault, proxy);
+        
+        Logger.d(TAG, "IActivityManager proxied.");
+    }
+
+    private static void hookActivityTaskManager() throws Exception {
+        Class<?> atmClass = Class.forName("android.app.ActivityTaskManager");
+        java.lang.reflect.Field field = atmClass.getDeclaredField("IActivityTaskManagerSingleton");
+        field.setAccessible(true);
+        Object gDefault = field.get(null);
+
+        Class<?> singletonClass = Class.forName("android.util.Singleton");
+        java.lang.reflect.Method getMethod = singletonClass.getDeclaredMethod("get");
+        getMethod.setAccessible(true);
+        Object atm = getMethod.invoke(gDefault);
+
+        Object proxy = ActivityTaskManagerHook.createProxy(atm);
+        java.lang.reflect.Field mInstanceField = singletonClass.getDeclaredField("mInstance");
+        mInstanceField.setAccessible(true);
+        mInstanceField.set(gDefault, proxy);
+        
+        Logger.d(TAG, "IActivityTaskManager proxied.");
+    }
+
+    private static void hookPackageManager(android.content.Context context) throws Exception {
+        Class<?> atClass = Class.forName("android.app.ActivityThread");
+        java.lang.reflect.Method getPmMethod = atClass.getDeclaredMethod("getPackageManager");
+        Object pm = getPmMethod.invoke(null);
+
+        // We need a proper way to get virtual path and package name here or inside the hook
+        // For now, we'll assume the hook knows how to find its own state
+        Object proxy = PackageManagerHook.createProxy(pm, "com.onecore.cloned.target", "/data/data/com.onecore.cloned.target");
+        
+        java.lang.reflect.Field sPackageManagerField = atClass.getDeclaredField("sPackageManager");
+        sPackageManagerField.setAccessible(true);
+        sPackageManagerField.set(null, proxy);
+        
+        // Also update IPackageManager in ServiceManager cache
+        hookService("package", proxy);
+        
+        Logger.d(TAG, "IPackageManager proxied.");
+    }
+
+    private static void hookService(String serviceName, Object proxyHandler) {
+        try {
+            Class<?> smClass = Class.forName("android.os.ServiceManager");
+            java.lang.reflect.Field cacheField = smClass.getDeclaredField("sCache");
+            cacheField.setAccessible(true);
+            java.util.Map<String, android.os.IBinder> cache = (java.util.Map<String, android.os.IBinder>) cacheField.get(null);
+            
+            android.os.IBinder originalBinder = (android.os.IBinder) smClass.getMethod("getService", String.class).invoke(null, serviceName);
+            if (originalBinder != null) {
+                // This is a simplified version. A real one would wrap the IBinder.
+                // For now, we'll just put the proxy if it is an IBinder, but it's usually IInterface.
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, "Service cache hook failed for " + serviceName);
         }
     }
 
