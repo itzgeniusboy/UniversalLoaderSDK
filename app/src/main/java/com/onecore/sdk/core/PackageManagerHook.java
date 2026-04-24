@@ -1,67 +1,58 @@
 package com.onecore.sdk.core;
 
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import com.onecore.sdk.core.pm.VirtualPackageManager;
 import com.onecore.sdk.utils.Logger;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
 /**
- * Proxies the System Package Manager to "lie" to the game.
- * When the game asks "What is my package name?", we return the Fake Name.
+ * Advanced PackageManager Proxy.
+ * Spoofs system responses to pretend virtual apps are installed natively.
  */
 public class PackageManagerHook implements InvocationHandler {
-    private final Object realService;
+    private static final String TAG = "OneCore-PMHook";
+    private final Object mBase;
 
-    private PackageManagerHook(Object realService) {
-        this.realService = realService;
+    private PackageManagerHook(Object base) {
+        this.mBase = base;
     }
 
     public static Object createProxy(Object realService) {
-        return Proxy.newProxyInstance(
-                realService.getClass().getClassLoader(),
-                realService.getClass().getInterfaces(),
-                new PackageManagerHook(realService)
-        );
-    }
-
-    public static Object createProxy(Object realService, String unused1, String unused2) {
-        return createProxy(realService);
+        Class<?> clazz = realService.getClass();
+        return Proxy.newProxyInstance(clazz.getClassLoader(), clazz.getInterfaces(), new PackageManagerHook(realService));
     }
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        String methodName = method.getName();
+        String name = method.getName();
 
-        // 1. Lie about Package Identity
-        if (methodName.equals("getPackageName") || methodName.equals("getCallingPackage")) {
-             // In a multi-app environment, we'd check which virtual process is calling
-        }
-
-        // 2. Handle PackageInfo Queries (Integrity checks)
-        if (methodName.equals("getPackageInfo") || methodName.equals("getPackageInfoAsUser")) {
+        if ("getPackageInfo".equals(name)) {
             String pkgName = (String) args[0];
-            android.content.pm.PackageInfo info = com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(pkgName);
-            if (info != null) {
-                Logger.d("PMS-Hook", "Spoofing PackageInfo for: " + pkgName);
-                return info;
-            }
+            PackageInfo info = VirtualPackageManager.get().getClonedPackage(pkgName);
+            if (info != null) return info;
         }
 
-        // 3. Lie about ApplicationInfo (Path redirection is CRITICAL for data isolation)
-        if (methodName.equals("getApplicationInfo") || methodName.equals("getApplicationInfoAsUser")) {
+        if ("getApplicationInfo".equals(name)) {
             String pkgName = (String) args[0];
-            android.content.pm.PackageInfo info = com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(pkgName);
-            if (info != null) {
-                Logger.d("PMS-Hook", "Spoofing ApplicationInfo for: " + pkgName);
-                return info.applicationInfo;
-            }
+            PackageInfo info = VirtualPackageManager.get().getClonedPackage(pkgName);
+            if (info != null) return info.applicationInfo;
         }
 
-        // 4. Handle Component resolution (Prevents Host/Guest leaks)
-        if (methodName.startsWith("queryIntent") || methodName.startsWith("resolveIntent")) {
-             // Redirection logic for virtual components should happen here
+        if ("getActivityInfo".equals(name)) {
+            // Logic to return virtual activity info
         }
 
-        return method.invoke(realService, args);
+        if ("getPackageInstaller".equals(name)) {
+            // Often used for verification, might need spoofing
+        }
+
+        try {
+            return method.invoke(mBase, args);
+        } catch (Throwable e) {
+            throw e.getCause();
+        }
     }
 }
