@@ -79,20 +79,35 @@ public class ProviderManager {
 
     private static void registerProviderLocally(Object activityThread, ContentProvider provider, ProviderInfo info) {
         try {
-            // ActivityThread.installProvider(Context, IContentProvider, ProviderInfo, boolean, boolean, boolean)
-            // The signature varies across Android versions.
+            // In Android, ActivityThread maintains mLocalProviders and mProviderMap
+            // We want to insert our virtual provider here so local ContentResolver.acquireProvider() finds it.
             
-            // Simplified: Add to mLocalProviders map in ActivityThread if accessible
             Field mLocalProvidersField = activityThread.getClass().getDeclaredField("mLocalProviders");
             mLocalProvidersField.setAccessible(true);
             java.util.Map mLocalProviders = (java.util.Map) mLocalProvidersField.get(activityThread);
             
-            // We need to wrap the ContentProvider in a 'ProviderClientRecord' or similar internal object if possible,
-            // but usually just adding it to the map with the IBinder is enough for local resolution.
+            // On newer Android, the key is usually an IBinder (represented by the provider's token)
+            // But for simplicity, many versions use the ProviderInfo.authority or similar.
             
-            Logger.d(TAG, "Provider " + info.name + " registered in local cache.");
+            // We need a proper IContentProvider proxy for the local map.
+            Object transport = getProviderTransport(provider);
+            if (transport != null) {
+                mLocalProviders.put(provider.getClass().getName(), transport);
+                Logger.i(TAG, "Provider " + info.name + " (" + info.authority + ") installed in ActivityThread.");
+            }
         } catch (Exception e) {
-            Logger.w(TAG, "Failed to register provider in ActivityThread maps: " + e.getMessage());
+            Logger.w(TAG, "Failed to register provider locally: " + e.getMessage());
+        }
+    }
+
+    private static Object getProviderTransport(ContentProvider provider) {
+        try {
+            // ContentProvider.getIContentProvider()
+            Method getIContentProvider = ContentProvider.class.getDeclaredMethod("getIContentProvider");
+            getIContentProvider.setAccessible(true);
+            return getIContentProvider.invoke(provider);
+        } catch (Exception e) {
+            return null;
         }
     }
 }

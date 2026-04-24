@@ -1,9 +1,14 @@
 package com.onecore.sdk.core;
 
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import com.onecore.sdk.utils.Logger;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -14,6 +19,7 @@ public class ServiceManager {
     private static final String TAG = "OneCore-ServiceMgr";
     private static final Map<String, Service> mServices = new HashMap<>();
     private static final Map<String, android.os.IBinder> mBinders = new HashMap<>();
+    private static final Map<Object, List<String>> mConnections = new HashMap<>();
 
     public static void startService(android.content.Context context, Intent intent) {
         if (intent == null || intent.getComponent() == null) return;
@@ -59,6 +65,17 @@ public class ServiceManager {
         
         Service service = mServices.get(className);
         if (service != null) {
+            if (connection != null) {
+                synchronized (mConnections) {
+                    List<String> list = mConnections.get(connection);
+                    if (list == null) {
+                        list = new ArrayList<>();
+                        mConnections.put(connection, list);
+                    }
+                    if (!list.contains(className)) list.add(className);
+                }
+            }
+
             android.os.IBinder binder = mBinders.get(className);
             if (binder == null) {
                 try {
@@ -101,7 +118,18 @@ public class ServiceManager {
 
     public static void unbindService(Object connection) {
         if (connection == null) return;
-        Logger.d(TAG, "Unbind virtual service requested for connection: " + connection.getClass().getSimpleName());
+        Logger.d(TAG, "Unbind virtual service requested. Connection: " + connection.getClass().getSimpleName());
+        
+        synchronized (mConnections) {
+            List<String> userServices = mConnections.remove(connection);
+            if (userServices != null) {
+                for (String className : userServices) {
+                    // In a full implementation, we would check if this was the last connection
+                    // and then call onUnbind(). For now, we just log cleanup.
+                    Logger.v(TAG, "Connection removed for service: " + className);
+                }
+            }
+        }
     }
 
     public static void startForeground(Service service, int id, android.app.Notification notification) {

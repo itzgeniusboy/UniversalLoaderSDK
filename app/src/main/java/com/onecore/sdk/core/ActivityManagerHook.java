@@ -120,30 +120,18 @@ public class ActivityManagerHook implements InvocationHandler {
             Object result = method.invoke(realService, args);
             if (result instanceof java.util.List) {
                 java.util.List list = (java.util.List) result;
-                java.util.List<android.app.ActivityManager.RunningAppProcessInfo> newList = new java.util.ArrayList<>();
-                
                 String pkgName = BinderHookManager.sCurrentPackage;
-                android.content.pm.PackageInfo pi = CloneManager.getInstance().getClonedPackage(pkgName);
                 
-                boolean currentAdded = false;
                 for (Object item : list) {
                     if (item instanceof android.app.ActivityManager.RunningAppProcessInfo) {
                         android.app.ActivityManager.RunningAppProcessInfo info = (android.app.ActivityManager.RunningAppProcessInfo) item;
                         if (info.pid == android.os.Process.myPid()) {
-                            info.processName = pkgName; // Default to main pkg
+                            info.processName = pkgName;
                             info.pkgList = new String[]{pkgName};
-                            newList.add(info);
-                            currentAdded = true;
                         }
                     }
                 }
-                
-                // If we have a cloned package, we can also spoof other processes as "background" or "cached"
-                if (pi != null && pi.activities != null) {
-                    // This is extra polish: adding "dummy" processes for multi-process apps
-                }
-                
-                return newList;
+                return list;
             }
             return result;
         }
