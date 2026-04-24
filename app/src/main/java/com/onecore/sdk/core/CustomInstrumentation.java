@@ -55,9 +55,8 @@ public class CustomInstrumentation extends Instrumentation {
 
     @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
-        Logger.i(TAG, ">>> callActivityOnCreate: " + activity.getClass().getName());
+        Logger.i(TAG, ">>> Final callActivityOnCreate: " + activity.getClass().getName());
         
-        // 3. SECURE CONTEXT FIX (Resources/ClassLoader/PackageName injection)
         try {
             Intent intent = activity.getIntent();
             Intent targetIntent = intent.getParcelableExtra("EXTRA_TARGET_INTENT");
@@ -66,14 +65,18 @@ public class CustomInstrumentation extends Instrumentation {
                 ClassLoader guestLoader = CloneManager.getInstance().getClassLoader();
                 android.content.res.Resources guestResources = CloneManager.getInstance().getResources();
 
-                // Advanced Fix: Inject resources and classloader into the base context
+                // 1. Deep Context FIX
                 ContextFixer.fix(activity.getBaseContext(), pkgName, guestLoader, guestResources);
                 
-                // Also fix the activity instance's own fields
-                ResourceInjector.inject(activity, guestResources);
+                // 2. Resource & Theme Injection
+                int theme = 0;
+                android.content.pm.ActivityInfo ai = com.onecore.sdk.core.pm.VirtualPackageManager.resolveActivity(pkgName, activity.getClass().getName());
+                if (ai != null) theme = ai.getThemeResource();
+                
+                ResourceInjector.inject(activity, guestResources, theme);
             }
         } catch (Exception e) {
-            Logger.e(TAG, "Dynamic Context Fix Failed", e);
+            Logger.e(TAG, "Final Environment Fix Failed", e);
         }
         
         try {
