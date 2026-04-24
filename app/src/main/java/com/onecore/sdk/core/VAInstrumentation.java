@@ -49,13 +49,13 @@ public class VAInstrumentation extends Instrumentation {
                 // Ensure correct component is set
                 String targetPackage = intent.getComponent() != null ? intent.getComponent().getPackageName() : null;
                 if (targetPackage == null) {
-                    // Fallback to searching CloneManager or using context
                     targetPackage = com.onecore.sdk.OneCoreSDK.getContext().getPackageName();
                 }
                 intent.setClassName(targetPackage, targetActivity);
 
-                // Use super to ensure we are instantiating with the correct ClassLoader
-                return super.newActivity(appCl, targetActivity, intent);
+                // 🔥 Direct instantiation ensures correct loader is used
+                Class<?> activityClass = appCl.loadClass(targetActivity);
+                return (Activity) activityClass.newInstance();
 
             } catch (Throwable e) {
                 Logger.e(TAG, "Redirection failed: " + e.getMessage());
@@ -93,8 +93,10 @@ public class VAInstrumentation extends Instrumentation {
         try {
             Context baseContext = activity.getBaseContext();
             Resources res = CloneManager.getInstance().getResources();
+            ClassLoader cl = CloneManager.getInstance().getClassLoader();
 
             if (res != null) {
+                // Replace Resources
                 Field mResources = Context.class.getDeclaredField("mResources");
                 mResources.setAccessible(true);
                 mResources.set(baseContext, res);
@@ -105,6 +107,19 @@ public class VAInstrumentation extends Instrumentation {
                     mActivityResources.setAccessible(true);
                     mActivityResources.set(activity, res);
                 } catch (Exception ignored) {}
+
+                // Replace ClassLoader
+                try {
+                    Field mPackageInfo = Context.class.getDeclaredField("mPackageInfo");
+                    mPackageInfo.setAccessible(true);
+                    Object loadedApk = mPackageInfo.get(baseContext);
+
+                    Field mClassLoader = loadedApk.getClass().getDeclaredField("mClassLoader");
+                    mClassLoader.setAccessible(true);
+                    mClassLoader.set(loadedApk, cl);
+                } catch (Exception e) {
+                    Logger.e(TAG, "Failed to inject ClassLoader into LoadedApk: " + e.getMessage());
+                }
             }
 
         } catch (Throwable e) {
