@@ -2,8 +2,10 @@ package com.onecore.sdk.core;
 
 import android.app.Activity;
 import android.app.Instrumentation;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.IBinder;
 import java.util.Map;
 import com.onecore.sdk.utils.Logger;
 
@@ -25,7 +27,7 @@ public class VAInstrumentation extends Instrumentation {
         
         String targetActivity = intent.getStringExtra("target_activity");
         if (targetActivity != null) {
-            Logger.i(TAG, "Interacting with ActivityThread for: " + targetActivity);
+            Logger.i(TAG, "Restoring Virtual Activity: " + targetActivity);
             try {
                 // Restore original intent for the guest activity
                 String targetPackage = intent.getStringExtra("target_package");
@@ -35,9 +37,8 @@ public class VAInstrumentation extends Instrumentation {
 
                 ClassLoader guestLoader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();
                 if (guestLoader != null) {
-                    // Load the real activity class
-                    Class<?> activityClass = guestLoader.loadClass(targetActivity);
-                    Activity activity = (Activity) activityClass.newInstance();
+                    // System-driven instantiation using the guest class loader
+                    Activity activity = base.newActivity(guestLoader, targetActivity, intent);
                     
                     // Hook into ActivityThread records to fix rendering/metadata
                     patchActivityThreadRecord(activity, targetPackage, targetActivity);
@@ -73,16 +74,25 @@ public class VAInstrumentation extends Instrumentation {
                     
                     // Update ActivityInfo if possible
                     try {
-                        java.lang.reflect.Field infoField = record.getClass().getDeclaredField("activityInfo");
-                        infoField.setAccessible(true);
-                        android.content.pm.ActivityInfo info = (android.content.pm.ActivityInfo) infoField.get(record);
-                        info.packageName = pkg;
-                        info.name = clazz;
+                        java.lang.reflect.Field intentField = record.getClass().getDeclaredField("intent");
+                        intentField.setAccessible(true);
+                        Intent recordIntent = (Intent) intentField.get(record);
+                        
+                        // If it's the StubActivity intent, it's our candidate
+                        if (recordIntent != null && recordIntent.hasExtra("target_activity")) {
+                            Logger.d(TAG, "Found Matching ActivityClientRecord: " + clazz);
+                            
+                            java.lang.reflect.Field infoField = record.getClass().getDeclaredField("activityInfo");
+                            infoField.setAccessible(true);
+                            android.content.pm.ActivityInfo info = (android.content.pm.ActivityInfo) infoField.get(record);
+                            info.packageName = pkg;
+                            info.name = clazz;
+                            
+                            // Link the activity to the record if not already
+                            activityField.set(record, activity);
+                            break;
+                        }
                     } catch (Exception ignored) {}
-
-                    // The system will call attach() shortly after we return the activity.
-                    // By then, the record in mActivities will point to our guest activity.
-                    break;
                 }
             }
         } catch (Exception e) {
@@ -144,6 +154,30 @@ public class VAInstrumentation extends Instrumentation {
     @Override
     public void callActivityOnPause(Activity activity) {
         base.callActivityOnPause(activity);
+    }
+
+    /**
+     * Intercept Activity launch at the client side.
+     * This is a hidden method in Instrumentation.
+     */
+    public ActivityResult execStartActivity(
+            Context who, IBinder contextThread, IBinder token, Activity target,
+            Intent intent, int requestCode, Bundle options) {
+        
+        Logger.i(TAG, "execStartActivity SYSTEM-LAUNCH: " + (intent.getComponent() != null ? intent.getComponent().getClassName() : intent.toString()));
+        
+        // Use reflection to call the base execStartActivity as it's hidden
+        try {
+            java.lang.reflect.Method execMethod = Instrumentation.class.getDeclaredMethod(
+                    "execStartActivity",
+                    Context.class, IBinder.class, IBinder.class, Activity.class,
+                    Intent.class, int.class, Bundle.class);
+            execMethod.setAccessible(true);
+            return (ActivityResult) execMethod.invoke(base, who, contextThread, token, target, intent, requestCode, options);
+        } catch (Exception e) {
+            Logger.e(TAG, "execStartActivity hook failed: " + e.getMessage());
+            return null;
+        }
     }
 
     @Override

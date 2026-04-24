@@ -17,8 +17,6 @@ import android.os.Build;
  */
 public class StubActivity extends Activity {
     private static final String TAG = "OneCore-Stub";
-    private Activity targetActivity;
-    private boolean isProxy = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
