@@ -77,6 +77,9 @@ public class VirtualContainer {
         Logger.i(TAG, "Preparing Secure Environment for: " + packageName);
         
         try {
+            // Set host context for metadata resolution later
+            CloneManager.getInstance().setHostContext(context);
+
             // 1. Prepare Metadata and Filesystem
             boolean cloneOk = CloneManager.getInstance().prepareClone(context, packageName);
             if (!cloneOk) {

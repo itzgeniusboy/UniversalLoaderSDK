@@ -41,13 +41,34 @@ public class HCallback implements Handler.Callback {
             intentField.setAccessible(true);
 
             Intent stubIntent = (Intent) intentField.get(r);
-            fixIntent(stubIntent);
+            String targetActivity = stubIntent.getStringExtra("target_activity");
+            String targetPackage = stubIntent.getStringExtra("target_package");
 
-            // Fix ActivityInfo
-            Field infoField = r.getClass().getDeclaredField("activityInfo");
-            infoField.setAccessible(true);
-            android.content.pm.ActivityInfo info = (android.content.pm.ActivityInfo) infoField.get(r);
-            fixActivityInfo(info, stubIntent);
+            if (targetActivity != null) {
+                // ✅ Fix Intent
+                stubIntent.setClassName(
+                        CloneManager.getInstance().getHostContext().getPackageName(),
+                        targetActivity
+                );
+
+                // 🔥 Inject ActivityInfo
+                Field activityInfoField = r.getClass().getDeclaredField("activityInfo");
+                activityInfoField.setAccessible(true);
+
+                android.content.pm.ActivityInfo ai = com.onecore.sdk.core.pm.VirtualPackageManager.resolveActivity(targetPackage, targetActivity);
+
+                if (ai != null) {
+                    // Update metadata to match host so system handles it
+                    String hostPkg = CloneManager.getInstance().getHostContext().getPackageName();
+                    ai.packageName = hostPkg;
+                    if (ai.applicationInfo != null) {
+                        ai.applicationInfo.packageName = hostPkg;
+                    }
+                    
+                    activityInfoField.set(r, ai);
+                    Logger.i("VA", "Injected ActivityInfo → " + targetActivity);
+                }
+            }
 
         } catch (Throwable e) {
             Logger.e(TAG, "handleLaunchActivity FAILED: " + e.getMessage());
@@ -66,57 +87,40 @@ public class HCallback implements Handler.Callback {
                 if (item.getClass().getName().contains("LaunchActivityItem")) {
                     Field intentField = item.getClass().getDeclaredField("mIntent");
                     intentField.setAccessible(true);
-                    Intent stubIntent = (Intent) intentField.get(item);
-                    fixIntent(stubIntent);
 
-                    // Fix ActivityInfo
-                    Field infoField = item.getClass().getDeclaredField("mInfo");
-                    infoField.setAccessible(true);
-                    android.content.pm.ActivityInfo info = (android.content.pm.ActivityInfo) infoField.get(item);
-                    fixActivityInfo(info, stubIntent);
+                    Intent stubIntent = (Intent) intentField.get(item);
+                    String targetActivity = stubIntent.getStringExtra("target_activity");
+                    String targetPackage = stubIntent.getStringExtra("target_package");
+
+                    if (targetActivity != null) {
+                        // Fix Intent
+                        stubIntent.setClassName(
+                                CloneManager.getInstance().getHostContext().getPackageName(),
+                                targetActivity
+                        );
+
+                        // Fix ActivityInfo
+                        Field aiField = item.getClass().getDeclaredField("mInfo");
+                        aiField.setAccessible(true);
+
+                        android.content.pm.ActivityInfo ai = com.onecore.sdk.core.pm.VirtualPackageManager.resolveActivity(targetPackage, targetActivity);
+
+                        if (ai != null) {
+                            String hostPkg = CloneManager.getInstance().getHostContext().getPackageName();
+                            ai.packageName = hostPkg;
+                            if (ai.applicationInfo != null) {
+                                ai.applicationInfo.packageName = hostPkg;
+                            }
+                            
+                            aiField.set(item, ai);
+                            Logger.i("VA", "Transaction ActivityInfo injected → " + targetActivity);
+                        }
+                    }
                 }
             }
 
         } catch (Throwable e) {
             Logger.e(TAG, "handleTransaction FAILED: " + e.getMessage());
-        }
-    }
-
-    private void fixIntent(Intent stubIntent) {
-        String target = stubIntent.getStringExtra("target_activity");
-        if (target != null) {
-            stubIntent.setClassName(
-                    CloneManager.getInstance().getHostContext().getPackageName(),
-                    target
-            );
-            Logger.i("VA", "HCallback fixed intent → " + target);
-        }
-    }
-
-    private void fixActivityInfo(android.content.pm.ActivityInfo info, Intent stubIntent) {
-        if (info == null) return;
-        String targetActivity = stubIntent.getStringExtra("target_activity");
-        String targetPackage = stubIntent.getStringExtra("target_package");
-        
-        if (targetActivity != null && targetPackage != null) {
-            android.content.pm.PackageInfo pkgInfo = CloneManager.getInstance().getClonedPackage(targetPackage);
-            if (pkgInfo != null && pkgInfo.activities != null) {
-                for (android.content.pm.ActivityInfo ai : pkgInfo.activities) {
-                    if (targetActivity.equals(ai.name)) {
-                        // Copy properties from real ActivityInfo to the stub's ActivityInfo
-                        // This preserves themes, launch modes, etc.
-                        info.name = ai.name;
-                        info.packageName = ai.packageName;
-                        info.theme = ai.theme;
-                        info.launchMode = ai.launchMode;
-                        info.applicationInfo = ai.applicationInfo;
-                        info.flags = ai.flags;
-                        info.screenOrientation = ai.screenOrientation;
-                        Logger.i(TAG, "Fixed ActivityInfo for " + targetActivity);
-                        break;
-                    }
-                }
-            }
         }
     }
 }
