@@ -69,6 +69,9 @@ public class SandboxActivity extends Activity {
             if (guestLoader != null) {
                 Logger.d(TAG, "Patching Thread Context ClassLoader...");
                 Thread.currentThread().setContextClassLoader(guestLoader);
+                
+                // 🔥 Critical: Trigger Application Creation
+                com.onecore.sdk.core.hook.ApplicationHook.createApplication(targetPackage);
             }
 
             // 1. Basic hooks (UID, Filesystem redirection)

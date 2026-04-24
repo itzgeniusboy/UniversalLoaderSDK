@@ -11,13 +11,21 @@ import com.onecore.sdk.utils.Logger;
 public class ApplicationHook {
     private static final String TAG = "ApplicationHook";
 
-    public static Application createApplication() {
+    public static Application createApplication(String packageName) {
         try {
             Object at = getActivityThread();
-            Object loadedApk = getLoadedApk(at);
+            Object loadedApk = getLoadedApk(at, packageName);
             if (loadedApk == null) {
-                Logger.e(TAG, "Could not find LoadedApk to create application.");
+                Logger.e(TAG, "Could not find LoadedApk to create application for: " + packageName);
                 return null;
+            }
+
+            // Check if application is already created
+            Field mApplicationField = loadedApk.getClass().getDeclaredField("mApplication");
+            mApplicationField.setAccessible(true);
+            Application existingApp = (Application) mApplicationField.get(loadedApk);
+            if (existingApp != null) {
+                return existingApp;
             }
 
             Method makeApplication = loadedApk.getClass()
@@ -36,25 +44,13 @@ public class ApplicationHook {
             );
 
             if (app != null) {
-                // 🔥 Sync with ActivityThread
-                Field mInitialApplicationField = at.getClass().getDeclaredField("mInitialApplication");
-                mInitialApplicationField.setAccessible(true);
-                mInitialApplicationField.set(at, app);
-
-                Field mAllApplicationsField = at.getClass().getDeclaredField("mAllApplications");
-                mAllApplicationsField.setAccessible(true);
-                java.util.List<Application> allApps = (java.util.List<Application>) mAllApplicationsField.get(at);
-                if (!allApps.contains(app)) {
-                    allApps.add(app);
-                }
-                
-                Logger.i(TAG, "Virtual Application successfully bound to ActivityThread.");
+                Logger.i(TAG, "Virtual Application successfully bound to ActivityThread for: " + packageName);
             }
 
             return app;
 
         } catch (Throwable e) {
-            Logger.e(TAG, "createApplication failed: " + e.getMessage());
+            Logger.e(TAG, "createApplication failed for " + packageName + ": " + e.getMessage());
             e.printStackTrace();
         }
 
@@ -68,20 +64,14 @@ public class ApplicationHook {
         return current.invoke(null);
     }
 
-    private static Object getLoadedApk(Object at) throws Exception {
+    private static Object getLoadedApk(Object at, String packageName) throws Exception {
         Field mPackagesField = at.getClass().getDeclaredField("mPackages");
         mPackagesField.setAccessible(true);
 
         Map<String, WeakReference<?>> mPackages =
                 (Map<String, WeakReference<?>>) mPackagesField.get(at);
 
-        // Preference: Return a LoadedApk that we've already patched
-        for (WeakReference<?> ref : mPackages.values()) {
-            Object loadedApk = ref.get();
-            if (loadedApk != null) {
-                return loadedApk;
-            }
-        }
-        return null;
+        WeakReference<?> ref = mPackages.get(packageName);
+        return ref != null ? ref.get() : null;
     }
 }

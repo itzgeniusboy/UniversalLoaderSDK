@@ -20,38 +20,67 @@ public class LoadedApkHook {
             mPackagesField.setAccessible(true);
             Map<String, WeakReference<?>> mPackages = (Map<String, WeakReference<?>>) mPackagesField.get(activityThread);
 
-            // Get or Create LoadedApk
+            // 1. Get ApplicationInfo for guest
+            android.content.pm.PackageInfo guestPackage = com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(packageName);
+            if (guestPackage == null || guestPackage.applicationInfo == null) {
+                Logger.e(TAG, "Cannot hook LoadedApk: Package metadata missing for " + packageName);
+                return;
+            }
+
+            android.content.pm.ApplicationInfo guestAi = guestPackage.applicationInfo;
+
+            // 2. Build or hijacking a LoadedApk
+            Method getPackageInfoMethod = null;
+            try {
+                getPackageInfoMethod = activityThread.getClass().getDeclaredMethod("getPackageInfoNoCheck", android.content.pm.ApplicationInfo.class, Class.forName("android.content.res.CompatibilityInfo"));
+            } catch (Exception e) {
+                Logger.w(TAG, "Standard getPackageInfoNoCheck not found, trying variants...");
+            }
+
             Object loadedApk = null;
-            WeakReference<?> ref = mPackages.get(packageName);
-            if (ref != null) {
-                loadedApk = ref.get();
+            if (getPackageInfoMethod != null) {
+                getPackageInfoMethod.setAccessible(true);
+                loadedApk = getPackageInfoMethod.invoke(activityThread, guestAi, null);
             }
 
             if (loadedApk == null) {
-                Logger.d(TAG, "LoadedApk not found for " + packageName + ". Attempting to create one.");
-                // We'll use getPackageInfoNoCheck or similar to generate a dummy one if possible,
-                // or just patch the host one for simplicity in this stage.
-                // For virtualization, we often find the host package and "hijack" it or add a new entry.
-                String hostPackage = CloneManager.getInstance().getHostContext().getPackageName();
-                ref = mPackages.get(hostPackage);
-                if (ref != null) {
-                    loadedApk = ref.get();
-                }
+                Logger.e(TAG, "Failed to generate guest LoadedApk via GetPackageInfoNoCheck");
+                return;
             }
 
             if (loadedApk != null) {
+                // 3. Inject guest components into this LoadedApk
                 Field mClassLoaderField = loadedApk.getClass().getDeclaredField("mClassLoader");
                 mClassLoaderField.setAccessible(true);
                 mClassLoaderField.set(loadedApk, appClassLoader);
                 
-                // Important: Also update ApplicationInfo if necessary
                 Field mApplicationInfoField = loadedApk.getClass().getDeclaredField("mApplicationInfo");
                 mApplicationInfoField.setAccessible(true);
-                ApplicationInfo hostAi = (ApplicationInfo) mApplicationInfoField.get(loadedApk);
+                mApplicationInfoField.set(loadedApk, guestAi);
+
+                try {
+                    Field mResField = loadedApk.getClass().getDeclaredField("mResources");
+                    mResField.setAccessible(true);
+                    mResField.set(loadedApk, CloneManager.getInstance().getResources());
+                    
+                    try {
+                        Field mBaseClField = loadedApk.getClass().getDeclaredField("mBaseClassLoader");
+                        mBaseClField.setAccessible(true);
+                        mBaseClField.set(loadedApk, appClassLoader);
+                    } catch (Exception ignored) {}
+                } catch (Exception ignored) {}
+
+                // 4. Register in mPackages map
+                mPackages.put(packageName, new WeakReference<>(loadedApk));
                 
-                // We don't change the package name of the LoadedApk in ActivityThread yet 
-                // to avoid confusing the system, but we ensure it uses OUR loader.
-                Logger.i(TAG, "Successfully patched LoadedApk ClassLoader.");
+                try {
+                   Field mResourcePackagesField = activityThread.getClass().getDeclaredField("mResourcePackages");
+                   mResourcePackagesField.setAccessible(true);
+                   Map<String, WeakReference<?>> mResourcePackages = (Map<String, WeakReference<?>>) mResourcePackagesField.get(activityThread);
+                   mResourcePackages.put(packageName, new WeakReference<>(loadedApk));
+                } catch (Exception ignored) {}
+
+                Logger.i(TAG, "GUEST LoadedApk FULLY INJECTED for: " + packageName);
             }
 
         } catch (Throwable e) {

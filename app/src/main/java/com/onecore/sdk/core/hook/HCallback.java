@@ -99,16 +99,13 @@ public class HCallback implements Handler.Callback {
         if (realAi != null) {
             // Hijack the existing info object to avoid breaking ActivityThread references
             info.name = realAi.name;
-            info.packageName = CloneManager.getInstance().getHostContext().getPackageName(); 
+            info.packageName = targetPackage; // Use real package to trigger LoadedApk lookup
             info.theme = realAi.theme;
             info.launchMode = realAi.launchMode;
             
             // 🔥 CRITICAL: Fix ApplicationInfo
             if (realAi.applicationInfo != null) {
-                // We keep some host fields but use guest paths
-                android.content.pm.ApplicationInfo guestAi = new android.content.pm.ApplicationInfo(realAi.applicationInfo);
-                guestAi.packageName = info.packageName; 
-                info.applicationInfo = guestAi;
+                info.applicationInfo = new android.content.pm.ApplicationInfo(realAi.applicationInfo);
             }
             
             info.flags = realAi.flags;

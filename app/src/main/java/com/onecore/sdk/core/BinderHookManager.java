@@ -30,11 +30,39 @@ public class BinderHookManager {
             
             // 3. Hook PackageManager
             hookPackageManager(context);
+
+            // 4. Hook ActivityThread Instrumentation & Handler
+            hookActivityThread();
             
             Logger.i(TAG, "All system hooks INSTALLED.");
         } catch (Exception e) {
             Logger.e(TAG, "Failed to install system hooks: " + e.getMessage());
+            e.printStackTrace();
         }
+    }
+
+    private static void hookActivityThread() throws Exception {
+        Class<?> atClass = Class.forName("android.app.ActivityThread");
+        Method currentAtMethod = atClass.getDeclaredMethod("currentActivityThread");
+        currentAtMethod.setAccessible(true);
+        Object at = currentAtMethod.invoke(null);
+
+        // 1. Hook Instrumentation
+        Field mInstrumentationField = atClass.getDeclaredField("mInstrumentation");
+        mInstrumentationField.setAccessible(true);
+        android.app.Instrumentation baseInst = (android.app.Instrumentation) mInstrumentationField.get(at);
+        mInstrumentationField.set(at, new VAInstrumentation(baseInst));
+
+        // 2. Hook H Handler (Callback)
+        Field mHField = atClass.getDeclaredField("mH");
+        mHField.setAccessible(true);
+        android.os.Handler h = (android.os.Handler) mHField.get(at);
+        
+        Field mCallbackField = android.os.Handler.class.getDeclaredField("mCallback");
+        mCallbackField.setAccessible(true);
+        mCallbackField.set(h, new com.onecore.sdk.core.hook.HCallback(h));
+
+        Logger.d(TAG, "ActivityThread Hooks (Instrumentation & Handler) installed.");
     }
 
     private static void hookActivityManager() throws Exception {
