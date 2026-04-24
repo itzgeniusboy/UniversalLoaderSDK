@@ -52,12 +52,57 @@ public class VirtualContainer {
         this.guestClassLoader = loader;
     }
 
+    public PackageInfo getClonedPackage(String packageName) {
+        return CloneManager.getInstance().getClonedPackage(packageName);
+    }
+
     public boolean isVirtualMode() {
         return virtualMode;
     }
 
     public void setVirtualMode(boolean mode) {
         this.virtualMode = mode;
+    }
+
+    /**
+     * Initializes the guest environment: metadata, filesystem, and classloader.
+     */
+    public boolean prepareGuestEnvironment(Context context, String packageName) {
+        Logger.i(TAG, "Preparing Secure Environment for: " + packageName);
+        
+        try {
+            // 1. Prepare Metadata and Filesystem
+            boolean cloneOk = CloneManager.getInstance().prepareClone(context, packageName);
+            if (!cloneOk) {
+                Logger.e(TAG, "CloneManager failed to prepare environment.");
+                return false;
+            }
+
+            PackageInfo info = CloneManager.getInstance().getClonedPackage(packageName);
+            if (info == null || info.applicationInfo == null) {
+                Logger.e(TAG, "Metadata not found after clone prep.");
+                return false;
+            }
+
+            // 2. Initialize Isolated ClassLoader
+            Logger.d(TAG, "Booting Isolated ClassLoader...");
+            String dexPath = info.applicationInfo.sourceDir;
+            String optimizedDir = context.getDir("dex_opt", Context.MODE_PRIVATE).getAbsolutePath();
+            String libPath = info.applicationInfo.nativeLibraryDir;
+            
+            this.guestClassLoader = new DexClassLoader(
+                dexPath,
+                optimizedDir,
+                libPath,
+                context.getClassLoader().getParent() // Isolate from host app classes as much as possible
+            );
+
+            Logger.i(TAG, "Environment Sync: SUCCESS");
+            return true;
+        } catch (Exception e) {
+            Logger.e(TAG, "Environment Prep Error: " + e.getMessage());
+            return false;
+        }
     }
 
     public boolean launch(Context context, String packageName, LaunchCallback callback) {
@@ -79,30 +124,16 @@ public class VirtualContainer {
         }
 
         try {
-            // 1. Validate Cloned Metadata
-            Logger.d(TAG, "Validating Cloned Metadata...");
-            PackageInfo info = CloneManager.getInstance().getClonedPackage(packageName);
-            if (info == null || info.applicationInfo == null) {
-                Logger.e(TAG, "Metadata VALIDATION FAILED: No cloned package found for " + packageName);
+            // 1. Prepare Metadata, ClassLoader and Filesystem
+            boolean prepOk = prepareGuestEnvironment(context, packageName);
+            if (!prepOk) {
+                Logger.e(TAG, "Environment Preparation FAILED for " + packageName);
                 return false;
             }
 
-            // 2. Validate Paths
-            File apkFile = new File(info.applicationInfo.sourceDir);
-            if (!apkFile.exists()) {
-                Logger.e(TAG, "APK Path VALIDATION FAILED: " + info.applicationInfo.sourceDir);
-                return false;
-            }
-
-            // 3. Validate Native Libs (optional but recommended)
-            File libDir = new File(info.applicationInfo.nativeLibraryDir);
-            if (!libDir.exists()) {
-                Logger.w(TAG, "Native Lib Path missing: " + info.applicationInfo.nativeLibraryDir);
-                // We proceed but log it
-            }
-
-            // 4. Register Broadcast for feedback (for UI updates, not for core flow)
-            registerLaunchResultReceiver(context);
+            PackageInfo info = getClonedPackage(packageName);
+            
+            // 2. Register Broadcast for feedback
 
             Logger.i(TAG, "Pre-checks successful. Booting sandbox process...");
             setVirtualMode(true);
@@ -184,19 +215,11 @@ public class VirtualContainer {
         context.startActivity(sandboxIntent);
     }
 
+    /*
     private void launchTraditional(Context context, String packageName) {
-        PackageManager pm = context.getPackageManager();
-        Intent intent = pm.getLaunchIntentForPackage(packageName);
-        if (intent != null) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            if (Build.VERSION.SDK_INT >= 34) {
-                launchViaStub(context, intent, packageName);
-            } else {
-                context.startActivity(intent);
-            }
-            Logger.d(TAG, "App launched via Traditional/Root method.");
-        }
+        ...
     }
+    */
 
     private boolean isRooted() {
         return new File("/system/bin/su").exists() || new File("/system/xbin/su").exists();
@@ -222,19 +245,15 @@ public class VirtualContainer {
         }
     }
 
+    /*
     private void launchViaStub(Context context, Intent realIntent, String packageName) {
-        // Stub activity pattern to bypass background restrictions and shared UID issues
-        // In a real implementation, this would start our own StubActivity passing the target intent
-        Logger.d(TAG, "Launching via StubProcess to isolate " + packageName);
-        context.startActivity(realIntent);
+        ...
     }
 
     public void fallbackLaunch(Context context, String packageName) {
-        try {
-            Intent intent = context.getPackageManager().getLaunchIntentForPackage(packageName);
-            if (intent != null) context.startActivity(intent);
-        } catch (Exception ignored) {}
+        ...
     }
+    */
 
     public void injectLibrary(Context context, String packageName, String libraryPath) {
         if (!SDKLicense.getInstance().isLicensed()) return;

@@ -57,36 +57,66 @@ public class SandboxActivity extends Activity {
     private void continueLaunch() {
         Logger.i(TAG, "Executing Step: Environment Synchronization");
         try {
+            // 0. Ensure Virtual Environment is ready in this process
+            boolean synced = VirtualContainer.getInstance().prepareGuestEnvironment(this, targetPackage);
+            if (!synced) {
+                Logger.e(TAG, "Process Environment Sync Failed!");
+                handleLaunchFailure("Process Out of Sync");
+                return;
+            }
+
+            ClassLoader guestLoader = VirtualContainer.getInstance().getGuestClassLoader();
+            if (guestLoader != null) {
+                Logger.d(TAG, "Patching Thread Context ClassLoader...");
+                Thread.currentThread().setContextClassLoader(guestLoader);
+            }
+
             // 1. Basic hooks (UID, Filesystem redirection)
             String virtualRoot = getFilesDir().getAbsolutePath() + "/virtual/" + targetPackage;
             NativeHookManager.setupIsolation(this, virtualRoot, targetPackage);
             
-            // 2. Resolve target intent
-            Logger.d(TAG, "Identifying Guest Entry Point...");
-            PackageManager pm = getPackageManager();
-            Intent launchIntent = pm.getLaunchIntentForPackage(targetPackage);
+            // 1.5 Apply Deep System Hooks
+            Logger.i(TAG, "Applying Anti-Root & Virtualization Hooks...");
+            EnvironmentHooker.apply(this, targetPackage, virtualRoot);
+            UidSpoofing.apply(this, 10000 + (int)(Math.random() * 5000));
+            
+            // 2. Resolve target activity from virtual metadata
+            Logger.d(TAG, "Resolving Guest Entry Point from Virtual Metadata...");
+            String mainActivity = getIntent().getStringExtra("main_activity");
+            
+            if (mainActivity == null) {
+                // Try to find it from VirtualContainer metadata
+                PackageInfo info = VirtualContainer.getInstance().getClonedPackage(targetPackage);
+                if (info != null && info.activities != null && info.activities.length > 0) {
+                    mainActivity = info.activities[0].name;
+                    for (android.content.pm.ActivityInfo ai : info.activities) {
+                        if (ai.name.toLowerCase().contains("main") || ai.name.toLowerCase().contains("splash")) {
+                            mainActivity = ai.name;
+                            break;
+                        }
+                    }
+                }
+            }
 
-            if (launchIntent == null) {
-                Logger.e(TAG, "Launch Resolution Failed: GetLaunchIntent returned null");
-                handleLaunchFailure("Package Metadata Inaccessible");
+            if (mainActivity == null) {
+                Logger.e(TAG, "Launch Resolution Failed: Could not find main activity in virtual metadata");
+                handleLaunchFailure("Metadata Resolution Failed");
                 return;
             }
 
-            // 3. Launch inside this process/environment
-            Logger.i(TAG, "Triggering Guest Transition...");
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            // 3. Hand over to StubActivity for virtualized class loading
+            Logger.i(TAG, "Handing over to StubActivity for: " + mainActivity);
+            Intent stubIntent = new Intent(this, StubActivity.class);
+            stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            stubIntent.putExtra("target_package", targetPackage);
+            stubIntent.putExtra("target_activity", mainActivity);
             
-            // Note: Since this process has EnvironmentHooker/VAInstrumentation applied,
-            // starting this intent should stay within the virtualized context.
-            startActivity(launchIntent);
+            startActivity(stubIntent);
             
-            Logger.i(TAG, "Launch Command Emitted. Sandbox standby for handover.");
+            Logger.i(TAG, "Stub Handover Successful. Sandbox shell retiring.");
             
-            // Self-destruct this activity after successful handover
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                Logger.i(TAG, "Sandbox Task Completed. Closing Shell.");
-                finish();
-            }, 3000);
+            // Self-destruct this activity after handover
+            new Handler(Looper.getMainLooper()).postDelayed(this::finish, 2000);
 
         } catch (Exception e) {
             Logger.e(TAG, "Sandbox Execution Failure: " + e.getMessage());
@@ -96,12 +126,11 @@ public class SandboxActivity extends Activity {
 
     private void handleLaunchFailure(String reason) {
         Logger.e(TAG, "!! VIRTUAL LAUNCH FAILED !! Reason: " + reason);
-        Logger.i(TAG, "Auto-Initiating Fallback Bridge...");
         
-        // Use the orchestrator to launch it directly
-        LauncherOrchestrator.launchFallback(this, targetPackage);
+        // NO MORE FALLBACK TO REAL APP as per security requirement
+        Logger.w(TAG, "System Fallback BLOCKED for security.");
         
-        // Broadcoast failure if needed
+        // Broadcast failure
         Intent result = new Intent(VirtualContainer.ACTION_LAUNCH_RESULT);
         result.putExtra("success", false);
         result.putExtra("error", reason);

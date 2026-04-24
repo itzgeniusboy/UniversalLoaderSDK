@@ -140,10 +140,16 @@ public class CloneManager {
                         try {
                             File target = new File(virtualLibDir, lib.getName());
                             if (target.exists()) target.delete();
-                            Os.symlink(lib.getAbsolutePath(), target.getAbsolutePath());
-                            Logger.d(TAG, "Mapped Library: " + lib.getName() + " -> " + lib.getAbsolutePath());
+                            
+                            // Physical copy for better isolation and to handle RO filesystems
+                            java.nio.file.Files.copy(
+                                java.nio.file.Paths.get(lib.getAbsolutePath()),
+                                java.nio.file.Paths.get(target.getAbsolutePath())
+                            );
+                            
+                            Logger.d(TAG, "Extracted Library: " + lib.getName());
                         } catch (Exception e) {
-                            Logger.e(TAG, "Failed to symlink lib " + lib.getName(), e);
+                            Logger.e(TAG, "Failed to extract lib " + lib.getName(), e);
                         }
                     }
                 }
