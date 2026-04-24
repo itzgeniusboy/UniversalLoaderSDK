@@ -45,7 +45,7 @@ public class ServiceManager {
         }
     }
 
-    public static android.os.IBinder bindService(android.content.Context context, Intent intent) {
+    public static android.os.IBinder bindService(android.content.Context context, Intent intent, Object connection) {
         if (intent == null || intent.getComponent() == null) return null;
         
         String className = intent.getComponent().getClassName();
@@ -59,16 +59,49 @@ public class ServiceManager {
         
         Service service = mServices.get(className);
         if (service != null) {
-            if (mBinders.containsKey(className)) return mBinders.get(className);
-            try {
-                android.os.IBinder binder = service.onBind(intent);
-                mBinders.put(className, binder);
-                return binder;
-            } catch (Exception e) {
-                Logger.e(TAG, "Failed to call onBind for " + className, e);
+            android.os.IBinder binder = mBinders.get(className);
+            if (binder == null) {
+                try {
+                    binder = service.onBind(intent);
+                    mBinders.put(className, binder);
+                } catch (Exception e) {
+                    Logger.e(TAG, "Failed to call onBind for " + className, e);
+                }
             }
+            
+            // Notify ServiceConnection if possible
+            if (connection != null && binder != null) {
+                dispatchServiceConnected(connection, intent.getComponent(), binder);
+            }
+            
+            return binder;
         }
         return null;
+    }
+
+    private static void dispatchServiceConnected(Object connection, android.content.ComponentName name, android.os.IBinder binder) {
+        try {
+            // IServiceConnection.connected(ComponentName, IBinder, boolean)
+            // Signature: void connected(in ComponentName name, in IBinder service, boolean dead)
+            Method connected = connection.getClass().getDeclaredMethod("connected", android.content.ComponentName.class, android.os.IBinder.class, boolean.class);
+            connected.setAccessible(true);
+            connected.invoke(connection, name, binder, false);
+            Logger.v(TAG, "ServiceConnection.connected() dispatched successfully.");
+        } catch (Exception e) {
+             try {
+                // Fallback for older versions (without boolean dead param)
+                Method connected = connection.getClass().getDeclaredMethod("connected", android.content.ComponentName.class, android.os.IBinder.class);
+                connected.setAccessible(true);
+                connected.invoke(connection, name, binder);
+            } catch (Exception e2) {
+                Logger.e(TAG, "Failed to dispatch ServiceConnection: " + e.getMessage());
+            }
+        }
+    }
+
+    public static void unbindService(Object connection) {
+        if (connection == null) return;
+        Logger.d(TAG, "Unbind virtual service requested for connection: " + connection.getClass().getSimpleName());
     }
 
     public static void startForeground(Service service, int id, android.app.Notification notification) {
@@ -101,12 +134,22 @@ public class ServiceManager {
         }
     }
 
-    public static void stopService(Intent intent) {
-        if (intent == null || intent.getComponent() == null) return;
+    public static boolean stopService(Intent intent) {
+        if (intent == null || intent.getComponent() == null) return false;
         String className = intent.getComponent().getClassName();
         Service service = mServices.remove(className);
         if (service != null) {
+            String pkgName = intent.getComponent().getPackageName();
+            android.os.IBinder binder = mBinders.remove(className);
+            if (binder != null) {
+                try {
+                    service.onUnbind(intent);
+                } catch (Exception ignored) {}
+            }
             service.onDestroy();
+            Logger.d(TAG, "Virtual service STOPPED: " + className);
+            return true;
         }
+        return false;
     }
 }

@@ -93,9 +93,12 @@ public class ActivityManagerHook implements InvocationHandler {
                             ServiceManager.startService(com.onecore.sdk.OneCoreSDK.getContext(), intent);
                             return null;
                         } else if (methodName.equals("bindService")) {
-                            android.os.IBinder binder = ServiceManager.bindService(com.onecore.sdk.OneCoreSDK.getContext(), intent);
-                            // Real bind service involves ServiceConnection callback. This is a simplified direct binder return.
-                            return binder != null;
+                            Object connection = args[4]; // IServiceConnection
+                            android.os.IBinder binder = ServiceManager.bindService(com.onecore.sdk.OneCoreSDK.getContext(), intent, connection);
+                            return binder != null ? 1 : 0; // Return 1 for success in newer AMS
+                        } else if (methodName.equals("unbindService")) {
+                             ServiceManager.unbindService(args[0]);
+                             return true;
                         } else if (methodName.equals("stopService")) {
                              // Handle service stop
                         }
@@ -117,17 +120,38 @@ public class ActivityManagerHook implements InvocationHandler {
             Object result = method.invoke(realService, args);
             if (result instanceof java.util.List) {
                 java.util.List list = (java.util.List) result;
+                java.util.List<android.app.ActivityManager.RunningAppProcessInfo> newList = new java.util.ArrayList<>();
+                
+                String pkgName = BinderHookManager.sCurrentPackage;
+                android.content.pm.PackageInfo pi = CloneManager.getInstance().getClonedPackage(pkgName);
+                
+                boolean currentAdded = false;
                 for (Object item : list) {
                     if (item instanceof android.app.ActivityManager.RunningAppProcessInfo) {
                         android.app.ActivityManager.RunningAppProcessInfo info = (android.app.ActivityManager.RunningAppProcessInfo) item;
                         if (info.pid == android.os.Process.myPid()) {
-                            info.processName = BinderHookManager.sCurrentPackage;
-                            info.pkgList = new String[]{BinderHookManager.sCurrentPackage};
+                            info.processName = pkgName; // Default to main pkg
+                            info.pkgList = new String[]{pkgName};
+                            newList.add(info);
+                            currentAdded = true;
                         }
                     }
                 }
+                
+                // If we have a cloned package, we can also spoof other processes as "background" or "cached"
+                if (pi != null && pi.activities != null) {
+                    // This is extra polish: adding "dummy" processes for multi-process apps
+                }
+                
+                return newList;
             }
             return result;
+        }
+
+        if (methodName.equals("getRunningServices")) {
+             Object result = method.invoke(realService, args);
+             // We could filter this to only show virtual services
+             return result;
         }
 
         if (methodName.equals("getProcessMemoryInfo") || methodName.equals("getMemoryInfo")) {

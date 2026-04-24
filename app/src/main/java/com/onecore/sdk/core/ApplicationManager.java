@@ -58,6 +58,9 @@ public class ApplicationManager {
                 // 4. Update ActivityThread.mInitialApplication to point to our virtual app
                 updateActivityThreadApp(app);
                 
+                // Also update mBoundApplication if possible
+                updateBoundApplication(app);
+                
                 // 5. Install Providers (Before Application.onCreate is standard)
                 try {
                     android.content.pm.PackageInfo pi = com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(packageName);
@@ -78,6 +81,29 @@ public class ApplicationManager {
                 Logger.e(TAG, "CRITICAL: Application Environment Binding FAILED", e);
                 return null;
             }
+        }
+    }
+
+    private static void updateBoundApplication(Application app) {
+        try {
+            Class<?> atClass = Class.forName("android.app.ActivityThread");
+            Method curAtMethod = atClass.getDeclaredMethod("currentActivityThread");
+            curAtMethod.setAccessible(true);
+            Object activityThread = curAtMethod.invoke(null);
+
+            if (activityThread != null) {
+                Field mBoundAppField = atClass.getDeclaredField("mBoundApplication");
+                mBoundAppField.setAccessible(true);
+                Object mBoundApp = mBoundAppField.get(activityThread);
+                if (mBoundApp != null) {
+                    Field appField = mBoundApp.getClass().getDeclaredField("app");
+                    appField.setAccessible(true);
+                    appField.set(mBoundApp, app);
+                    Logger.v(TAG, "mBoundApplication.app updated correctly.");
+                }
+            }
+        } catch (Exception e) {
+            Logger.w(TAG, "Failed to update mBoundApplication reference.");
         }
     }
 
