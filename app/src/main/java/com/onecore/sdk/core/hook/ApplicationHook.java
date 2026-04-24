@@ -11,7 +11,34 @@ import com.onecore.sdk.utils.Logger;
 public class ApplicationHook {
     private static final String TAG = "ApplicationHook";
 
+    private static String sActivePackage;
+
+    public static Application createApplication() {
+        if (sActivePackage == null) {
+            // Try to auto-derive from LoadedApk map if only one guest app is loaded
+            try {
+                Object at = getActivityThread();
+                Field mPackagesField = at.getClass().getDeclaredField("mPackages");
+                mPackagesField.setAccessible(true);
+                Map<String, WeakReference<?>> mPackages = (Map<String, WeakReference<?>>) mPackagesField.get(at);
+                String hostPkg = com.onecore.sdk.OneCoreSDK.getContext().getPackageName();
+                for (String pkg : mPackages.keySet()) {
+                    if (!pkg.equals(hostPkg)) {
+                        sActivePackage = pkg;
+                        break;
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        
+        if (sActivePackage != null) {
+            return createApplication(sActivePackage);
+        }
+        return null;
+    }
+
     public static Application createApplication(String packageName) {
+        sActivePackage = packageName;
         try {
             Object at = getActivityThread();
             Object loadedApk = getLoadedApk(at, packageName);

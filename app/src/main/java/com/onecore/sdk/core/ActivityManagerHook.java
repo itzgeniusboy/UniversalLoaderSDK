@@ -54,7 +54,7 @@ public class ActivityManagerHook implements InvocationHandler {
                     String className = intent.getComponent().getClassName();
 
                     // If it's a guest activity/service launch, wrap it
-                    if (CloneManager.getInstance().getClonedPackage(pkgName) != null) {
+                    if (CloneManager.getInstance().getClonedPackage(pkgName) != null && !intent.hasExtra("_VA_NON_HOOK_")) {
                         Logger.i("ActivityManagerHook", "AMS Interception: " + methodName + " for " + className);
                         
                         if (methodName.equals("startActivity")) {

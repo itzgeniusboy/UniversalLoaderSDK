@@ -67,6 +67,7 @@ public class ActivityTaskManagerHook implements InvocationHandler {
 
     private boolean shouldRedirect(Intent intent) {
         if (intent == null || intent.getComponent() == null) return false;
+        if (intent.hasExtra("_VA_NON_HOOK_")) return false;
         String pkg = intent.getComponent().getPackageName();
         return CloneManager.getInstance().getClonedPackage(pkg) != null;
     }
