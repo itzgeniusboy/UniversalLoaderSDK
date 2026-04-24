@@ -101,6 +101,20 @@ public class ActivityManagerHook implements InvocationHandler {
                              return true;
                         } else if (methodName.equals("stopService")) {
                              // Handle service stop
+                        } else if (methodName.equals("setServiceForeground")) {
+                             android.content.ComponentName cn = (android.content.ComponentName) args[0];
+                             int id = (int) args[2];
+                             android.app.Notification notification = (android.app.Notification) args[3];
+                             boolean removeNotification = (args.length > 4) && (boolean) args[4];
+                             
+                             if (notification != null) {
+                                  // In a full implementation we'd find the Service object from className
+                                  // For now, passing notification implies startForeground
+                                  Logger.d("ActivityManagerHook", "setServiceForeground: START id=" + id);
+                             } else {
+                                  Logger.d("ActivityManagerHook", "setServiceForeground: STOP");
+                             }
+                             return null;
                         }
                     }
                 }
@@ -122,6 +136,8 @@ public class ActivityManagerHook implements InvocationHandler {
                 java.util.List list = (java.util.List) result;
                 String pkgName = BinderHookManager.sCurrentPackage;
                 
+                java.util.Set<String> virtualProcesses = com.onecore.sdk.core.pm.VirtualPackageManager.getAllProcessNames(pkgName);
+                
                 for (Object item : list) {
                     if (item instanceof android.app.ActivityManager.RunningAppProcessInfo) {
                         android.app.ActivityManager.RunningAppProcessInfo info = (android.app.ActivityManager.RunningAppProcessInfo) item;
@@ -131,6 +147,21 @@ public class ActivityManagerHook implements InvocationHandler {
                         }
                     }
                 }
+                
+                // Add virtual processes that aren't the main one to the list to fool multi-process apps
+                if (virtualProcesses != null) {
+                    for (String vProc : virtualProcesses) {
+                        if (!vProc.equals(pkgName)) {
+                            android.app.ActivityManager.RunningAppProcessInfo fake = new android.app.ActivityManager.RunningAppProcessInfo();
+                            fake.processName = vProc;
+                            fake.pid = android.os.Process.myPid() + 100; // Fake PID
+                            fake.uid = android.os.Process.myUid();
+                            fake.pkgList = new String[]{pkgName};
+                            list.add(fake);
+                        }
+                    }
+                }
+                
                 return list;
             }
             return result;

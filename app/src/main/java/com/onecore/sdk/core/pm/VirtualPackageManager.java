@@ -176,4 +176,40 @@ public class VirtualPackageManager {
         }
         return null;
     }
+
+    public static java.util.Set<String> getAllProcessNames(String packageName) {
+        java.util.Set<String> processes = new java.util.HashSet<>();
+        try {
+            PackageInfo info = CloneManager.getInstance().getClonedPackage(packageName);
+            if (info != null) {
+                processes.add(info.applicationInfo.processName);
+                if (info.activities != null) {
+                    for (ActivityInfo ai : info.activities) if (ai.processName != null) processes.add(ai.processName);
+                }
+                if (info.services != null) {
+                    for (android.content.pm.ServiceInfo si : info.services) if (si.processName != null) processes.add(si.processName);
+                }
+                if (info.providers != null) {
+                    for (android.content.pm.ProviderInfo pi : info.providers) if (pi.processName != null) processes.add(pi.processName);
+                }
+                if (info.receivers != null) {
+                    for (ActivityInfo ai : info.receivers) if (ai.processName != null) processes.add(ai.processName);
+                }
+            }
+        } catch (Exception e) {}
+        return processes;
+    }
+
+    public static String resolveProcessName(String packageName, String className, String type) {
+        try {
+            if (type.equals("activity")) {
+                ActivityInfo ai = resolveActivity(packageName, className);
+                if (ai != null) return ai.processName;
+            } else if (type.equals("service")) {
+                android.content.pm.ServiceInfo si = resolveService(packageName, className);
+                if (si != null) return si.processName;
+            }
+        } catch (Exception e) {}
+        return packageName;
+    }
 }

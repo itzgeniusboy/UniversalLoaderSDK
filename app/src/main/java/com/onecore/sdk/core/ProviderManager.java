@@ -82,19 +82,30 @@ public class ProviderManager {
             // In Android, ActivityThread maintains mLocalProviders and mProviderMap
             // We want to insert our virtual provider here so local ContentResolver.acquireProvider() finds it.
             
+            Object transport = getProviderTransport(provider);
+            if (transport == null) return;
+
+            // 1. Update mLocalProviders
             Field mLocalProvidersField = activityThread.getClass().getDeclaredField("mLocalProviders");
             mLocalProvidersField.setAccessible(true);
             java.util.Map mLocalProviders = (java.util.Map) mLocalProvidersField.get(activityThread);
+            mLocalProviders.put(provider.getClass().getName(), transport);
+
+            // 2. Update mProviderMap
+            Field mProviderMapField = activityThread.getClass().getDeclaredField("mProviderMap");
+            mProviderMapField.setAccessible(true);
+            java.util.Map mProviderMap = (java.util.Map) mProviderMapField.get(activityThread);
             
-            // On newer Android, the key is usually an IBinder (represented by the provider's token)
-            // But for simplicity, many versions use the ProviderInfo.authority or similar.
-            
-            // We need a proper IContentProvider proxy for the local map.
-            Object transport = getProviderTransport(provider);
-            if (transport != null) {
-                mLocalProviders.put(provider.getClass().getName(), transport);
-                Logger.i(TAG, "Provider " + info.name + " (" + info.authority + ") installed in ActivityThread.");
+            // On some versions mProviderMap uses authority as key, on others it uses component name or IBinder
+            // We try to add it for all authorities
+            if (info.authority != null) {
+                String[] auths = info.authority.split(";");
+                for (String auth : auths) {
+                    mProviderMap.put(auth, transport);
+                }
             }
+            
+            Logger.i(TAG, "Provider " + info.name + " (" + info.authority + ") installed in ActivityThread.");
         } catch (Exception e) {
             Logger.w(TAG, "Failed to register provider locally: " + e.getMessage());
         }

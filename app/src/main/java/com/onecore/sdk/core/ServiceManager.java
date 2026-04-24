@@ -20,6 +20,7 @@ public class ServiceManager {
     private static final Map<String, Service> mServices = new HashMap<>();
     private static final Map<String, android.os.IBinder> mBinders = new HashMap<>();
     private static final Map<Object, List<String>> mConnections = new HashMap<>();
+    private static final Map<String, Integer> mForegroundServices = new HashMap<>();
 
     public static void startService(android.content.Context context, Intent intent) {
         if (intent == null || intent.getComponent() == null) return;
@@ -133,9 +134,28 @@ public class ServiceManager {
     }
 
     public static void startForeground(Service service, int id, android.app.Notification notification) {
-        Logger.i(TAG, "Service.startForeground() intercepted for id: " + id);
-        // In a real implementation, we would either proxy this to a host notification channel
-        // or show our own. For now, we simply log it to prevent crashes.
+        if (service == null) return;
+        String className = service.getClass().getName();
+        Logger.i(TAG, "Virtual service " + className + " entered FOREGROUND (id: " + id + ")");
+        mForegroundServices.put(className, id);
+        
+        // Proxy to host service to ensure process doesn't get killed
+        try {
+            Context context = com.onecore.sdk.OneCoreSDK.getContext();
+            Intent intent = new Intent(context, SandboxHeartbeatService.class);
+            intent.putExtra("ACTION_FOREGROUND", true);
+            intent.putExtra("VIRTUAL_SERVICE", className);
+            context.startService(intent);
+        } catch (Exception e) {
+            Logger.e(TAG, "Failed to start host foreground proxy", e);
+        }
+    }
+
+    public static void stopForeground(Service service, boolean removeNotification) {
+        if (service == null) return;
+        String className = service.getClass().getName();
+        Logger.i(TAG, "Virtual service " + className + " exited FOREGROUND");
+        mForegroundServices.remove(className);
     }
 
     private static void attachService(Service service, Context virtualContext, String className, String pkgName, ClassLoader cl, android.content.res.Resources res) {
