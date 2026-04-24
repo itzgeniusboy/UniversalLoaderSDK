@@ -339,7 +339,8 @@ public class VirtualContainer {
     private void installSystemHooks(Context context, String packageName) {
         try {
             Logger.i(TAG, "Initiating System Hook Sequence...");
-            com.onecore.sdk.core.BinderHookManager.installHooks(context);
+            String vPath = OneCoreSDK.getContext().getFilesDir().getAbsolutePath() + "/virtual/" + packageName;
+            com.onecore.sdk.core.BinderHookManager.installHooks(context, packageName, vPath);
             
             // Isolation & Root Bypass are handled via these hooks
             Logger.d(TAG, "Root Detection Bypass active: Reporting Non-Root state.");

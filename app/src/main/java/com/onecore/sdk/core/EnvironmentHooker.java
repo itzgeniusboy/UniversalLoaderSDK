@@ -21,7 +21,7 @@ public class EnvironmentHooker {
             Logger.i(TAG, "Applying Environment Hooks for " + fakePackageName);
 
             // 1. Install Global Service & ActivityThread Hooks
-             BinderHookManager.installHooks(context);
+             BinderHookManager.installHooks(context, fakePackageName, virtualPath);
 
             // 2. Patch LoadedApk specifically for the Sandbox process
             ClassLoader guestLoader = com.onecore.sdk.VirtualContainer.getInstance().getGuestClassLoader();

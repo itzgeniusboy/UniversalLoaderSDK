@@ -59,33 +59,51 @@ public class HCallback implements Handler.Callback {
 
     private void handleTransaction(Object transaction) {
         try {
-            Field callbacksField = transaction.getClass().getDeclaredField("mActivityCallbacks");
-            callbacksField.setAccessible(true);
-
-            List callbacks = (List) callbacksField.get(transaction);
-            if (callbacks == null) return;
-
-            for (Object item : callbacks) {
-                if (item.getClass().getName().contains("LaunchActivityItem")) {
-                    Field intentField = item.getClass().getDeclaredField("mIntent");
-                    intentField.setAccessible(true);
-
-                    Intent stubIntent = (Intent) intentField.get(item);
-                    Intent target = stubIntent.getParcelableExtra("_VA_TARGET_");
-
-                    if (target != null) {
-                        intentField.set(item, target);
-
-                        Field infoField = item.getClass().getDeclaredField("mInfo");
-                        infoField.setAccessible(true);
-                        android.content.pm.ActivityInfo ai = (android.content.pm.ActivityInfo) infoField.get(item);
-                        fixActivityInfo(ai, target);
+            // Android 9+ uses ClientTransaction. We try to get mActivityCallbacks list.
+            List callbacks = null;
+            try {
+                Field callbacksField = transaction.getClass().getDeclaredField("mActivityCallbacks");
+                callbacksField.setAccessible(true);
+                callbacks = (List) callbacksField.get(transaction);
+            } catch (Exception e) {
+                // Fallback for different OS versions
+                Method getCallbacks = transaction.getClass().getDeclaredMethod("getCallbacks");
+                getCallbacks.setAccessible(true);
+                callbacks = (List) getCallbacks.invoke(transaction);
+            }
+ 
+            if (callbacks != null) {
+                for (Object item : callbacks) {
+                    if (item.getClass().getName().contains("LaunchActivityItem")) {
+                        processLaunchItem(item);
                     }
                 }
             }
-
+ 
         } catch (Throwable e) {
             Logger.e(TAG, "handleTransaction FAILED: " + e.getMessage());
+        }
+    }
+
+    private void processLaunchItem(Object item) {
+        try {
+            Field intentField = item.getClass().getDeclaredField("mIntent");
+            intentField.setAccessible(true);
+
+            Intent stubIntent = (Intent) intentField.get(item);
+            Intent target = stubIntent.getParcelableExtra("_VA_TARGET_");
+
+            if (target != null) {
+                intentField.set(item, target);
+
+                Field infoField = item.getClass().getDeclaredField("mInfo");
+                infoField.setAccessible(true);
+                android.content.pm.ActivityInfo ai = (android.content.pm.ActivityInfo) infoField.get(item);
+                fixActivityInfo(ai, target);
+                Logger.d(TAG, "Successfully intercepted LaunchActivityItem");
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, "Failed to process LaunchActivityItem: " + e.getMessage());
         }
     }
 

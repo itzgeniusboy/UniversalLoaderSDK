@@ -16,9 +16,14 @@ import com.onecore.sdk.utils.Logger;
 public class BinderHookManager {
     private static final String TAG = "OneCore-Binder";
 
-    public static void installHooks(android.content.Context context) {
+    public static String sCurrentPackage;
+    public static String sCurrentVirtualPath;
+
+    public static void installHooks(android.content.Context context, String packageName, String virtualPath) {
+        sCurrentPackage = packageName;
+        sCurrentVirtualPath = virtualPath;
         try {
-            Logger.i(TAG, "Installing Deep System Hooks...");
+            Logger.i(TAG, "Installing Deep System Hooks for " + packageName);
             
             // 1. Hook ActivityManager
             hookActivityManager();
@@ -34,7 +39,7 @@ public class BinderHookManager {
             // 4. Hook ActivityThread Instrumentation & Handler
             hookActivityThread();
             
-            Logger.i(TAG, "All system hooks INSTALLED.");
+            Logger.i(TAG, "All system hooks INSTALLED for " + packageName);
         } catch (Exception e) {
             Logger.e(TAG, "Failed to install system hooks: " + e.getMessage());
             e.printStackTrace();
@@ -115,10 +120,9 @@ public class BinderHookManager {
         Class<?> atClass = Class.forName("android.app.ActivityThread");
         java.lang.reflect.Method getPmMethod = atClass.getDeclaredMethod("getPackageManager");
         Object pm = getPmMethod.invoke(null);
-
-        // We need a proper way to get virtual path and package name here or inside the hook
-        // For now, we'll assume the hook knows how to find its own state
-        Object proxy = PackageManagerHook.createProxy(pm, "com.onecore.cloned.target", "/data/data/com.onecore.cloned.target");
+ 
+        // Use the current guest package and path
+        Object proxy = PackageManagerHook.createProxy(pm, sCurrentPackage, sCurrentVirtualPath);
         
         java.lang.reflect.Field sPackageManagerField = atClass.getDeclaredField("sPackageManager");
         sPackageManagerField.setAccessible(true);

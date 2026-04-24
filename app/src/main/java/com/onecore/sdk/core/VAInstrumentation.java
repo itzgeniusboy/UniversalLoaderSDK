@@ -28,52 +28,43 @@ public class VAInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
+        Logger.d(TAG, "newActivity: " + className);
         Intent target = intent.getParcelableExtra("_VA_TARGET_");
-        if (target != null && target.getComponent() != null) {
-            String targetActivity = target.getComponent().getClassName();
-            try {
-                ClassLoader appCl = CloneManager.getInstance().getClassLoader();
-                Logger.i("VA", "Instrumentation redirecting to: " + targetActivity);
-                
-                // Ensure target remains set to the correct class
-                target.setExtrasClassLoader(appCl);
-                
-                return super.newActivity(appCl, targetActivity, target);
-            } catch (Throwable e) {
-                Logger.e(TAG, "newActivity redirection failed: " + e.getMessage());
-            }
-        }
         
+        // If the className is StubActivity but we have a target, we MUST redirect
+        if (className.contains("StubActivity") && target != null && target.getComponent() != null) {
+            String targetActivity = target.getComponent().getClassName();
+            cl = CloneManager.getInstance().getClassLoader();
+            className = targetActivity;
+            intent = target;
+            Logger.i(TAG, "Instrumentation Redirection [Stub -> Real]: " + className);
+        } else if (target != null && target.getComponent() != null) {
+             // Already swapped by HCallback maybe? Or just a nested launch.
+             cl = CloneManager.getInstance().getClassLoader();
+             className = target.getComponent().getClassName();
+             intent = target;
+        }
+
         return super.newActivity(cl, className, intent);
     }
 
     @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
-        Logger.i(TAG, ">>> HOOK ACTIVE: callActivityOnCreate for " + activity.getClass().getName());
+        Logger.i(TAG, ">>> callActivityOnCreate: " + activity.getClass().getName());
         injectContext(activity);
-        base.callActivityOnCreate(activity, icicle);
-    }
-
-    @Override
-    public void callActivityOnResume(Activity activity) {
-        base.callActivityOnResume(activity);
-    }
-
-    @Override
-    public void callActivityOnStop(Activity activity) {
-        base.callActivityOnStop(activity);
-    }
-
-    @Override
-    public void callActivityOnPause(Activity activity) {
-        base.callActivityOnPause(activity);
+        try {
+            base.callActivityOnCreate(activity, icicle);
+        } catch (Throwable e) {
+            Logger.e(TAG, "callActivityOnCreate Failed for " + activity.getClass().getName(), e);
+            throw e;
+        }
     }
 
     // 🔥 CRITICAL: Context Fix
     private void injectContext(Activity activity) {
         try {
             Context baseContext = activity.getBaseContext();
-            Resources res = CloneManager.getInstance().getResources();
+            android.content.res.Resources res = CloneManager.getInstance().getResources();
             ClassLoader cl = CloneManager.getInstance().getClassLoader();
 
             if (res != null) {
@@ -113,15 +104,6 @@ public class VAInstrumentation extends Instrumentation {
                         Field mLoadedApkResources = loadedApk.getClass().getDeclaredField("mResources");
                         mLoadedApkResources.setAccessible(true);
                         mLoadedApkResources.set(loadedApk, res);
-                        
-                        // Patch Application instance inside LoadedApk if it exists
-                        Field mApplication = loadedApk.getClass().getDeclaredField("mApplication");
-                        mApplication.setAccessible(true);
-                        Object app = mApplication.get(loadedApk);
-                        if (app == null) {
-                            // If app is null, we might need to set the one we created
-                            // But usually makeApplication handles this.
-                        }
                     }
                 } catch (Exception e) {
                     Logger.e(TAG, "LoadedApk patch failed: " + e.getMessage());
@@ -153,49 +135,52 @@ public class VAInstrumentation extends Instrumentation {
         }
     }
 
-    /**
-     * Intercept Activity launch at the client side.
-     * This is a hidden method in Instrumentation.
-     */
+    // Support for multiple execStartActivity signatures to ensure interception of all internal launches
     public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
         
-        Logger.i(TAG, "execStartActivity Hooked. Target: " + (intent.getComponent() != null ? intent.getComponent().getClassName() : intent.toString()));
+        intent = wrapIntentIfNecessary(who, intent);
+        try {
+            Method method = Instrumentation.class.getDeclaredMethod("execStartActivity", 
+                Context.class, IBinder.class, IBinder.class, Activity.class, Intent.class, int.class, Bundle.class);
+            method.setAccessible(true);
+            return (ActivityResult) method.invoke(base, who, contextThread, token, target, intent, requestCode, options);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-        // Check if the target belongs to the guest app
-        if (intent.getComponent() != null) {
-            String packageName = intent.getComponent().getPackageName();
-            String className = intent.getComponent().getClassName();
-            
-            // If it's not our own package, it's likely a guest activity (or a system one)
-            // For now, if we are in guest mode, we redirect.
-            if (CloneManager.getInstance().getClonedPackage(packageName) != null) {
-                Logger.d(TAG, "Redirecting internal guest activity launch: " + className);
-                
+    public ActivityResult execStartActivity(
+            Context who, IBinder contextThread, IBinder token, String target,
+            Intent intent, int requestCode, Bundle options) {
+        
+        intent = wrapIntentIfNecessary(who, intent);
+        try {
+            Method method = Instrumentation.class.getDeclaredMethod("execStartActivity", 
+                Context.class, IBinder.class, IBinder.class, String.class, Intent.class, int.class, Bundle.class);
+            method.setAccessible(true);
+            return (ActivityResult) method.invoke(base, who, contextThread, token, target, intent, requestCode, options);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Intent wrapIntentIfNecessary(Context who, Intent intent) {
+        if (intent != null && intent.getComponent() != null) {
+            String pkg = intent.getComponent().getPackageName();
+            if (CloneManager.getInstance().getClonedPackage(pkg) != null) {
+                Logger.d(TAG, "Intercepted internal launch: " + intent.getComponent().getClassName());
                 Intent stubIntent = new Intent();
                 stubIntent.setClassName(who.getPackageName(), "com.onecore.sdk.core.StubActivity");
-                stubIntent.putExtra("target_activity", className);
-                stubIntent.putExtra("target_package", packageName);
+                stubIntent.putExtra("target_package", pkg);
+                stubIntent.putExtra("target_activity", intent.getComponent().getClassName());
                 stubIntent.putExtra("_VA_TARGET_", new Intent(intent));
                 stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                
-                intent = stubIntent;
+                return stubIntent;
             }
         }
-        
-        // Use reflection to call the base execStartActivity as it's hidden
-        try {
-            java.lang.reflect.Method execMethod = Instrumentation.class.getDeclaredMethod(
-                    "execStartActivity",
-                    Context.class, IBinder.class, IBinder.class, Activity.class,
-                    Intent.class, int.class, Bundle.class);
-            execMethod.setAccessible(true);
-            return (ActivityResult) execMethod.invoke(base, who, contextThread, token, target, intent, requestCode, options);
-        } catch (Exception e) {
-            Logger.e(TAG, "execStartActivity hook failed: " + e.getMessage());
-            return null;
-        }
+        return intent;
     }
 
     @Override
