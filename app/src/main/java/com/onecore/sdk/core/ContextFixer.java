@@ -17,6 +17,11 @@ public class ContextFixer {
     public static void fix(Context context, String packageName, ClassLoader classLoader, Resources resources) {
         if (context == null) return;
         try {
+            // Recurse into ContextWrapper (Activity, Service, Application etc.)
+            if (context instanceof android.content.ContextWrapper) {
+                fix(((android.content.ContextWrapper) context).getBaseContext(), packageName, classLoader, resources);
+            }
+
             Logger.v(TAG, "Applying deep patch to Context: " + context.getClass().getName());
             
             // 1. Patch ContextImpl instance fields
@@ -32,21 +37,53 @@ public class ContextFixer {
 
     private static void patchContextImpl(Context context, String pkg, ClassLoader cl, Resources res) {
         Class<?> clazz = context.getClass();
+        
+        // Ensure we are working with ContextImpl directly if possible
+        if (!clazz.getName().equals("android.app.ContextImpl")) {
+            // Search for mBase in wrappers
+            try {
+                Field mBase = getField(clazz, "mBase");
+                if (mBase != null) {
+                    Context base = (Context) mBase.get(context);
+                    if (base != null) patchContextImpl(base, pkg, cl, res);
+                }
+            } catch (Exception ignored) {}
+        }
+
         setFieldValue(context, clazz, "mResources", res);
         setFieldValue(context, clazz, "mClassLoader", cl);
         setFieldValue(context, clazz, "mBasePackageName", pkg);
         setFieldValue(context, clazz, "mOpPackageName", pkg);
         
+        // PackageManager patch
+        try {
+            Field mPackageManager = getField(clazz, "mPackageManager");
+            if (mPackageManager != null) {
+                // We could set a fake PackageManager instance here if needed
+                // For now system uses ActivityThread.getPackageManager() which we hooked.
+            }
+        } catch (Exception ignored) {}
+        
         // Assets handling
         try {
-            Field mAssets = clazz.getDeclaredField("mAssets");
-            mAssets.setAccessible(true);
-            mAssets.set(context, res.getAssets());
+            Field mAssets = getField(clazz, "mAssets");
+            if (mAssets != null) {
+                mAssets.set(context, res.getAssets());
+            }
         } catch (Exception ignored) {}
 
-        // Storage redirection (Hooking mFilesDir, mCacheDir etc if needed or just patching them)
-        // Note: Real storage hooking usually happens at the syscall or File object level, 
-        // but patching these fields helps for many apps.
+        // ContentResolver patch (important for setting package name in queries)
+        try {
+            Field mContentResolver = getField(clazz, "mContentResolver");
+            if (mContentResolver != null) {
+                Object resolver = mContentResolver.get(context);
+                if (resolver != null) {
+                    setFieldValue(resolver, resolver.getClass(), "mPackageName", pkg);
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // Storage redirection
         try {
             setFieldValue(context, clazz, "mFilesDir", VirtualStorage.getVirtualDir(pkg, "files"));
             setFieldValue(context, clazz, "mCacheDir", VirtualStorage.getVirtualDir(pkg, "cache"));
@@ -54,13 +91,28 @@ public class ContextFixer {
 
         // Android 12+ AttributionSource handling
         try {
-            Field mAttributionSourceField = clazz.getDeclaredField("mAttributionSource");
-            mAttributionSourceField.setAccessible(true);
-            Object attributionSource = mAttributionSourceField.get(context);
-            if (attributionSource != null) {
-                setFieldValue(attributionSource, attributionSource.getClass(), "mPackageName", pkg);
+            Field mAttributionSourceField = getField(clazz, "mAttributionSource");
+            if (mAttributionSourceField != null) {
+                Object attributionSource = mAttributionSourceField.get(context);
+                if (attributionSource != null) {
+                    setFieldValue(attributionSource, attributionSource.getClass(), "mPackageName", pkg);
+                }
             }
         } catch (Exception ignored) {}
+    }
+
+    private static Field getField(Class<?> clazz, String fieldName) {
+        try {
+            Field field = clazz.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return field;
+        } catch (NoSuchFieldException e) {
+            Class<?> superclass = clazz.getSuperclass();
+            if (superclass != null && superclass != Object.class) {
+                return getField(superclass, fieldName);
+            }
+        }
+        return null;
     }
 
     private static void patchLoadedApk(Context context, String pkg, ClassLoader cl, Resources res) throws Exception {

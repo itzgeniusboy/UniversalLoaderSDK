@@ -121,9 +121,15 @@ public class VirtualPackageManager {
             if (ai != null) {
                 android.content.pm.ResolveInfo ri = new android.content.pm.ResolveInfo();
                 ri.activityInfo = ai;
+                ri.intentFilter = null; // We could try to populate this if needed
+                ri.priority = 0;
                 return java.util.Collections.singletonList(ri);
             }
         }
+        
+        // Handle Action based resolution if possible
+        // (This would require scanning all intent filters in the APK)
+        
         return null;
     }
 

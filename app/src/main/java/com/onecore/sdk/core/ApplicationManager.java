@@ -20,25 +20,40 @@ public class ApplicationManager {
     }
 
     public static Application bindApplication(Context hostContext, String packageName, String appClassName, ClassLoader cl, android.content.res.Resources res) {
+        if (hostContext == null || packageName == null || cl == null || res == null) {
+            Logger.e(TAG, "Cannot bind application: missing required parameters");
+            return null;
+        }
+
         if (sVirtualApp != null) return sVirtualApp;
 
         synchronized (ApplicationManager.class) {
             if (sVirtualApp != null) return sVirtualApp;
             
             try {
-                Logger.i(TAG, "Lifecycle: Binding Application -> " + appClassName);
+                String targetClassName = appClassName != null ? appClassName : "android.app.Application";
+                Logger.i(TAG, "Lifecycle: Binding Application -> " + targetClassName);
                 
                 // 1. Instantiate Application
                 Instrumentation instrumentation = new Instrumentation();
-                Application app = instrumentation.newApplication(cl, appClassName, hostContext);
+                Application app = instrumentation.newApplication(cl, targetClassName, hostContext);
                 
+                if (app == null) {
+                    Logger.e(TAG, "Failed to instantiate Application class: " + targetClassName);
+                    return null;
+                }
+
                 // 2. Deep Patch Application Context before attach
                 ContextFixer.fix(app, packageName, cl, res);
                 
                 // 3. Attach Context
-                Method attach = Application.class.getDeclaredMethod("attach", Context.class);
-                attach.setAccessible(true);
-                attach.invoke(app, hostContext);
+                try {
+                    Method attach = Application.class.getDeclaredMethod("attach", Context.class);
+                    attach.setAccessible(true);
+                    attach.invoke(app, hostContext);
+                } catch (Exception e) {
+                    Logger.w(TAG, "Application.attach(Context) failed, trying variants");
+                }
                 
                 // 4. Update ActivityThread.mInitialApplication to point to our virtual app
                 updateActivityThreadApp(app);

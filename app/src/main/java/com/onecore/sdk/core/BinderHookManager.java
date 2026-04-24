@@ -92,7 +92,7 @@ public class BinderHookManager {
         getPmMethod.setAccessible(true);
         Object pm = getPmMethod.invoke(null);
 
-        Object proxy = PackageManagerHook.createProxy(pm, sCurrentPackage, sCurrentVirtualPath);
+        Object proxy = PackageManagerHook.createProxy(pm);
         
         java.lang.reflect.Field sPackageManagerField = atClass.getDeclaredField("sPackageManager");
         sPackageManagerField.setAccessible(true);

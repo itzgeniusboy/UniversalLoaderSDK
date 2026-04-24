@@ -23,18 +23,25 @@ public class VirtualStorage {
     }
 
     public static String redirectPath(String originalPath, String pkgName) {
-        if (originalPath == null || sVirtualRoot == null) return originalPath;
+        if (originalPath == null || sVirtualRoot == null || pkgName == null) return originalPath;
         
         // Redirect standard data paths
         String dataPrefix = "/data/data/" + pkgName;
         String userPrefix = "/data/user/0/" + pkgName;
+        String mntPrefix = "/mnt/sdcard/Android/data/" + pkgName;
 
-        if (originalPath.startsWith(dataPrefix) || originalPath.startsWith(userPrefix)) {
-            String suffix = originalPath.substring(originalPath.indexOf(pkgName) + pkgName.length());
+        if (originalPath.startsWith(dataPrefix) || originalPath.startsWith(userPrefix) || originalPath.startsWith(mntPrefix)) {
+            String suffix = "";
+            if (originalPath.startsWith(dataPrefix)) suffix = originalPath.substring(dataPrefix.length());
+            else if (originalPath.startsWith(userPrefix)) suffix = originalPath.substring(userPrefix.length());
+            else suffix = originalPath.substring(mntPrefix.length());
+
             String redirected = new File(sVirtualRoot, pkgName + "/data" + suffix).getAbsolutePath();
             
-            File dir = new File(redirected).getParentFile();
-            if (dir != null && !dir.exists()) dir.mkdirs();
+            // Ensure parent directory exists
+            File file = new File(redirected);
+            File parent = file.getParentFile();
+            if (parent != null && !parent.exists()) parent.mkdirs();
             
             return redirected;
         }

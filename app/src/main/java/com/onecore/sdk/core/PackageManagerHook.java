@@ -51,78 +51,79 @@ public class PackageManagerHook implements InvocationHandler {
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String name = method.getName();
 
-        if ("getPackageInfo".equals(name)) {
-            String pkgName = (String) args[0];
-            PackageInfo info = VirtualPackageManager.get().getClonedPackage(pkgName);
-            if (info != null) {
-                Logger.v(TAG, "Spoofing getPackageInfo for: " + pkgName);
-                return info;
-            }
-        }
-
-        if ("getApplicationInfo".equals(name)) {
-            String pkgName = (String) args[0];
-            PackageInfo info = VirtualPackageManager.get().getClonedPackage(pkgName);
-            if (info != null) {
-                Logger.v(TAG, "Spoofing getApplicationInfo for: " + pkgName);
-                return info.applicationInfo;
-            }
-        }
-
-        if ("getActivityInfo".equals(name)) {
-            android.content.ComponentName component = (android.content.ComponentName) args[0];
-            if (component != null) {
-                ActivityInfo ai = VirtualPackageManager.resolveActivity(component.getPackageName(), component.getClassName());
-                if (ai != null) {
-                    Logger.v(TAG, "Spoofing getActivityInfo for: " + component.flattenToString());
-                    return ai;
+        if (args != null && args.length > 0) {
+            if ("getPackageInfo".equals(name) || "getPackageInfoAsUser".equals(name)) {
+                String pkgName = (String) args[0];
+                PackageInfo info = VirtualPackageManager.get().getClonedPackage(pkgName);
+                if (info != null) {
+                    Logger.v(TAG, "Spoofing " + name + " for: " + pkgName);
+                    return info;
                 }
             }
-        }
 
-        if ("getServiceInfo".equals(name)) {
-            android.content.ComponentName component = (android.content.ComponentName) args[0];
-            if (component != null) {
-                // Return virtual service info if available
-                android.content.pm.ServiceInfo si = VirtualPackageManager.resolveService(component.getPackageName(), component.getClassName());
-                if (si != null) return si;
-            }
-        }
-
-        if ("getReceiverInfo".equals(name)) {
-            android.content.ComponentName component = (android.content.ComponentName) args[0];
-            if (component != null) {
-                android.content.pm.ActivityInfo ai = VirtualPackageManager.resolveReceiver(component.getPackageName(), component.getClassName());
-                if (ai != null) return ai;
-            }
-        }
-
-        if ("getProviderInfo".equals(name)) {
-            android.content.ComponentName component = (android.content.ComponentName) args[0];
-            if (component != null) {
-                android.content.pm.ProviderInfo pi = VirtualPackageManager.resolveProvider(component.getPackageName(), component.getClassName());
-                if (pi != null) return pi;
-            }
-        }
-
-        if ("queryIntentActivities".equals(name)) {
-            Intent intent = (Intent) args[0];
-            if (intent != null) {
-                List<ResolveInfo> list = VirtualPackageManager.queryIntentActivities(intent);
-                if (list != null && !list.isEmpty()) {
-                    Logger.v(TAG, "Spoofing queryIntentActivities for: " + intent);
-                    return list;
+            if ("getApplicationInfo".equals(name) || "getApplicationInfoAsUser".equals(name)) {
+                String pkgName = (String) args[0];
+                PackageInfo info = VirtualPackageManager.get().getClonedPackage(pkgName);
+                if (info != null) {
+                    Logger.v(TAG, "Spoofing " + name + " for: " + pkgName);
+                    return info.applicationInfo;
                 }
             }
-        }
 
-        if ("resolveIntent".equals(name)) {
-            Intent intent = (Intent) args[0];
-            if (intent != null) {
-                ResolveInfo ri = VirtualPackageManager.resolveIntent(intent);
-                if (ri != null) {
-                    Logger.v(TAG, "Spoofing resolveIntent for: " + intent);
-                    return ri;
+            if ("getActivityInfo".equals(name)) {
+                android.content.ComponentName component = (android.content.ComponentName) args[0];
+                if (component != null) {
+                    ActivityInfo ai = VirtualPackageManager.resolveActivity(component.getPackageName(), component.getClassName());
+                    if (ai != null) {
+                        Logger.v(TAG, "Spoofing getActivityInfo for: " + component.flattenToString());
+                        return ai;
+                    }
+                }
+            }
+
+            if ("getServiceInfo".equals(name)) {
+                android.content.ComponentName component = (android.content.ComponentName) args[0];
+                if (component != null) {
+                    android.content.pm.ServiceInfo si = VirtualPackageManager.resolveService(component.getPackageName(), component.getClassName());
+                    if (si != null) return si;
+                }
+            }
+
+            if ("getReceiverInfo".equals(name)) {
+                android.content.ComponentName component = (android.content.ComponentName) args[0];
+                if (component != null) {
+                    android.content.pm.ActivityInfo ai = VirtualPackageManager.resolveReceiver(component.getPackageName(), component.getClassName());
+                    if (ai != null) return ai;
+                }
+            }
+
+            if ("getProviderInfo".equals(name)) {
+                android.content.ComponentName component = (android.content.ComponentName) args[0];
+                if (component != null) {
+                    android.content.pm.ProviderInfo pi = VirtualPackageManager.resolveProvider(component.getPackageName(), component.getClassName());
+                    if (pi != null) return pi;
+                }
+            }
+
+            if ("queryIntentActivities".equals(name)) {
+                Intent intent = (Intent) args[0];
+                if (intent != null) {
+                    List<ResolveInfo> list = VirtualPackageManager.queryIntentActivities(intent);
+                    if (list != null && !list.isEmpty()) {
+                        Logger.v(TAG, "Spoofing queryIntentActivities for: " + intent);
+                        return list;
+                    }
+                }
+            }
+
+            if ("resolveIntent".equals(name)) {
+                Intent intent = (Intent) args[0];
+                if (intent != null) {
+                    ResolveInfo ri = VirtualPackageManager.resolveIntent(intent);
+                    if (ri != null) {
+                        Logger.v(TAG, "Spoofing resolveIntent for: " + intent);
+                        return ri;
+                    }
                 }
             }
         }
@@ -133,6 +134,10 @@ public class PackageManagerHook implements InvocationHandler {
 
         if ("checkPermission".equals(name)) {
             return android.content.pm.PackageManager.PERMISSION_GRANTED;
+        }
+
+        if ("isSafeMode".equals(name)) {
+            return false;
         }
 
         try {

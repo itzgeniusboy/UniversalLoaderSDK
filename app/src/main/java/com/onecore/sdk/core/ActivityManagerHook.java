@@ -85,8 +85,18 @@ public class ActivityManagerHook implements InvocationHandler {
 
         // Return Fake UID or PID if requested by the Game
         if (methodName.equals("getRunningAppProcesses")) {
-            // Logic to filter or spoof the process list
-            return method.invoke(realService, args);
+            Object result = method.invoke(realService, args);
+            if (result instanceof java.util.List) {
+                java.util.List<android.app.ActivityManager.RunningAppProcessInfo> list = (java.util.List<android.app.ActivityManager.RunningAppProcessInfo>) result;
+                for (android.app.ActivityManager.RunningAppProcessInfo info : list) {
+                    if (info.pid == android.os.Process.myPid()) {
+                        // Spoof our process name to be the guest app's package name
+                        info.processName = BinderHookManager.sCurrentPackage;
+                        info.pkgList = new String[]{BinderHookManager.sCurrentPackage};
+                    }
+                }
+            }
+            return result;
         }
 
         return method.invoke(realService, args);

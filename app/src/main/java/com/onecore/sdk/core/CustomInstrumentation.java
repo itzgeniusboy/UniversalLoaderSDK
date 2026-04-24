@@ -21,6 +21,7 @@ public class CustomInstrumentation extends Instrumentation {
 
     public CustomInstrumentation(Instrumentation base) {
         this.mBase = base;
+        // Optionally bind mBase context if needed
     }
 
     @Override
@@ -52,10 +53,19 @@ public class CustomInstrumentation extends Instrumentation {
                     // Force using the guest loader specifically for the target activity
                     Class<?> activityClass = guestLoader.loadClass(realClassName);
                     Activity activity = (Activity) activityClass.newInstance();
+                    
+                    // Pre-bind context if possible
+                    ContextManager.bindContext(activity, realPackageName, guestLoader, guestResources);
+                    
                     return activity;
                 } catch (Exception e) {
-                    Logger.e(TAG, "Manual instantiation failed, falling back to super.newActivity", e);
-                    return super.newActivity(guestLoader, realClassName, targetIntent);
+                    Logger.e(TAG, "Manual instantiation failed for " + realClassName + ", falling back to super.newActivity", e);
+                    try {
+                        return super.newActivity(guestLoader, realClassName, targetIntent);
+                    } catch (Exception ex) {
+                        Logger.e(TAG, "Fallback instantiation also failed", ex);
+                        throw ex;
+                    }
                 }
             }
         }
