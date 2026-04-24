@@ -1,7 +1,9 @@
 package com.onecore.sdk.core;
 
+import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
+import android.content.pm.ServiceInfo;
 import com.onecore.sdk.core.pm.VirtualPackageManager;
 import com.onecore.sdk.utils.Logger;
 import java.lang.reflect.InvocationHandler;
@@ -10,7 +12,7 @@ import java.lang.reflect.Proxy;
 
 /**
  * Advanced PackageManager Proxy.
- * Spoofs system responses to pretend virtual apps are installed natively.
+ * Provides virtual app information to the system and target application.
  */
 public class PackageManagerHook implements InvocationHandler {
     private static final String TAG = "OneCore-PMHook";
@@ -21,8 +23,12 @@ public class PackageManagerHook implements InvocationHandler {
     }
 
     public static Object createProxy(Object realService) {
-        Class<?> clazz = realService.getClass();
-        return Proxy.newProxyInstance(clazz.getClassLoader(), clazz.getInterfaces(), new PackageManagerHook(realService));
+        try {
+            Class<?> iPmClass = Class.forName("android.content.pm.IPackageManager");
+            return Proxy.newProxyInstance(iPmClass.getClassLoader(), new Class[]{iPmClass}, new PackageManagerHook(realService));
+        } catch (Exception e) {
+            return Proxy.newProxyInstance(realService.getClass().getClassLoader(), realService.getClass().getInterfaces(), new PackageManagerHook(realService));
+        }
     }
 
     @Override
@@ -42,11 +48,22 @@ public class PackageManagerHook implements InvocationHandler {
         }
 
         if ("getActivityInfo".equals(name)) {
-            // Logic to return virtual activity info
+            android.content.ComponentName component = (android.content.ComponentName) args[0];
+            if (component != null) {
+                ActivityInfo ai = VirtualPackageManager.resolveActivity(component.getPackageName(), component.getClassName());
+                if (ai != null) return ai;
+            }
         }
 
-        if ("getPackageInstaller".equals(name)) {
-            // Often used for verification, might need spoofing
+        if ("getServiceInfo".equals(name)) {
+            android.content.ComponentName component = (android.content.ComponentName) args[0];
+            if (component != null) {
+                // Return virtual service info if available
+            }
+        }
+
+        if ("checkPermission".equals(name)) {
+            return android.content.pm.PackageManager.PERMISSION_GRANTED;
         }
 
         try {

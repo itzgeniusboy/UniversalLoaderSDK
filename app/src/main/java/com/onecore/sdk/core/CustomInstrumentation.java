@@ -36,7 +36,17 @@ public class CustomInstrumentation extends Instrumentation {
             
             // 2. LOAD USING GUEST CLASSLOADER (DexClassLoader)
             ClassLoader guestLoader = CloneManager.getInstance().getClassLoader();
+            android.content.res.Resources guestResources = CloneManager.getInstance().getResources();
+
             if (guestLoader != null) {
+                // Ensure Virtual Application is correctly initialized before any Activity arises
+                android.content.pm.PackageInfo pi = com.onecore.sdk.core.pm.VirtualPackageManager.get().getClonedPackage(realPackageName);
+                if (pi != null && pi.applicationInfo != null) {
+                    String appClass = pi.applicationInfo.className;
+                    if (appClass == null) appClass = "android.app.Application";
+                    ApplicationManager.bindApplication(CloneManager.getInstance().getHostContext(), realPackageName, appClass, guestLoader, guestResources);
+                }
+
                 Logger.d(TAG, "Forcing DexClassLoader for: " + realClassName);
                 try {
                     // Force using the guest loader specifically for the target activity

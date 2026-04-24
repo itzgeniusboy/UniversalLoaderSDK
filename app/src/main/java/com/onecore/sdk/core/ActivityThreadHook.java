@@ -5,6 +5,7 @@ import com.onecore.sdk.core.hook.HandlerCallback;
 import com.onecore.sdk.utils.Logger;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 
 /**
  * FINAL ActivityThread Hook.
@@ -50,6 +51,19 @@ public class ActivityThreadHook {
             if (!(currentCb instanceof HandlerCallback)) {
                 cbField.set(mH, new HandlerCallback(mH));
                 Logger.d(TAG, "ActivityThread.mH hooked via HandlerCallback");
+            }
+
+            // 4. Inject PackageManager Proxy
+            try {
+                Field sPmField = atClass.getDeclaredField("sPackageManager");
+                sPmField.setAccessible(true);
+                Object sPm = sPmField.get(null);
+                if (sPm != null && !(Proxy.isProxyClass(sPm.getClass()) && Proxy.getInvocationHandler(sPm) instanceof PackageManagerHook)) {
+                    sPmField.set(null, PackageManagerHook.createProxy(sPm));
+                    Logger.d(TAG, "ActivityThread.sPackageManager hooked.");
+                }
+            } catch (Exception e) {
+                Logger.e(TAG, "PackageManager Hook FAILED", e);
             }
 
             Logger.i(TAG, "PHASE 1 Hooks successfully injected.");
