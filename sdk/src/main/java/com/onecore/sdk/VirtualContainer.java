@@ -165,29 +165,27 @@ public class VirtualContainer {
     public void bindApplication(Context context, String applicationClassName, String packageName) {
         if (mClassLoader == null || mTargetApplication != null) return;
         
-        SafeExecutionManager.run("Application Binding", () -> {
-            try {
-                Log.i(TAG, ">>> V_CORE: Binding Target Application [" + applicationClassName + "] <<<");
-                
-                // 1. Fix base context first
-                com.onecore.sdk.core.OneCoreContextFixer.fixContext(context, packageName);
-                
-                // 2. Create instance
-                Class<?> appClass = mClassLoader.loadClass(applicationClassName);
-                mTargetApplication = (android.app.Application) appClass.newInstance();
-                
-                // 3. Attach base context
-                Method attach = android.app.Application.class.getDeclaredMethod("attach", Context.class);
-                attach.setAccessible(true);
-                attach.invoke(mTargetApplication, context);
-                
-                // 4. Call onCreate
-                mTargetApplication.onCreate();
-                Log.i(TAG, ">>> V_CORE: Application Bound and Active. <<<");
-            } catch (Exception e) {
-                Log.e(TAG, "!!! V_CORE: Application Binding FAILED !!!", e);
-            }
-        });
+        try {
+            Log.i(TAG, ">>> V_CORE: Binding Target Application [" + applicationClassName + "] <<<");
+            
+            // 1. Fix base context first
+            com.onecore.sdk.core.OneCoreContextFixer.fixContext(context, packageName);
+            
+            // 2. Create instance
+            Class<?> appClass = mClassLoader.loadClass(applicationClassName);
+            mTargetApplication = (android.app.Application) appClass.newInstance();
+            
+            // 3. Attach base context
+            Method attach = android.app.Application.class.getDeclaredMethod("attach", Context.class);
+            attach.setAccessible(true);
+            attach.invoke(mTargetApplication, context);
+            
+            // 4. Call onCreate
+            mTargetApplication.onCreate();
+            Log.i(TAG, ">>> V_CORE: Application Bound and Active. <<<");
+        } catch (Exception e) {
+            Log.e(TAG, "!!! V_CORE: Application Binding FAILED !!!", e);
+        }
     }
 
     public android.app.Application getTargetApplication() {
@@ -211,11 +209,13 @@ public class VirtualContainer {
     }
 
     private void fixGameObb(String packageName) {
-        com.onecore.sdk.core.SafeExecutionManager.run("Gaming OBB Fix", () -> {
+        try {
             File obbDir = new File(android.os.Environment.getExternalStorageDirectory(), "Android/obb/" + packageName);
             if (!obbDir.exists()) {
                 Log.w(TAG, "OneCore-DEBUG: OBB directory missing. BGMI/PUBG might not start. Path: " + obbDir.getAbsolutePath());
             }
-        });
+        } catch (Exception e) {
+            Log.e(TAG, "OBB Check Failed", e);
+        }
     }
 }
