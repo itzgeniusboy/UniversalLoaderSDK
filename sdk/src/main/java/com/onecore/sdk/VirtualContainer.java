@@ -104,32 +104,15 @@ public class VirtualContainer {
         }
     }
 
-    /**
-     * Loads and initializes the target application instance.
-     */
-    public void bindApplication(Context context, String applicationClassName) {
-        if (mClassLoader == null) return;
-        
-        try {
-            Log.i(TAG, "Binding Application: " + applicationClassName);
-            
-            Class<?> appClass = mClassLoader.loadClass(applicationClassName);
-            mTargetApplication = (android.app.Application) appClass.newInstance();
-            
-            // We would need to attach context here. In a full engine, we use instrumentation.
-            // For now, we simulate the call if possible.
-            Method attach = android.app.Application.class.getDeclaredMethod("attach", Context.class);
-            attach.setAccessible(true);
-            attach.invoke(mTargetApplication, context);
-            
-            mTargetApplication.onCreate();
-            Log.i(TAG, "Target Application bound and onCreate called.");
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to bind application", e);
-        }
+    public String getApkPath() {
+        return mApkPath;
     }
 
-    public android.app.Application getTargetApplication() {
-        return mTargetApplication;
+    public ClassLoader getClassLoader() {
+        return mClassLoader;
+    }
+
+    public Resources getResources() {
+        return mResources;
     }
 }

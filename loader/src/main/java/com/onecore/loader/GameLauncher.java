@@ -54,14 +54,6 @@ public class GameLauncher {
 
             if (callback != null) callback.onProgress("Launching in Container...");
             
-            // Phase 2: Bind Application
-            android.content.pm.ApplicationInfo appInfo = context.getPackageManager().getApplicationInfo(targetPkg, 0);
-            if (appInfo.className != null) {
-                container.bindApplication(context, appInfo.className);
-            } else {
-                Log.d(TAG, "No custom Application class found for " + targetPkg);
-            }
-            
             // Launch the main activity
             String targetActivity = context.getPackageManager().getLaunchIntentForPackage(targetPkg).getComponent().getClassName();
             container.launch(context, targetActivity);

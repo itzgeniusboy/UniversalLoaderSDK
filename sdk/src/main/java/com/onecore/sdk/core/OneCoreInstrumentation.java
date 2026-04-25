@@ -50,6 +50,9 @@ public class OneCoreInstrumentation extends Instrumentation {
         try {
             Log.i(TAG, "Fixing context for activity: " + activity.getClass().getName());
             
+            Context baseContext = activity.getBaseContext();
+            VirtualContainer container = VirtualContainer.getInstance();
+            
             // 0. Patch Package names in ContextImpl
             try {
                 String targetPkg = activity.getIntent().getStringExtra("target_package");
@@ -71,13 +74,15 @@ public class OneCoreInstrumentation extends Instrumentation {
             }
 
             // 1. Patch Resources
-            try {
-                Field mResourcesField = baseContext.getClass().getDeclaredField("mResources");
-                mResourcesField.setAccessible(true);
-                mResourcesField.set(baseContext, container.getResources());
-                Log.d(TAG, "Fixed ContextImpl Resources");
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to fix ContextImpl Resources", e);
+            if (container.getResources() != null) {
+                try {
+                    Field mResourcesField = baseContext.getClass().getDeclaredField("mResources");
+                    mResourcesField.setAccessible(true);
+                    mResourcesField.set(baseContext, container.getResources());
+                    Log.d(TAG, "Fixed ContextImpl Resources");
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to fix ContextImpl Resources", e);
+                }
             }
 
             // 2. Patch LoadedApk (mPackageInfo)
@@ -86,17 +91,21 @@ public class OneCoreInstrumentation extends Instrumentation {
                 mPackageInfoField.setAccessible(true);
                 Object mPackageInfo = mPackageInfoField.get(baseContext);
 
-                // mClassLoader
-                Field mClassLoaderField = mPackageInfo.getClass().getDeclaredField("mClassLoader");
-                mClassLoaderField.setAccessible(true);
-                mClassLoaderField.set(mPackageInfo, container.getClassLoader());
+                if (mPackageInfo != null) {
+                    // mClassLoader
+                    Field mClassLoaderField = mPackageInfo.getClass().getDeclaredField("mClassLoader");
+                    mClassLoaderField.setAccessible(true);
+                    mClassLoaderField.set(mPackageInfo, container.getClassLoader());
 
-                // mResources
-                Field mLoadedApkResField = mPackageInfo.getClass().getDeclaredField("mResources");
-                mLoadedApkResField.setAccessible(true);
-                mLoadedApkResField.set(mPackageInfo, container.getResources());
-                
-                Log.d(TAG, "Fixed LoadedApk ClassLoader and Resources");
+                    // mResources
+                    if (container.getResources() != null) {
+                        Field mLoadedApkResField = mPackageInfo.getClass().getDeclaredField("mResources");
+                        mLoadedApkResField.setAccessible(true);
+                        mLoadedApkResField.set(mPackageInfo, container.getResources());
+                    }
+                    
+                    Log.d(TAG, "Fixed LoadedApk ClassLoader and Resources");
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Failed to fix LoadedApk", e);
             }

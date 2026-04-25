@@ -30,6 +30,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        // Initialize OneCore SDK early to hook system lifecycle
+        com.onecore.sdk.OneCoreSDK.init(this);
+        
         setContentView(R.layout.activity_main);
 
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
