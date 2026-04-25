@@ -98,63 +98,17 @@ public class OneCoreInstrumentation extends Instrumentation {
 
     private void fixActivityContext(Activity activity) {
         try {
-            Log.i(TAG, "Patching Activity Context: " + activity.getClass().getName());
-            Context baseContext = activity.getBaseContext();
-            VirtualContainer container = VirtualContainer.getInstance();
+            String targetPkg = activity.getIntent().getStringExtra("target_package");
+            if (targetPkg == null) return;
+
+            Log.i(TAG, ">>> OneCore: Deep Patching Activity Context for [" + targetPkg + "] <<<");
             
-            // Fix Package Names
-            try {
-                String targetPkg = activity.getIntent().getStringExtra("target_package");
-                if (targetPkg != null) {
-                    Field mPackageNameField = baseContext.getClass().getDeclaredField("mPackageName");
-                    mPackageNameField.setAccessible(true);
-                    mPackageNameField.set(baseContext, targetPkg);
+            // Use specialized ContextFixer
+            ContextFixer.fixContext(activity, targetPkg);
 
-                    try {
-                        Field mBasePackageNameField = baseContext.getClass().getDeclaredField("mBasePackageName");
-                        mBasePackageNameField.setAccessible(true);
-                        mBasePackageNameField.set(baseContext, targetPkg);
-                    } catch (NoSuchFieldException ignored) {}
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to fix PackageNames", e);
-            }
-
-            // Fix Resources
-            if (container.getResources() != null) {
-                try {
-                    Field mResourcesField = baseContext.getClass().getDeclaredField("mResources");
-                    mResourcesField.setAccessible(true);
-                    mResourcesField.set(baseContext, container.getResources());
-                } catch (Exception e) {
-                    Log.e(TAG, "Failed to fix Resources", e);
-                }
-            }
-
-            // Fix ClassLoader in LoadedApk
-            try {
-                Field mPackageInfoField = baseContext.getClass().getDeclaredField("mPackageInfo");
-                mPackageInfoField.setAccessible(true);
-                Object mPackageInfo = mPackageInfoField.get(baseContext);
-
-                if (mPackageInfo != null) {
-                    Field mClassLoaderField = mPackageInfo.getClass().getDeclaredField("mClassLoader");
-                    mClassLoaderField.setAccessible(true);
-                    mClassLoaderField.set(mPackageInfo, container.getClassLoader());
-
-                    if (container.getResources() != null) {
-                        Field mLoadedApkResField = mPackageInfo.getClass().getDeclaredField("mResources");
-                        mLoadedApkResField.setAccessible(true);
-                        mLoadedApkResField.set(mPackageInfo, container.getResources());
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to fix LoadedApk", e);
-            }
-
-            Log.i(TAG, "Context patching COMPLETE.");
+            Log.i(TAG, ">>> OneCore: Activity Lifecycle ready for rendering. <<<");
         } catch (Exception e) {
-            Log.e(TAG, "Context patching FAILED", e);
+            Log.e(TAG, "!!! OneCore: Deep Patch FAILED !!!", e);
         }
     }
 }

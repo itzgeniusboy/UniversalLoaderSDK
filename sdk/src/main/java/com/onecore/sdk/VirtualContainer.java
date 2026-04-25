@@ -103,6 +103,36 @@ public class VirtualContainer {
         }
     }
 
+    /**
+     * Loads and initializes the target application instance.
+     */
+    public void bindApplication(Context context, String applicationClassName, String packageName) {
+        if (mClassLoader == null) return;
+        
+        try {
+            Log.i(TAG, ">>> V_CORE: Binding Target Application [" + applicationClassName + "] <<<");
+            
+            Class<?> appClass = mClassLoader.loadClass(applicationClassName);
+            mTargetApplication = (android.app.Application) appClass.newInstance();
+            
+            // Fix context before attaching
+            com.onecore.sdk.core.ContextFixer.fixContext(context, packageName);
+
+            Method attach = android.app.Application.class.getDeclaredMethod("attach", Context.class);
+            attach.setAccessible(true);
+            attach.invoke(mTargetApplication, context);
+            
+            mTargetApplication.onCreate();
+            Log.i(TAG, ">>> V_CORE: Application Bound and Active. <<<");
+        } catch (Exception e) {
+            Log.e(TAG, "!!! V_CORE: Application Binding FAILED !!!", e);
+        }
+    }
+
+    public android.app.Application getTargetApplication() {
+        return mTargetApplication;
+    }
+
     public String getApkPath() {
         return mApkPath;
     }

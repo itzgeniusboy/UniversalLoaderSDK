@@ -54,6 +54,14 @@ public class GameLauncher {
 
             if (callback != null) callback.onProgress("Launching in Container...");
             
+            // Phase 3: Bind Application with correct context
+            android.content.pm.ApplicationInfo appInfo = context.getPackageManager().getApplicationInfo(targetPkg, 0);
+            if (appInfo.className != null) {
+                container.bindApplication(context, appInfo.className, targetPkg);
+            } else {
+                container.bindApplication(context, "android.app.Application", targetPkg);
+            }
+            
             // Launch the main activity
             String targetActivity = context.getPackageManager().getLaunchIntentForPackage(targetPkg).getComponent().getClassName();
             container.launch(context, targetActivity);
