@@ -55,14 +55,17 @@ public class OneCoreInstrumentation extends Instrumentation {
         
         String targetActivity = intent.getStringExtra("target_activity");
         if (targetActivity != null) {
-            return SafeExecutionManager.runWithResult("newActivity (" + targetActivity + ")", () -> {
-                ClassLoader virtualCl = VirtualContainer.getInstance().getClassLoader();
-                if (virtualCl != null) {
-                    Log.d(TAG, "OneCore-DEBUG: Using virtual classloader for " + targetActivity);
+            ClassLoader virtualCl = VirtualContainer.getInstance().getClassLoader();
+            if (virtualCl != null) {
+                try {
+                    Log.d(TAG, "OneCore-DEBUG: Instantiating virtual activity: " + targetActivity);
                     return mBase.newActivity(virtualCl, targetActivity, intent);
+                } catch (Exception e) {
+                    Log.e(TAG, "!!! OneCore-ERROR: Failed to instantiate virtual activity: " + targetActivity, e);
+                    // Critical failure: if we can't load the virtual activity, we can't proceed
+                    throw new ClassNotFoundException("Virtual Activity not found: " + targetActivity, e);
                 }
-                return mBase.newActivity(cl, targetActivity, intent);
-            }, super.newActivity(cl, className, intent));
+            }
         }
         
         return mBase.newActivity(cl, className, intent);

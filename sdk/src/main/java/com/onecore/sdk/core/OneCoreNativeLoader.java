@@ -26,42 +26,46 @@ public class OneCoreNativeLoader {
             ZipFile zipFile = new ZipFile(apkPath);
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
             
-            // Determine primary ABI (high priority for Gaming)
-            String[] abis = android.os.Build.SUPPORTED_ABIS;
-            String primaryAbi = abis.length > 0 ? abis[0] : "armeabi-v7a";
+            // Determine best ABI available in APK
+            String bestAbi = null;
+            String[] supportedAbis = android.os.Build.SUPPORTED_ABIS;
             
-            Log.i(TAG, "OneCore-DEBUG: Target ABI for Gaming -> " + primaryAbi);
+            // First pass: find the best ABI that actually has libraries in this ZIP
+            for (String abi : supportedAbis) {
+                Enumeration<? extends ZipEntry> checkEntries = zipFile.entries();
+                while (checkEntries.hasMoreElements()) {
+                    ZipEntry entry = checkEntries.nextElement();
+                    if (entry.getName().startsWith("lib/" + abi + "/")) {
+                        bestAbi = abi;
+                        break;
+                    }
+                }
+                if (bestAbi != null) break;
+            }
+            
+            if (bestAbi == null) bestAbi = "armeabi-v7a"; // Fallback
+            
+            Log.i(TAG, "OneCore-DEBUG: Best APK ABI detected -> " + bestAbi);
 
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
                 
-                if (name.startsWith("lib/") && name.endsWith(".so")) {
-                    // Optimized extraction: Match best ABI or fallback to v7a
-                    boolean match = false;
-                    for (String abi : abis) {
-                        if (name.contains(abi)) {
-                            match = true;
-                            break;
+                if (name.startsWith("lib/" + bestAbi + "/") && name.endsWith(".so")) {
+                    String fileName = name.substring(name.lastIndexOf("/") + 1);
+                    File outFile = new File(libDir, fileName);
+                    
+                    if (!outFile.exists() || outFile.length() != entry.getSize()) {
+                        InputStream is = zipFile.getInputStream(entry);
+                        FileOutputStream fos = new FileOutputStream(outFile);
+                        byte[] buffer = new byte[16384]; // Larger buffer for speed
+                        int len;
+                        while ((len = is.read(buffer)) != -1) {
+                            fos.write(buffer, 0, len);
                         }
-                    }
-
-                    if (match) {
-                        String fileName = name.substring(name.lastIndexOf("/") + 1);
-                        File outFile = new File(libDir, fileName);
-                        
-                        if (!outFile.exists() || outFile.length() != entry.getSize()) {
-                            InputStream is = zipFile.getInputStream(entry);
-                            FileOutputStream fos = new FileOutputStream(outFile);
-                            byte[] buffer = new byte[8192];
-                            int len;
-                            while ((len = is.read(buffer)) != -1) {
-                                fos.write(buffer, 0, len);
-                            }
-                            fos.close();
-                            is.close();
-                            Log.d(TAG, "Extracted: " + fileName);
-                        }
+                        fos.close();
+                        is.close();
+                        Log.d(TAG, "Extracted: " + fileName);
                     }
                 }
             }

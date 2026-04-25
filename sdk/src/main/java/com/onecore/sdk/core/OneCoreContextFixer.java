@@ -48,14 +48,20 @@ public class OneCoreContextFixer {
             if (!cacheDir.exists()) cacheDir.mkdirs();
             ReflectionHelper.setFieldValue(contextImpl, cacheDir, "mCacheDir");
                 
-            // 2. Fix Resources & LayoutInflater
+            // 2. Fix Resources & ClassLoader & LayoutInflater
             Resources virtualRes = VirtualContainer.getInstance().getResources();
+            ClassLoader virtualCl = VirtualContainer.getInstance().getClassLoader();
+            
+            if (virtualCl != null) {
+                ReflectionHelper.setFieldValue(contextImpl, virtualCl, "mClassLoader");
+            }
+
             if (virtualRes != null) {
                 ReflectionHelper.setFieldValue(contextImpl, virtualRes, "mResources");
                 
                 // CRITICAL: Clone LayoutInflater and inject back
                 android.view.LayoutInflater original = (android.view.LayoutInflater) baseContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-                if (original != null) {
+                if (original != null && !(original.getClass().getName().contains("OneCore"))) {
                     android.view.LayoutInflater virtualInflater = original.cloneInContext(context);
                     ReflectionHelper.setFieldValue(contextImpl, virtualInflater, "mInflater");
                 }

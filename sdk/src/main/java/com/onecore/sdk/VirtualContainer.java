@@ -39,16 +39,27 @@ public class VirtualContainer {
      */
     public boolean installApk(Context context, String apkPath, String packageName) {
         Log.i(TAG, "Installing APK for virtualization: " + apkPath);
+        
+        File apkFile = new File(apkPath);
+        if (!apkFile.exists()) {
+            Log.e(TAG, "Target APK not found at: " + apkPath);
+            return false;
+        }
+
         this.mApkPath = apkPath;
         this.mPackageName = packageName;
 
         try {
             android.content.pm.PackageInfo packageInfo = context.getPackageManager().getPackageArchiveInfo(apkPath, 
-                android.content.pm.PackageManager.GET_ACTIVITIES);
+                android.content.pm.PackageManager.GET_ACTIVITIES | android.content.pm.PackageManager.GET_PROVIDERS | android.content.pm.PackageManager.GET_RECEIVERS);
             if (packageInfo != null && packageInfo.applicationInfo != null) {
                 mAppInfo = packageInfo.applicationInfo;
                 mAppInfo.sourceDir = apkPath;
                 mAppInfo.publicSourceDir = apkPath;
+                
+                // Ensure native lib dir is set correctly
+                File libDir = context.getDir("v_lib_" + packageName, Context.MODE_PRIVATE);
+                mAppInfo.nativeLibraryDir = libDir.getAbsolutePath();
                 
                 // Register in VPM
                 com.onecore.sdk.core.OneCorePackageManagerProxy.registerPackage(packageInfo);
@@ -56,9 +67,11 @@ public class VirtualContainer {
                 if (packageInfo.activities != null) {
                     for (android.content.pm.ActivityInfo info : packageInfo.activities) {
                         mActivityThemes.put(info.name, info.theme != 0 ? info.theme : packageInfo.applicationInfo.theme);
-                        Log.d(TAG, "Cached theme for " + info.name + ": " + info.theme);
                     }
                 }
+            } else {
+                Log.e(TAG, "Failed to parse APK: " + apkPath);
+                return false;
             }
             
             // 0. Hidden API Bypass
@@ -92,7 +105,7 @@ public class VirtualContainer {
             // 5. Install Content Providers
             com.onecore.sdk.core.OneCoreContentProviderManager.installProviders(context, packageInfo.providers);
             
-            Log.i(TAG, "OneCore-DEBUG: LoadedApk injected, Receivers & Providers registered");
+            Log.i(TAG, "OneCore-DEBUG: Virtual Space Ready for " + packageName);
             return true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to initialize environment", e);
@@ -108,7 +121,7 @@ public class VirtualContainer {
         } catch (Exception e) {
             Log.e(TAG, "PackageManager Resources failed, falling back to manual AssetManager", e);
             try {
-                AssetManager assetManager = AssetManager.class.newInstance();
+                AssetManager assetManager = (AssetManager) AssetManager.class.newInstance();
                 Method addAssetPath = assetManager.getClass().getMethod("addAssetPath", String.class);
                 addAssetPath.invoke(assetManager, apkPath);
                 
@@ -150,26 +163,31 @@ public class VirtualContainer {
      * Loads and initializes the target application instance.
      */
     public void bindApplication(Context context, String applicationClassName, String packageName) {
-        if (mClassLoader == null) return;
+        if (mClassLoader == null || mTargetApplication != null) return;
         
-        try {
-            Log.i(TAG, ">>> V_CORE: Binding Target Application [" + applicationClassName + "] <<<");
-            
-            Class<?> appClass = mClassLoader.loadClass(applicationClassName);
-            mTargetApplication = (android.app.Application) appClass.newInstance();
-            
-            // Fix context before attaching
-            com.onecore.sdk.core.OneCoreContextFixer.fixContext(context, packageName);
-
-            Method attach = android.app.Application.class.getDeclaredMethod("attach", Context.class);
-            attach.setAccessible(true);
-            attach.invoke(mTargetApplication, context);
-            
-            mTargetApplication.onCreate();
-            Log.i(TAG, ">>> V_CORE: Application Bound and Active. <<<");
-        } catch (Exception e) {
-            Log.e(TAG, "!!! V_CORE: Application Binding FAILED !!!", e);
-        }
+        SafeExecutionManager.run("Application Binding", () -> {
+            try {
+                Log.i(TAG, ">>> V_CORE: Binding Target Application [" + applicationClassName + "] <<<");
+                
+                // 1. Fix base context first
+                com.onecore.sdk.core.OneCoreContextFixer.fixContext(context, packageName);
+                
+                // 2. Create instance
+                Class<?> appClass = mClassLoader.loadClass(applicationClassName);
+                mTargetApplication = (android.app.Application) appClass.newInstance();
+                
+                // 3. Attach base context
+                Method attach = android.app.Application.class.getDeclaredMethod("attach", Context.class);
+                attach.setAccessible(true);
+                attach.invoke(mTargetApplication, context);
+                
+                // 4. Call onCreate
+                mTargetApplication.onCreate();
+                Log.i(TAG, ">>> V_CORE: Application Bound and Active. <<<");
+            } catch (Exception e) {
+                Log.e(TAG, "!!! V_CORE: Application Binding FAILED !!!", e);
+            }
+        });
     }
 
     public android.app.Application getTargetApplication() {

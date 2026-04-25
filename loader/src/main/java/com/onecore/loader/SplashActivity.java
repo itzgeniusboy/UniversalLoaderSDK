@@ -1,19 +1,27 @@
 package com.onecore.loader;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
+import android.provider.Settings;
 import android.util.Log;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 /**
- * Splash Screen.
- * Simplified for minimal working version.
+ * Splash Screen with mandatory Permission handling for Games.
  */
 public class SplashActivity extends Activity {
     private static final String TAG = "SplashActivity";
+    private static final int REQ_PERMS = 1001;
+    private static final int REQ_MANAGE_STORAGE = 1002;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,12 +40,73 @@ public class SplashActivity extends Activity {
 
         setContentView(root);
         
+        checkAndRequestPermissions();
+    }
+
+    private void checkAndRequestPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            String[] commonPerms = {
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            };
+
+            boolean allGranted = true;
+            for (String p : commonPerms) {
+                if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    break;
+                }
+            }
+
+            if (!allGranted) {
+                requestPermissions(commonPerms, REQ_PERMS);
+                return;
+            }
+        }
+        
+        // Handle Android 11+ Manage External Storage
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                    intent.addCategory("android.intent.category.DEFAULT");
+                    intent.setData(Uri.parse(String.format("package:%s", getPackageName())));
+                    startActivityForResult(intent, REQ_MANAGE_STORAGE);
+                } catch (Exception e) {
+                    Intent intent = new Intent();
+                    intent.setAction(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                    startActivityForResult(intent, REQ_MANAGE_STORAGE);
+                }
+                return;
+            }
+        }
+
+        proceedToMain();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQ_PERMS) {
+            checkAndRequestPermissions();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_MANAGE_STORAGE) {
+            checkAndRequestPermissions();
+        }
+    }
+
+    private void proceedToMain() {
         new Handler().postDelayed(() -> {
             if (!isFinishing()) {
                 Intent intent = new Intent(this, MainActivity.class);
                 startActivity(intent);
                 finish();
             }
-        }, 1000);
+        }, 800);
     }
 }

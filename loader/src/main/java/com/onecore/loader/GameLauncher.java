@@ -20,58 +20,69 @@ public class GameLauncher {
 
     public static void start(Context context, LaunchCallback callback) {
         Log.i(TAG, "!! GameLauncher SESSION START !!");
-        try {
-            if (callback != null) callback.onProgress("Initializing Virtual Environment...");
+        new Thread(() -> {
+            try {
+                if (callback != null) callback.onProgress("Initializing Virtual Environment...");
 
-            String targetPkg = null;
-            if (isPackageInstalled(context, PKG_IMOBILE)) {
-                targetPkg = PKG_IMOBILE;
-            } else if (isPackageInstalled(context, PKG_BGMI)) {
-                targetPkg = PKG_BGMI;
+                String targetPkg = null;
+                if (isPackageInstalled(context, PKG_IMOBILE)) {
+                    targetPkg = PKG_IMOBILE;
+                } else if (isPackageInstalled(context, PKG_BGMI)) {
+                    targetPkg = PKG_BGMI;
+                }
+
+                if (targetPkg == null) {
+                    Log.e(TAG, "Game not found locally.");
+                    if (callback != null) callback.onFailed("Install APK first (BGMI/PUBG)");
+                    return;
+                }
+
+                Log.i(TAG, "Found target package: " + targetPkg);
+                
+                // REAL PROGRESS: Using OneCore SDK and VirtualContainer
+                com.onecore.sdk.OneCoreSDK.init(context);
+                com.onecore.sdk.VirtualContainer container = com.onecore.sdk.VirtualContainer.getInstance();
+                
+                android.content.pm.ApplicationInfo hostAppInfo = context.getPackageManager().getApplicationInfo(targetPkg, 0);
+                String sourcePath = hostAppInfo.sourceDir;
+                
+                if (callback != null) callback.onProgress("Preparing Virtual Space...");
+                boolean installed = container.installApk(context, sourcePath, targetPkg);
+                
+                if (!installed) {
+                    if (callback != null) callback.onFailed("Failed to initialize virtual space");
+                    return;
+                }
+
+                if (callback != null) callback.onProgress("Launching in Container...");
+                
+                // Phase 3: Bind Application with correct context
+                final String finalPkg = targetPkg;
+                String appClass = hostAppInfo.className != null ? hostAppInfo.className : "android.app.Application";
+                
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                    try {
+                        container.bindApplication(context, appClass, finalPkg);
+                        
+                        // Launch the main activity
+                        android.content.Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(finalPkg);
+                        if (launchIntent != null && launchIntent.getComponent() != null) {
+                            String targetActivity = launchIntent.getComponent().getClassName();
+                            container.launch(context, targetActivity);
+                            if (callback != null) callback.onProcessDetected(1); 
+                        } else {
+                            if (callback != null) callback.onFailed("Failed to find main activity for " + finalPkg);
+                        }
+                    } catch (Exception e) {
+                        if (callback != null) callback.onFailed("Launch internal error: " + e.getMessage());
+                    }
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error in GameLauncher", e);
+                if (callback != null) callback.onFailed(e.getMessage());
             }
-
-            if (targetPkg == null) {
-                Log.e(TAG, "Game not found locally.");
-                if (callback != null) callback.onFailed("Install APK first (BGMI/PUBG)");
-                return;
-            }
-
-            Log.i(TAG, "Found target package: " + targetPkg);
-            
-            // REAL PROGRESS: Using OneCore SDK and VirtualContainer
-            com.onecore.sdk.OneCoreSDK.init(context);
-            com.onecore.sdk.VirtualContainer container = com.onecore.sdk.VirtualContainer.getInstance();
-            
-            String sourcePath = context.getPackageManager().getApplicationInfo(targetPkg, 0).sourceDir;
-            
-            if (callback != null) callback.onProgress("Preparing Virtual Space...");
-            boolean installed = container.installApk(context, sourcePath, targetPkg);
-            
-            if (!installed) {
-                if (callback != null) callback.onFailed("Failed to initialize virtual space");
-                return;
-            }
-
-            if (callback != null) callback.onProgress("Launching in Container...");
-            
-            // Phase 3: Bind Application with correct context
-            android.content.pm.ApplicationInfo appInfo = context.getPackageManager().getApplicationInfo(targetPkg, 0);
-            if (appInfo.className != null) {
-                container.bindApplication(context, appInfo.className, targetPkg);
-            } else {
-                container.bindApplication(context, "android.app.Application", targetPkg);
-            }
-            
-            // Launch the main activity
-            String targetActivity = context.getPackageManager().getLaunchIntentForPackage(targetPkg).getComponent().getClassName();
-            container.launch(context, targetActivity);
-
-            if (callback != null) callback.onProcessDetected(1); 
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error in GameLauncher", e);
-            if (callback != null) callback.onFailed(e.getMessage());
-        }
+        }).start();
     }
 
     private static boolean isPackageInstalled(Context context, String packageName) {
