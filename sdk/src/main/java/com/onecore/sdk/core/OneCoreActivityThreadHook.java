@@ -36,6 +36,15 @@ public class OneCoreActivityThreadHook {
                 OneCoreInstrumentation customInstrumentation = new OneCoreInstrumentation(baseInstrumentation);
                 ReflectionHelper.setFieldValue(at, customInstrumentation, "mInstrumentation");
             });
+
+            // 1.1 Hook H Handler (The core of ActivityThread lifecycle)
+            SafeExecutionManager.run("H Handler Hook", () -> {
+                android.os.Handler h = (android.os.Handler) ReflectionHelper.getFieldValue(at, "mH");
+                if (h != null) {
+                    ReflectionHelper.setFieldValue(h, new OneCoreHCallback(h), "mCallback");
+                    Log.i(TAG, "OneCore-DEBUG: ActivityThread H Handler hooked.");
+                }
+            });
             
             // 2. Hook Service Proxies with safe execution
             SafeExecutionManager.run("AMS Proxy", () -> OneCoreAMSProxy.install(context.getPackageName()));

@@ -59,6 +59,14 @@ public class OneCoreContextFixer {
             if (virtualRes != null) {
                 ReflectionHelper.setFieldValue(contextImpl, virtualRes, "mResources");
                 
+                // Fix AssetManager specifically for Android 10+
+                try {
+                    Object assetManager = virtualRes.getAssets();
+                    ReflectionHelper.setFieldValue(contextImpl, assetManager, "mAssets");
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to inject AssetManager specifically");
+                }
+                
                 // CRITICAL: Clone LayoutInflater and inject back
                 android.view.LayoutInflater original = (android.view.LayoutInflater) baseContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
                 if (original != null && !(original.getClass().getName().contains("OneCore"))) {
@@ -72,6 +80,17 @@ public class OneCoreContextFixer {
 
             // 4. Activity specific fixes
             if (context instanceof Activity) {
+                Activity activity = (Activity) context;
+                ReflectionHelper.setFieldValue(activity, virtualRes, "mResources");
+                
+                // Reset theme to force reload from virtual resources
+                try {
+                    ReflectionHelper.setFieldValue(activity, 0, "mThemeResource");
+                    ReflectionHelper.setFieldValue(activity, null, "mTheme");
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to reset theme cache");
+                }
+
                 ReflectionHelper.setFieldValue(context, null, "mInflater");
             }
 

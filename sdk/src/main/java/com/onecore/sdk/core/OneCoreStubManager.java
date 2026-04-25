@@ -57,6 +57,12 @@ public class OneCoreStubManager {
             stubIntent.putExtra("target_activity", targetClass);
             stubIntent.putExtra("target_package", targetPkg);
             
+            // Pass APK path for child process initialization
+            String apkPath = com.onecore.sdk.VirtualContainer.getInstance().getApkPath();
+            if (apkPath != null) {
+                stubIntent.putExtra("target_apk_path", apkPath);
+            }
+            
             // Map original flags to stub
             stubIntent.setFlags(flags);
             

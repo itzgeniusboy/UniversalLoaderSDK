@@ -58,12 +58,12 @@ public class OneCoreLoadedApkManager {
             
             if (loadedApk != null) {
                 // Patch the new LoadedApk
-                setField(loadedApk.getClass(), loadedApk, "mClassLoader", classLoader);
-                setField(loadedApk.getClass(), loadedApk, "mResources", resources);
-                setField(loadedApk.getClass(), loadedApk, "mPackageName", packageName);
-                setField(loadedApk.getClass(), loadedApk, "mAppInfo", ai);
-                setField(loadedApk.getClass(), loadedApk, "mDataDir", ai.dataDir);
-                setField(loadedApk.getClass(), loadedApk, "mLibDir", ai.nativeLibraryDir);
+                ReflectionHelper.setFieldValue(loadedApk, classLoader, "mClassLoader");
+                ReflectionHelper.setFieldValue(loadedApk, resources, "mResources");
+                ReflectionHelper.setFieldValue(loadedApk, packageName, "mPackageName");
+                ReflectionHelper.setFieldValue(loadedApk, ai, "mAppInfo");
+                ReflectionHelper.setFieldValue(loadedApk, ai.dataDir, "mDataDir");
+                ReflectionHelper.setFieldValue(loadedApk, ai.nativeLibraryDir, "mLibDir", "mBaseLibDir", "mAppLibDir");
                 
                 // Inject into both maps in ActivityThread
                 WeakReference<Object> ref = new WeakReference<>(loadedApk);
@@ -71,7 +71,7 @@ public class OneCoreLoadedApkManager {
                 mResourcePackages.put(packageName, ref);
                 mLoadedApkCache.put(packageName, ref);
                 
-                Log.i(TAG, "OneCore-DEBUG: LoadedApk injected into mPackages and mResourcePackages for " + packageName);
+                Log.i(TAG, "OneCore-DEBUG: LoadedApk injected into maps for " + packageName);
             }
             
             return loadedApk;

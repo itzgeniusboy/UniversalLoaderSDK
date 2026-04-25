@@ -115,6 +115,23 @@ public class OneCoreAMSProxy implements InvocationHandler {
             }
         } else if (methodName.contains("scheduleJob")) {
             Log.d(TAG, "OneCore-DEBUG: JobScheduler intercepted.");
+        } else if (methodName.contains("getContentProvider")) {
+            // getContentProvider(callingThread, callingPackage, name, userId, stable)
+            String authority = null;
+            for (Object arg : args) {
+                if (arg instanceof String) {
+                    authority = (String) arg;
+                    break;
+                }
+            }
+            if (authority != null) {
+                if (OneCoreContentProviderManager.getProvider(authority) != null) {
+                    Log.i(TAG, "OneCore-DEBUG: High-level ContentProvider redirect for: " + authority);
+                    // On modern Android, we'd return a ContentProviderHolder.
+                    // However, if the provider is already installed in our process, 
+                    // ActivityThread.acquireProvider might find it locally if we've registered it.
+                }
+            }
         }
         return method.invoke(mBase, args);
     }

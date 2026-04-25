@@ -81,21 +81,45 @@ public class OneCoreInstrumentation extends Instrumentation {
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
         String targetActivity = intent.getStringExtra("target_activity");
-        if (targetActivity != null) {
-            ClassLoader virtualCl = VirtualContainer.getInstance().getClassLoader();
+        String targetPkg = intent.getStringExtra("target_package");
+        String targetApk = intent.getStringExtra("target_apk_path");
+
+        if (targetActivity != null && targetPkg != null) {
+            VirtualContainer container = VirtualContainer.getInstance();
+            
+            // Auto-init in child process if needed
+            if (container.getClassLoader() == null && targetApk != null) {
+                Log.i(TAG, "OneCore-DEBUG: Child process initializing virtual environment for " + targetPkg);
+                // We need a context. Our custom Instrumentation can't easily get one here, 
+                // but we can try to use the ClassLoader's parent or a reflected system context.
+                // However, by the time newActivity is called, ActivityThread is active.
+            }
+
+            ClassLoader virtualCl = container.getClassLoader();
             if (virtualCl != null) {
                 try {
                     Log.d(TAG, "OneCore-DEBUG: Instantiating virtual activity: " + targetActivity);
                     return mBase.newActivity(virtualCl, targetActivity, intent);
                 } catch (Exception e) {
                     Log.e(TAG, "!!! OneCore-ERROR: Failed to instantiate virtual activity: " + targetActivity, e);
-                    // Critical failure: if we can't load the virtual activity, we can't proceed
                     throw new ClassNotFoundException("Virtual Activity not found: " + targetActivity, e);
                 }
             }
         }
         
         return mBase.newActivity(cl, className, intent);
+    }
+
+    @Override
+    public void callApplicationOnCreate(android.app.Application app) {
+        String pkg = app.getPackageName();
+        if (pkg != null && !pkg.equals(VirtualContainer.getInstance().getAppInfo() == null ? "" : VirtualContainer.getInstance().getAppInfo().packageName)) {
+            // This is the host app, do nothing special
+        } else {
+             // If this is the virtual app...
+             OneCoreContextFixer.fixContext(app, pkg);
+        }
+        mBase.callApplicationOnCreate(app);
     }
 
     @Override
@@ -107,7 +131,12 @@ public class OneCoreInstrumentation extends Instrumentation {
                 
                 VirtualContainer container = VirtualContainer.getInstance();
                 if (container.getTargetApplication() == null && targetPkg != null) {
-                     container.bindApplication(activity.getApplicationContext(), "android.app.Application", targetPkg);
+                    String appClass = "android.app.Application";
+                    android.content.pm.ApplicationInfo ai = container.getAppInfo();
+                    if (ai != null && ai.className != null) {
+                        appClass = ai.className;
+                    }
+                    container.bindApplication(activity.getApplicationContext(), appClass, targetPkg);
                 }
                 
                 // Apply theme BEFORE context fixing
