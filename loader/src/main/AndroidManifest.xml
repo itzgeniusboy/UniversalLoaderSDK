@@ -50,6 +50,14 @@
                   android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
                   android:configChanges="orientation|screenSize|keyboardHidden" />
 
+        <service android:name=".StubService" android:exported="false" />
+        <service android:name=".StubService$P1" android:process=":virtual1" android:exported="false" />
+        <service android:name=".StubService$P2" android:process=":virtual2" android:exported="false" />
+
+        <activity android:name=".StubActivity_P1" android:process=":virtual1" android:launchMode="singleTop" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name=".StubActivity_P2" android:process=":virtual2" android:launchMode="singleTask" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name=".StubActivity_P3" android:process=":virtual1" android:launchMode="singleInstance" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
     </application>
 
 </manifest>

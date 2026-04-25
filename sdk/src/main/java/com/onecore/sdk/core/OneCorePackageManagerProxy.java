@@ -1,7 +1,7 @@
 package com.onecore.sdk.core;
 
 import android.util.Log;
-import java.lang.reflect.Field;
+import com.onecore.sdk.core.reflex.ReflectionHelper;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Proxy for IPackageManager to spoof guest app information.
+ * Version-adaptive Proxy for IPackageManager to spoof guest app information.
  */
 public class OneCorePackageManagerProxy implements InvocationHandler {
     private static final String TAG = "OneCore-PMProxy";
@@ -21,16 +21,34 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
     }
 
     public static void registerPackage(android.content.pm.PackageInfo info) {
-        if (info != null) sVirtualPackages.put(info.packageName, info);
+        if (info != null) {
+            OneCoreSignatureProxy.spoofSignature(info);
+            sVirtualPackages.put(info.packageName, info);
+        }
+    }
+
+    public static android.content.pm.ActivityInfo getActivityInfo(android.content.ComponentName component) {
+        if (component == null) return null;
+        android.content.pm.PackageInfo info = sVirtualPackages.get(component.getPackageName());
+        if (info != null && info.activities != null) {
+            for (android.content.pm.ActivityInfo ai : info.activities) {
+                if (ai.name.equals(component.getClassName())) {
+                    return ai;
+                }
+            }
+        }
+        return null;
     }
 
     public static void install() {
-        try {
-            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-            Method sPmMethod = activityThreadClass.getDeclaredMethod("getPackageManager");
-            sPmMethod.setAccessible(true);
-            Object rawPm = sPmMethod.invoke(null);
-            
+        SafeExecutionManager.run("PMS Hook", () -> {
+            Object rawPm = ReflectionHelper.invokeMethod(null, "getPackageManager");
+            if (rawPm == null) {
+                // Fallback attempt via ActivityThread
+                Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+                rawPm = ReflectionHelper.invokeMethod(null, "getPackageManager");
+            }
+
             Class<?> iPmClass = Class.forName("android.content.pm.IPackageManager");
             Object proxy = Proxy.newProxyInstance(
                 iPmClass.getClassLoader(),
@@ -38,23 +56,11 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
                 new OneCorePackageManagerProxy(rawPm)
             );
             
-            // Hook ActivityThread.sPackageManager
-            Field sPmField = activityThreadClass.getDeclaredField("sPackageManager");
-            sPmField.setAccessible(true);
-            sPmField.set(null, proxy);
-            
-            // Hook AppGlobals.getPackageManager() via its internal cache if possible
-            try {
-                Class<?> appGlobalsClass = Class.forName("android.app.AppGlobals");
-                // AppGlobals.getPackageManager() usually just calls ActivityThread.getPackageManager()
-                // So hooking sPackageManager is usually enough, but some versions cache it differently.
-                Log.d(TAG, "AppGlobals checked.");
-            } catch (Exception ignored) {}
+            // Hook multiple possible locations for PMS cache
+            ReflectionHelper.setFieldValue(null, proxy, "sPackageManager"); // ActivityThread
             
             Log.i(TAG, "OneCore-DEBUG: IPackageManager hooked successfully.");
-        } catch (Exception e) {
-            Log.e(TAG, "!!! OneCore-ERROR: IPackageManager hook FAILED !!!", e);
-        }
+        });
     }
 
     @Override
@@ -64,13 +70,17 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
         if ("getPackageInfo".equals(methodName)) {
             String pkg = (String) args[0];
             if (sVirtualPackages.containsKey(pkg)) {
-                Log.d(TAG, "OneCore-DEBUG: IPackageManager.getPackageInfo -> " + pkg);
                 return sVirtualPackages.get(pkg);
             }
         } else if ("getApplicationInfo".equals(methodName)) {
             String pkg = (String) args[0];
             if (sVirtualPackages.containsKey(pkg)) {
                 return sVirtualPackages.get(pkg).applicationInfo;
+            }
+        } else if ("checkPermission".equals(methodName)) {
+            String pkg = (String) args[args.length - 1] instanceof String ? (String) args[args.length - 1] : null;
+            if (pkg != null && sVirtualPackages.containsKey(pkg)) {
+                return android.content.pm.PackageManager.PERMISSION_GRANTED;
             }
         }
         

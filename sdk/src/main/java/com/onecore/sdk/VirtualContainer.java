@@ -61,17 +61,19 @@ public class VirtualContainer {
                 }
             }
             
-            File dexOptDir = context.getDir("v_opt", Context.MODE_PRIVATE);
-            File libDir = context.getDir("v_lib", Context.MODE_PRIVATE);
+            // 0. Hidden API Bypass
+            com.onecore.sdk.core.OneCoreHiddenApiFixer.bypass();
 
-            // Extract native libs
-            com.onecore.sdk.core.OneCoreNativeLoader.extract(apkPath, libDir);
+            File dexOptDir = context.getDir("v_opt_" + packageName, Context.MODE_PRIVATE);
 
-            // 1. Setup ClassLoader
+            // 1. Extract native libs
+            String libPath = com.onecore.sdk.core.OneCoreNativeLoader.copyNativeBinaries(context, apkPath, packageName);
+
+            // 2. Setup ClassLoader
             mClassLoader = new DexClassLoader(
                 apkPath,
                 dexOptDir.getAbsolutePath(),
-                libDir.getAbsolutePath(),
+                libPath,
                 context.getClassLoader()
             );
             
@@ -81,7 +83,13 @@ public class VirtualContainer {
             // 3. Inject LoadedApk into ActivityThread
             com.onecore.sdk.core.OneCoreLoadedApkManager.getLoadedApk(context, apkPath, packageName, mClassLoader, mResources);
             
-            Log.i(TAG, "OneCore-DEBUG: LoadedApk injected");
+            // 4. Register Receivers
+            com.onecore.sdk.core.OneCoreBroadcastManager.registerReceivers(context, packageInfo);
+            
+            // 5. Install Content Providers
+            com.onecore.sdk.core.OneCoreContentProviderManager.installProviders(context, packageInfo.providers);
+            
+            Log.i(TAG, "OneCore-DEBUG: LoadedApk injected, Receivers & Providers registered");
             return true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to initialize environment", e);

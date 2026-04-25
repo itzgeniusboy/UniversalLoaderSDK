@@ -1,5 +1,7 @@
 package com.onecore.sdk.core;
 
+import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.util.Log;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -9,43 +11,54 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Handles native library extraction from APK.
+ * Handles extraction and loading of native .so libraries from the guest APK.
  */
 public class OneCoreNativeLoader {
     private static final String TAG = "OneCore-NativeLoader";
 
-    public static void extract(String apkPath, File libDir) {
+    public static String copyNativeBinaries(Context context, String apkPath, String packageName) {
         try {
-            Log.i(TAG, "OneCore-DEBUG: Extracting native libs to: " + libDir.getName());
+            File libDir = context.getDir("v_lib_" + packageName, Context.MODE_PRIVATE);
             if (!libDir.exists()) libDir.mkdirs();
+
+            Log.i(TAG, "OneCore-DEBUG: Extracting native libraries to " + libDir.getAbsolutePath());
             
             ZipFile zipFile = new ZipFile(apkPath);
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
             
+            // Determine primary ABI (simplified)
+            String primaryCpuAbi = android.os.Build.CPU_ABI;
+            
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
+                
                 if (name.startsWith("lib/") && name.endsWith(".so")) {
-                    // Primitive ABI selection (prefer arm64-v8a if available, etc)
-                    // For now, extract all but flat file names will collide. 
-                    // Better: lib/<abi>/libname.so -> lib/libname.so
-                    String fileName = name.substring(name.lastIndexOf('/') + 1);
-                    File outFile = new File(libDir, fileName);
-                    
-                    InputStream is = zipFile.getInputStream(entry);
-                    FileOutputStream fos = new FileOutputStream(outFile);
-                    byte[] buffer = new byte[8192];
-                    int len;
-                    while ((len = is.read(buffer)) != -1) {
-                        fos.write(buffer, 0, len);
+                    // Extract if it matches device ABI
+                    if (name.contains(primaryCpuAbi) || name.contains("armeabi-v7a")) {
+                        String fileName = name.substring(name.lastIndexOf("/") + 1);
+                        File outFile = new File(libDir, fileName);
+                        
+                        if (!outFile.exists() || outFile.length() != entry.getSize()) {
+                            InputStream is = zipFile.getInputStream(entry);
+                            FileOutputStream fos = new FileOutputStream(outFile);
+                            byte[] buffer = new byte[8192];
+                            int len;
+                            while ((len = is.read(buffer)) != -1) {
+                                fos.write(buffer, 0, len);
+                            }
+                            fos.close();
+                            is.close();
+                            Log.d(TAG, "Extracted: " + fileName);
+                        }
                     }
-                    fos.close();
-                    is.close();
                 }
             }
             zipFile.close();
+            return libDir.getAbsolutePath();
         } catch (Exception e) {
-            Log.e(TAG, "!!! OneCore-ERROR: Native extraction FAILED !!!", e);
+            Log.e(TAG, "Failed to extract native libs", e);
+            return null;
         }
     }
 }

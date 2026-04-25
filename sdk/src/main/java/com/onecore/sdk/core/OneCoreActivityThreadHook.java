@@ -2,39 +2,57 @@ package com.onecore.sdk.core;
 
 import android.content.Context;
 import android.util.Log;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
+import com.onecore.sdk.core.reflex.ReflectionHelper;
 
 /**
- * Entry point for system-level virtualization hooks.
+ * Entry point for dynamic, version-adaptive virtualization hooks.
  */
 public class OneCoreActivityThreadHook {
     private static final String TAG = "OneCore-ATHook";
 
     public static void install(Context context) {
-        try {
+        SystemVersionManager.logVersionInfo();
+        
+        SafeExecutionManager.run("Main Hook Initialization", () -> {
             Log.i(TAG, ">>> INITIATING OneCore SYSTEM HOOK <<<");
             
+            // 0. Bypass system restrictions
+            OneCoreHiddenApiFixer.bypass();
+            
             Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-            Method currentActivityThreadMethod = activityThreadClass.getDeclaredMethod("currentActivityThread");
-            currentActivityThreadMethod.setAccessible(true);
-            Object activityThread = currentActivityThreadMethod.invoke(null);
+            Object activityThread = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+            if (activityThread == null) {
+                // Fallback attempt
+                Method m = activityThreadClass.getDeclaredMethod("currentActivityThread");
+                m.setAccessible(true);
+                activityThread = m.invoke(null);
+            }
 
             // 1. Hook Instrumentation
-            Field instrumentationField = activityThreadClass.getDeclaredField("mInstrumentation");
-            instrumentationField.setAccessible(true);
-            android.app.Instrumentation baseInstrumentation = (android.app.Instrumentation) instrumentationField.get(activityThread);
+            final Object at = activityThread;
+            SafeExecutionManager.run("Instrumentation Hook", () -> {
+                android.app.Instrumentation baseInstrumentation = (android.app.Instrumentation) ReflectionHelper.getFieldValue(at, "mInstrumentation");
+                OneCoreInstrumentation customInstrumentation = new OneCoreInstrumentation(baseInstrumentation);
+                ReflectionHelper.setFieldValue(at, customInstrumentation, "mInstrumentation");
+            });
             
-            OneCoreInstrumentation customInstrumentation = new OneCoreInstrumentation(baseInstrumentation);
-            instrumentationField.set(activityThread, customInstrumentation);
+            // 2. Hook Service Proxies with safe execution
+            SafeExecutionManager.run("AMS Proxy", () -> OneCoreAMSProxy.install(context.getPackageName()));
+            SafeExecutionManager.run("PMS Proxy", OneCorePackageManagerProxy::install);
+            SafeExecutionManager.run("CP Proxy", OneCoreContentProviderProxy::install);
+            SafeExecutionManager.run("Service Manager", () -> OneCoreServiceManager.install(context));
             
-            // 2. Hook Service Proxies
-            OneCoreAMSProxy.install(context.getPackageName());
-            OneCorePackageManagerProxy.install();
+            // 3. Spoofing and optimizations
+            OneCoreBuildProxy.spoof();
+            OneCoreUidProxy.spoof();
+            OneCoreDeviceSpoofing.install();
+            OneCoreAccountManagerProxy.install();
+            OneCoreWebViewFixer.fix();
+            OneCoreCrashHandler.install();
+            OneCoreAntiDetection.apply();
+            OneCoreMemoryOptimizer.optimize();
             
-            Log.i(TAG, "OneCore-DEBUG: System hooks successfully applied.");
-        } catch (Exception e) {
-            Log.e(TAG, "!!! OneCore-ERROR: System hook FAILED !!!", e);
-        }
+            Log.i(TAG, "OneCore-DEBUG: All system hooks successfully applied.");
+        });
     }
 }
