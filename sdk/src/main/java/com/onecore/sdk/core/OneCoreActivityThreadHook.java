@@ -3,6 +3,7 @@ package com.onecore.sdk.core;
 import android.content.Context;
 import android.util.Log;
 import com.onecore.sdk.core.reflex.ReflectionHelper;
+import java.lang.reflect.Method;
 
 /**
  * Entry point for dynamic, version-adaptive virtualization hooks.

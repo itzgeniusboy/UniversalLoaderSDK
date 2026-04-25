@@ -9,6 +9,7 @@ import android.os.IBinder;
 import android.util.Log;
 import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.core.reflex.ReflectionHelper;
+import java.lang.reflect.Method;
 
 /**
  * Version-adaptive Instrumentation to intercept Activity lifecycle and fix ClassLoaders.
