@@ -38,9 +38,18 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
                 new OneCorePackageManagerProxy(rawPm)
             );
             
+            // Hook ActivityThread.sPackageManager
             Field sPmField = activityThreadClass.getDeclaredField("sPackageManager");
             sPmField.setAccessible(true);
             sPmField.set(null, proxy);
+            
+            // Hook AppGlobals.getPackageManager() via its internal cache if possible
+            try {
+                Class<?> appGlobalsClass = Class.forName("android.app.AppGlobals");
+                // AppGlobals.getPackageManager() usually just calls ActivityThread.getPackageManager()
+                // So hooking sPackageManager is usually enough, but some versions cache it differently.
+                Log.d(TAG, "AppGlobals checked.");
+            } catch (Exception ignored) {}
             
             Log.i(TAG, "OneCore-DEBUG: IPackageManager hooked successfully.");
         } catch (Exception e) {

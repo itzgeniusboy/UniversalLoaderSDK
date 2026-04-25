@@ -15,7 +15,7 @@ public class BoxApplication extends Application {
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
         // Deep initial hook
-        com.onecore.sdk.core.HookManager.installInstrumentationHook(base);
+        com.onecore.sdk.core.OneCoreActivityThreadHook.install(base);
     }
 
     @Override

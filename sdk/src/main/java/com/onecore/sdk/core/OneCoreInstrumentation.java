@@ -87,14 +87,15 @@ public class OneCoreInstrumentation extends Instrumentation {
                  container.bindApplication(activity.getApplicationContext(), "android.app.Application", targetPkg);
             }
             
-            fixActivityContext(activity);
-            
-            // Apply theme
+            // Apply theme BEFORE context fixing
             Integer theme = container.getTheme(targetActivity);
             if (theme != null && theme != 0) {
                 Log.d(TAG, "OneCore-DEBUG: Theme applied -> " + theme);
                 activity.setTheme(theme);
             }
+
+            // Fixed context includes Resources and LayoutInflater swap
+            fixActivityContext(activity);
         }
         mBase.callActivityOnCreate(activity, icicle);
         Log.d(TAG, "OneCore-DEBUG: callActivityOnCreate success.");

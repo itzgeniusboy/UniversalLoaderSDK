@@ -26,10 +26,14 @@ public class OneCoreLoadedApkManager {
             currentActivityThreadMethod.setAccessible(true);
             Object activityThread = currentActivityThreadMethod.invoke(null);
             
-            // Get mPackages map
+            // Get mPackages and mResourcePackages maps
             Field mPackagesField = activityThreadClass.getDeclaredField("mPackages");
             mPackagesField.setAccessible(true);
             Map mPackages = (Map) mPackagesField.get(activityThread);
+
+            Field mResourcePackagesField = activityThreadClass.getDeclaredField("mResourcePackages");
+            mResourcePackagesField.setAccessible(true);
+            Map mResourcePackages = (Map) mResourcePackagesField.get(activityThread);
             
             // ApplicationInfo for the guest app
             android.content.pm.ApplicationInfo ai = new android.content.pm.ApplicationInfo();
@@ -38,6 +42,7 @@ public class OneCoreLoadedApkManager {
             ai.publicSourceDir = apkPath;
             ai.dataDir = context.getDir("v_data_" + packageName, Context.MODE_PRIVATE).getAbsolutePath();
             ai.uid = context.getApplicationInfo().uid;
+            ai.nativeLibraryDir = context.getDir("v_lib", Context.MODE_PRIVATE).getAbsolutePath();
             
             // CompatibilityInfo
             Class<?> compatInfoClass = Class.forName("android.content.res.CompatibilityInfo");
@@ -57,12 +62,16 @@ public class OneCoreLoadedApkManager {
                 setField(loadedApk.getClass(), loadedApk, "mResources", resources);
                 setField(loadedApk.getClass(), loadedApk, "mPackageName", packageName);
                 setField(loadedApk.getClass(), loadedApk, "mAppInfo", ai);
+                setField(loadedApk.getClass(), loadedApk, "mDataDir", ai.dataDir);
+                setField(loadedApk.getClass(), loadedApk, "mLibDir", ai.nativeLibraryDir);
                 
-                // Inject into ActivityThread.mPackages
-                mPackages.put(packageName, new WeakReference<>(loadedApk));
-                mLoadedApkCache.put(packageName, new WeakReference<>(loadedApk));
+                // Inject into both maps in ActivityThread
+                WeakReference<Object> ref = new WeakReference<>(loadedApk);
+                mPackages.put(packageName, ref);
+                mResourcePackages.put(packageName, ref);
+                mLoadedApkCache.put(packageName, ref);
                 
-                Log.i(TAG, "OneCore-DEBUG: LoadedApk injected");
+                Log.i(TAG, "OneCore-DEBUG: LoadedApk injected into mPackages and mResourcePackages for " + packageName);
             }
             
             return loadedApk;

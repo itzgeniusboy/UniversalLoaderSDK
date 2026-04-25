@@ -14,7 +14,7 @@ public class OneCoreSDK {
         sContext = context.getApplicationContext();
         
         // Phase 2: Hook system early
-        com.onecore.sdk.core.HookManager.installInstrumentationHook(sContext);
+        com.onecore.sdk.core.OneCoreActivityThreadHook.install(sContext);
         
         sInitialized = true;
     }
