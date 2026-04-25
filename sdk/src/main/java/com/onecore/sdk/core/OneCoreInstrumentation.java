@@ -33,7 +33,7 @@ public class OneCoreInstrumentation extends Instrumentation {
         Log.d(TAG, "OneCore-DEBUG: execStartActivity intercepted. Intent=" + intent);
         
         // Rewrite intent for StubActivity
-        intent = StubActivityManager.replaceWithStub(intent, who.getPackageName());
+        intent = OneCoreStubManager.replaceWithStub(intent, who.getPackageName());
 
         try {
             Method execMethod = Instrumentation.class.getDeclaredMethod("execStartActivity",
@@ -108,7 +108,7 @@ public class OneCoreInstrumentation extends Instrumentation {
             Log.i(TAG, "OneCore-DEBUG: Resources switched for context fixing.");
             
             // Use specialized ContextFixer
-            ContextFixer.fixContext(activity, targetPkg);
+            OneCoreContextFixer.fixContext(activity, targetPkg);
 
             Log.i(TAG, "OneCore-DEBUG: setContentView ready for triggering.");
         } catch (Exception e) {

@@ -5,24 +5,23 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * Proxy for IPackageManager to intercept system calls.
+ * Proxy for IPackageManager to spoof guest app information.
  */
-public class VPackageManager implements InvocationHandler {
-    private static final String TAG = "VPackageManager";
+public class OneCorePackageManagerProxy implements InvocationHandler {
+    private static final String TAG = "OneCore-PMProxy";
     private final Object mBase;
-    private static java.util.Map<String, android.content.pm.PackageInfo> sVirtualPackages = new java.util.HashMap<>();
+    private static final Map<String, android.content.pm.PackageInfo> sVirtualPackages = new HashMap<>();
 
-    public VPackageManager(Object base) {
+    public OneCorePackageManagerProxy(Object base) {
         this.mBase = base;
     }
 
     public static void registerPackage(android.content.pm.PackageInfo info) {
-        if (info != null) {
-            sVirtualPackages.put(info.packageName, info);
-            Log.d(TAG, "Registered virtual package: " + info.packageName);
-        }
+        if (info != null) sVirtualPackages.put(info.packageName, info);
     }
 
     public static void install() {
@@ -36,17 +35,16 @@ public class VPackageManager implements InvocationHandler {
             Object proxy = Proxy.newProxyInstance(
                 iPmClass.getClassLoader(),
                 new Class[]{iPmClass},
-                new VPackageManager(rawPm)
+                new OneCorePackageManagerProxy(rawPm)
             );
             
-            // Replace in ActivityThread
             Field sPmField = activityThreadClass.getDeclaredField("sPackageManager");
             sPmField.setAccessible(true);
             sPmField.set(null, proxy);
             
-            Log.i(TAG, "IPackageManager successfully hooked.");
+            Log.i(TAG, "OneCore-DEBUG: IPackageManager hooked successfully.");
         } catch (Exception e) {
-            Log.e(TAG, "Failed to hook IPackageManager", e);
+            Log.e(TAG, "!!! OneCore-ERROR: IPackageManager hook FAILED !!!", e);
         }
     }
 
@@ -63,22 +61,8 @@ public class VPackageManager implements InvocationHandler {
         } else if ("getApplicationInfo".equals(methodName)) {
             String pkg = (String) args[0];
             if (sVirtualPackages.containsKey(pkg)) {
-                Log.d(TAG, "OneCore-DEBUG: IPackageManager.getApplicationInfo -> " + pkg);
                 return sVirtualPackages.get(pkg).applicationInfo;
             }
-        } else if ("getActivityInfo".equals(methodName)) {
-             android.content.ComponentName component = (android.content.ComponentName) args[0];
-             if (component != null && sVirtualPackages.containsKey(component.getPackageName())) {
-                 android.content.pm.PackageInfo info = sVirtualPackages.get(component.getPackageName());
-                 if (info.activities != null) {
-                     for (android.content.pm.ActivityInfo ai : info.activities) {
-                         if (ai.name.equals(component.getClassName())) {
-                             Log.d(TAG, "Spoofing getActivityInfo for " + component);
-                             return ai;
-                         }
-                     }
-                 }
-             }
         }
         
         return method.invoke(mBase, args);

@@ -42,8 +42,8 @@ public class HookManager {
                     Log.i(TAG, "Verification SUCCESS: OneCore is in control.");
                     
                     // Install Service Proxies
-                    VActivityManager.install(context.getPackageName());
-                    VPackageManager.install();
+                    OneCoreAMSProxy.install(context.getPackageName());
+                    OneCorePackageManagerProxy.install();
                 } else {
                     Log.e(TAG, "Verification FAILED: Hook was rejected or overwritten.");
                 }

@@ -51,7 +51,7 @@ public class VirtualContainer {
                 mAppInfo.publicSourceDir = apkPath;
                 
                 // Register in VPM
-                com.onecore.sdk.core.VPackageManager.registerPackage(packageInfo);
+                com.onecore.sdk.core.OneCorePackageManagerProxy.registerPackage(packageInfo);
                 
                 if (packageInfo.activities != null) {
                     for (android.content.pm.ActivityInfo info : packageInfo.activities) {
@@ -65,7 +65,7 @@ public class VirtualContainer {
             File libDir = context.getDir("v_lib", Context.MODE_PRIVATE);
 
             // Extract native libs
-            com.onecore.sdk.core.NativeLibExtractor.extract(apkPath, libDir);
+            com.onecore.sdk.core.OneCoreNativeLoader.extract(apkPath, libDir);
 
             // 1. Setup ClassLoader
             mClassLoader = new DexClassLoader(
@@ -79,7 +79,7 @@ public class VirtualContainer {
             setupResources(context, apkPath);
             
             // 3. Inject LoadedApk into ActivityThread
-            com.onecore.sdk.core.LoadedApkManager.inject(context, apkPath, packageName, mClassLoader, mResources);
+            com.onecore.sdk.core.OneCoreLoadedApkManager.getLoadedApk(context, apkPath, packageName, mClassLoader, mResources);
             
             Log.i(TAG, "OneCore-DEBUG: LoadedApk injected");
             return true;
@@ -112,6 +112,8 @@ public class VirtualContainer {
 
     /**
      * Launches the target activity via system intent.
+     */
+    public void launch(Context context, String targetActivity) {
         if (mClassLoader == null) {
             Log.e(TAG, "Cannot launch: ClassLoader not initialized. Call installApk first.");
             return;
@@ -146,7 +148,7 @@ public class VirtualContainer {
             mTargetApplication = (android.app.Application) appClass.newInstance();
             
             // Fix context before attaching
-            com.onecore.sdk.core.ContextFixer.fixContext(context, packageName);
+            com.onecore.sdk.core.OneCoreContextFixer.fixContext(context, packageName);
 
             Method attach = android.app.Application.class.getDeclaredMethod("attach", Context.class);
             attach.setAccessible(true);

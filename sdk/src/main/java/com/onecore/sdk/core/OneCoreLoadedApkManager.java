@@ -2,20 +2,25 @@ package com.onecore.sdk.core;
 
 import android.content.Context;
 import android.util.Log;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Map;
 
 /**
- * Handles the creation and injection of LoadedApk objects into ActivityThread.
+ * Manages the creation and injection of LoadedApk objects into ActivityThread.
  */
-public class LoadedApkManager {
+public class OneCoreLoadedApkManager {
     private static final String TAG = "OneCore-LoadedApk";
+    private static final Map<String, WeakReference<Object>> mLoadedApkCache = new java.util.HashMap<>();
 
-    public static Object inject(Context context, String apkPath, String packageName, ClassLoader classLoader, android.content.res.Resources resources) {
+    public static Object getLoadedApk(Context context, String apkPath, String packageName, ClassLoader classLoader, android.content.res.Resources resources) {
+        if (mLoadedApkCache.containsKey(packageName)) {
+            Object obj = mLoadedApkCache.get(packageName).get();
+            if (obj != null) return obj;
+        }
+
         try {
-            Log.i(TAG, "OneCore-DEBUG: LoadedApk injection starting for [" + packageName + "]");
-            
             Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
             Method currentActivityThreadMethod = activityThreadClass.getDeclaredMethod("currentActivityThread");
             currentActivityThreadMethod.setAccessible(true);
@@ -46,20 +51,23 @@ public class LoadedApkManager {
             getPackageInfoMethod.setAccessible(true);
             Object loadedApk = getPackageInfoMethod.invoke(activityThread, ai, compatInfo);
             
-            // Patch the new LoadedApk with virtual info
-            setField(loadedApk.getClass(), loadedApk, "mClassLoader", classLoader);
-            setField(loadedApk.getClass(), loadedApk, "mResources", resources);
-            setField(loadedApk.getClass(), loadedApk, "mPackageName", packageName);
-            setField(loadedApk.getClass(), loadedApk, "mAppInfo", ai);
-            
-            // Put it into mPackages
-            mPackages.put(packageName, new java.lang.ref.WeakReference<>(loadedApk));
-            
-            Log.i(TAG, "OneCore-DEBUG: LoadedApk injected into ActivityThread.mPackages for " + packageName);
+            if (loadedApk != null) {
+                // Patch the new LoadedApk
+                setField(loadedApk.getClass(), loadedApk, "mClassLoader", classLoader);
+                setField(loadedApk.getClass(), loadedApk, "mResources", resources);
+                setField(loadedApk.getClass(), loadedApk, "mPackageName", packageName);
+                setField(loadedApk.getClass(), loadedApk, "mAppInfo", ai);
+                
+                // Inject into ActivityThread.mPackages
+                mPackages.put(packageName, new WeakReference<>(loadedApk));
+                mLoadedApkCache.put(packageName, new WeakReference<>(loadedApk));
+                
+                Log.i(TAG, "OneCore-DEBUG: LoadedApk injected");
+            }
             
             return loadedApk;
         } catch (Exception e) {
-            Log.e(TAG, "!!! OneCore-ERROR: Failed to inject LoadedApk !!!", e);
+            Log.e(TAG, "!!! OneCore-ERROR: LoadedApk injection FAILED !!!", e);
             return null;
         }
     }
