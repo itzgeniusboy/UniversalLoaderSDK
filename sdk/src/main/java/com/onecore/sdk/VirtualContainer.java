@@ -78,7 +78,8 @@ public class VirtualContainer {
     }
 
     /**
-     * Launches the target activity inside a StubActivity.
+     * Launches the target activity via system intent.
+     * The Instrumentation hook will intercept this and redirect to StubActivity.
      */
     public void launch(Context context, String targetActivity) {
         if (mClassLoader == null) {
@@ -86,21 +87,23 @@ public class VirtualContainer {
             return;
         }
 
-        // Install Instrumentation Hook before launching any activity
-        com.onecore.sdk.core.HookManager.installInstrumentationHook();
-
-        Log.i(TAG, "Launching target activity: " + targetActivity);
+        Log.i(TAG, "Requesting launch of target activity: " + targetActivity);
         
         try {
             Intent intent = new Intent();
-            // Use the StubActivity for UI hosting
+            intent.setClassName(mPackageName, targetActivity);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+            Log.d(TAG, "Launch intent sent to system.");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to launch target via system intent", e);
+            // Fallback: Manually launch via StubActivity if hook didn't catch it
+            Intent intent = new Intent();
             intent.setClassName(context.getPackageName(), "com.onecore.loader.StubActivity");
             intent.putExtra("target_activity", targetActivity);
             intent.putExtra("target_package", mPackageName);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(intent);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to start StubActivity", e);
         }
     }
 

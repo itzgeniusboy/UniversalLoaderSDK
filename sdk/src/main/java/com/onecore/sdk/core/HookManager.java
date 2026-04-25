@@ -35,7 +35,7 @@ public class HookManager {
             OneCoreInstrumentation customInstrumentation = new OneCoreInstrumentation(baseInstrumentation);
             instrumentationField.set(activityThread, customInstrumentation);
             
-            Log.i(TAG, "Instrumentation Hook SUCCESS.");
+            Log.i(TAG, "!!! OneCore HOOK SUCCESS !!! mInstrumentation replaced.");
             
         } catch (Exception e) {
             Log.e(TAG, "Failed to install Instrumentation Hook", e);

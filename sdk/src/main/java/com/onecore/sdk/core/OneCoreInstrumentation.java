@@ -12,7 +12,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
- * Custom Instrumentation to intercept Activity lifecycle and fix ClassLoaders/Context.
+ * Advanced Instrumentation to intercept Activity lifecycle and fix ClassLoaders.
  */
 public class OneCoreInstrumentation extends Instrumentation {
     private static final String TAG = "OneCoreInstrumentation";
@@ -20,6 +20,47 @@ public class OneCoreInstrumentation extends Instrumentation {
 
     public OneCoreInstrumentation(Instrumentation base) {
         this.mBase = base;
+        Log.i(TAG, "OneCoreInstrumentation initialized with base: " + (base != null ? base.getClass().getName() : "null"));
+    }
+
+    /**
+     * Hidden method in Instrumentation. We override it to intercept intent launches.
+     */
+    public ActivityResult execStartActivity(
+            Context who, IBinder contextThread, IBinder token, Activity target,
+            Intent intent, int requestCode, Bundle options) {
+        
+        Log.d(TAG, "execStartActivity intercepted for: " + intent);
+        
+        String targetPackage = intent.getComponent() != null ? intent.getComponent().getPackageName() : null;
+        String targetClass = intent.getComponent() != null ? intent.getComponent().getClassName() : null;
+        
+        // Redirect to StubActivity if it's an external (virtualized) activity
+        if (targetClass != null && !targetClass.startsWith(who.getPackageName())) {
+            Log.i(TAG, "Redirecting launch for external activity: " + targetClass);
+            
+            Intent stubIntent = new Intent();
+            stubIntent.setClassName(who.getPackageName(), "com.onecore.loader.StubActivity");
+            stubIntent.putExtra("target_activity", targetClass);
+            stubIntent.putExtra("target_package", targetPackage);
+            if (intent.getExtras() != null) {
+                stubIntent.putExtras(intent.getExtras());
+            }
+            stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            
+            intent = stubIntent;
+        }
+
+        try {
+            Method execMethod = Instrumentation.class.getDeclaredMethod("execStartActivity",
+                    Context.class, IBinder.class, IBinder.class, Activity.class,
+                    Intent.class, int.class, Bundle.class);
+            execMethod.setAccessible(true);
+            return (ActivityResult) execMethod.invoke(mBase, who, contextThread, token, target, intent, requestCode, options);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to invoke base execStartActivity", e);
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -27,9 +68,14 @@ public class OneCoreInstrumentation extends Instrumentation {
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
         String targetActivity = intent.getStringExtra("target_activity");
+        Log.d(TAG, "newActivity called for: " + className + ", target_activity extra: " + targetActivity);
+
         if (targetActivity != null) {
-            Log.i(TAG, "Intercepting newActivity for target: " + targetActivity);
+            Log.i(TAG, "!!! INTERCEPT SUCCESS !!! Creating target instance: " + targetActivity);
             ClassLoader virtualCl = VirtualContainer.getInstance().getClassLoader();
+            
+            Log.d(TAG, "Using ClassLoader: " + (virtualCl != null ? "VIRTUAL" : "HOST"));
+            
             if (virtualCl != null) {
                 return mBase.newActivity(virtualCl, targetActivity, intent);
             }
@@ -40,6 +86,7 @@ public class OneCoreInstrumentation extends Instrumentation {
 
     @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
+        Log.d(TAG, "callActivityOnCreate: " + activity.getClass().getName());
         if (activity.getIntent().hasExtra("target_activity")) {
             fixActivityContext(activity);
         }
@@ -48,12 +95,11 @@ public class OneCoreInstrumentation extends Instrumentation {
 
     private void fixActivityContext(Activity activity) {
         try {
-            Log.i(TAG, "Fixing context for activity: " + activity.getClass().getName());
-            
+            Log.i(TAG, "Patching Activity Context: " + activity.getClass().getName());
             Context baseContext = activity.getBaseContext();
             VirtualContainer container = VirtualContainer.getInstance();
             
-            // 0. Patch Package names in ContextImpl
+            // Fix Package Names
             try {
                 String targetPkg = activity.getIntent().getStringExtra("target_package");
                 if (targetPkg != null) {
@@ -66,52 +112,46 @@ public class OneCoreInstrumentation extends Instrumentation {
                         mBasePackageNameField.setAccessible(true);
                         mBasePackageNameField.set(baseContext, targetPkg);
                     } catch (NoSuchFieldException ignored) {}
-                    
-                    Log.d(TAG, "Fixed ContextImpl PackageNames to: " + targetPkg);
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Failed to fix PackageNames in ContextImpl", e);
+                Log.e(TAG, "Failed to fix PackageNames", e);
             }
 
-            // 1. Patch Resources
+            // Fix Resources
             if (container.getResources() != null) {
                 try {
                     Field mResourcesField = baseContext.getClass().getDeclaredField("mResources");
                     mResourcesField.setAccessible(true);
                     mResourcesField.set(baseContext, container.getResources());
-                    Log.d(TAG, "Fixed ContextImpl Resources");
                 } catch (Exception e) {
-                    Log.e(TAG, "Failed to fix ContextImpl Resources", e);
+                    Log.e(TAG, "Failed to fix Resources", e);
                 }
             }
 
-            // 2. Patch LoadedApk (mPackageInfo)
+            // Fix ClassLoader in LoadedApk
             try {
                 Field mPackageInfoField = baseContext.getClass().getDeclaredField("mPackageInfo");
                 mPackageInfoField.setAccessible(true);
                 Object mPackageInfo = mPackageInfoField.get(baseContext);
 
                 if (mPackageInfo != null) {
-                    // mClassLoader
                     Field mClassLoaderField = mPackageInfo.getClass().getDeclaredField("mClassLoader");
                     mClassLoaderField.setAccessible(true);
                     mClassLoaderField.set(mPackageInfo, container.getClassLoader());
 
-                    // mResources
                     if (container.getResources() != null) {
                         Field mLoadedApkResField = mPackageInfo.getClass().getDeclaredField("mResources");
                         mLoadedApkResField.setAccessible(true);
                         mLoadedApkResField.set(mPackageInfo, container.getResources());
                     }
-                    
-                    Log.d(TAG, "Fixed LoadedApk ClassLoader and Resources");
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Failed to fix LoadedApk", e);
             }
 
+            Log.i(TAG, "Context patching COMPLETE.");
         } catch (Exception e) {
-            Log.e(TAG, "Error in fixActivityContext", e);
+            Log.e(TAG, "Context patching FAILED", e);
         }
     }
 }
