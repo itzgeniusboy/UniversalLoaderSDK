@@ -21,7 +21,7 @@ public class GameLauncher {
     public static void start(Context context, LaunchCallback callback) {
         Log.i(TAG, "!! GameLauncher SESSION START !!");
         try {
-            if (callback != null) callback.onProgress("Detecting Game Installation...");
+            if (callback != null) callback.onProgress("Initializing Virtual Environment...");
 
             String targetPkg = null;
             if (isPackageInstalled(context, PKG_IMOBILE)) {
@@ -37,15 +37,29 @@ public class GameLauncher {
             }
 
             Log.i(TAG, "Found target package: " + targetPkg);
-            if (callback != null) callback.onProgress("Launching " + targetPkg + "...");
+            
+            // REAL PROGRESS: Using VirtualContainer
+            com.onecore.sdk.VirtualContainer container = com.onecore.sdk.VirtualContainer.getInstance(context);
+            
+            // In a real scenario, we'd get the source APK path. 
+            // For now, we simulate the "install" from the public APK location.
+            String sourcePath = context.getPackageManager().getApplicationInfo(targetPkg, 0).sourceDir;
+            
+            if (callback != null) callback.onProgress("Preparing Virtual Space...");
+            boolean installed = container.installApk(sourcePath, targetPkg);
+            
+            if (!installed) {
+                if (callback != null) callback.onFailed("Failed to install into virtual container");
+                return;
+            }
 
-            android.content.Intent intent = context.getPackageManager().getLaunchIntentForPackage(targetPkg);
-            if (intent != null) {
-                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(intent);
-                if (callback != null) callback.onProcessDetected(1); // Simulated PID for success
+            if (callback != null) callback.onProgress("Launching in Container...");
+            boolean launched = container.launchApp(context, targetPkg);
+
+            if (launched) {
+                if (callback != null) callback.onProcessDetected(1); 
             } else {
-                if (callback != null) callback.onFailed("Could not create launch Intent");
+                if (callback != null) callback.onFailed("Container launch failed");
             }
 
         } catch (Exception e) {
