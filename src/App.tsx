@@ -86,7 +86,7 @@ export default function App() {
             </div>
             <div className="flex justify-between text-[11px] font-mono">
               <span className="text-gray-500">Min API</span>
-              <span className="text-[#F27D26]">26</span>
+              <span className="text-[#F27D26]">21</span>
             </div>
             <div className="flex justify-between text-[11px] font-mono">
               <span className="text-gray-500">Language</span>
