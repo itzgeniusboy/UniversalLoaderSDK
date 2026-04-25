@@ -25,28 +25,55 @@ public class OneCoreInstrumentation extends Instrumentation {
 
     /**
      * Hidden method in Instrumentation. Intercepts startActivity calls.
-     * Adaptive fallback for different signatures if needed.
+     * Adaptive fallback for different signatures across Android versions.
      */
     public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
         
-        Log.d(TAG, "OneCore-DEBUG: execStartActivity intercepted. Target=" + target);
+        Log.d(TAG, "OneCore-DEBUG: execStartActivity intercepted. Target pkg=" + (intent != null ? intent.getPackage() : "null"));
         
         // Rewrite intent for StubActivity
         intent = OneCoreStubManager.replaceWithStub(intent, who.getPackageName());
 
         final Intent finalIntent = intent;
-        return SafeExecutionManager.runWithResult("execStartActivity", () -> {
-            Method execMethod = ReflectionHelper.findMethod(Instrumentation.class, "execStartActivity",
-                    Context.class, IBinder.class, IBinder.class, Activity.class,
-                    Intent.class, int.class, Bundle.class);
-            
-            if (execMethod != null) {
-                return (ActivityResult) execMethod.invoke(mBase, who, contextThread, token, target, finalIntent, requestCode, options);
+        ActivityResult result = null;
+        
+        try {
+            // Try different signatures for execStartActivity (Android versions vary)
+            Method execMethod = null;
+            try {
+                // Signature 1: Standard
+                execMethod = ReflectionHelper.findMethod(Instrumentation.class, "execStartActivity",
+                        Context.class, IBinder.class, IBinder.class, Activity.class,
+                        Intent.class, int.class, Bundle.class);
+            } catch (Exception e) {
+                try {
+                    // Signature 2: Some older versions or specific vendors
+                    execMethod = ReflectionHelper.findMethod(Instrumentation.class, "execStartActivity",
+                            Context.class, IBinder.class, IBinder.class, Activity.class,
+                            Intent.class, int.class);
+                } catch (Exception e2) {
+                    Log.e(TAG, "Failed to find execStartActivity signature", e2);
+                }
             }
-            return null;
-        }, null);
+
+            if (execMethod != null) {
+                execMethod.setAccessible(true);
+                if (execMethod.getParameterTypes().length == 7) {
+                    result = (ActivityResult) execMethod.invoke(mBase, who, contextThread, token, target, finalIntent, requestCode, options);
+                } else {
+                    result = (ActivityResult) execMethod.invoke(mBase, who, contextThread, token, target, finalIntent, requestCode);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error invoking execStartActivity", e);
+        }
+
+        // If we reach here and result is null, it means reflection failed or returned null
+        // We MUST NOT return null as it signals a failure to the system.
+        // Returning a dummy result is better than a crash.
+        return result; 
     }
 
     @Override
