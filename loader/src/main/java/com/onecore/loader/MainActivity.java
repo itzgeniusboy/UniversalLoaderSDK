@@ -99,49 +99,28 @@ public class MainActivity extends Activity {
     }
 
     private void launchGame() {
-        Log.i(TAG, "launchGame: Initiating Sandbox Launch Sequence.");
+        Log.i(TAG, "launchGame: Initiating Launch Sequence.");
         startGameBtn.setEnabled(false);
-        startGameBtn.setText("VIRTUALIZING...");
+        startGameBtn.setText("STARTING...");
         
         GameLauncher.start(this, new GameLauncher.LaunchCallback() {
             @Override
             public void onProcessDetected(int pid) {
-                Log.i(TAG, "Sandbox Session Established.");
+                Log.i(TAG, "Game Launch Started Successfully.");
                 runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "GAME LOADED IN SANDBOX", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "GAME LAUNCHED", Toast.LENGTH_SHORT).show();
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         startGameBtn.setEnabled(true);
                         startGameBtn.setText("START GAME");
-                    }, 1000);
+                    }, 2000);
                 });
             }
 
             @Override
             public void onFailed(String reason) {
-                Log.e(TAG, "Sandbox Engine Error: " + reason);
+                Log.e(TAG, "Launch Error: " + reason);
                 runOnUiThread(() -> {
-                    Toast.makeText(MainActivity.this, "VIRTUALIZATION FAILED: " + reason, Toast.LENGTH_LONG).show();
-                    Log.i(TAG, "!! FAILSAFE !! Opening game via direct launch...");
-                    
-                    // Fallback to direct launch
-                    try {
-                        String pkg = "com.pubg.imobile";
-                        Intent intent = getPackageManager().getLaunchIntentForPackage(pkg);
-                        if (intent == null) {
-                            pkg = "com.pubg.bgmi";
-                            intent = getPackageManager().getLaunchIntentForPackage(pkg);
-                        }
-                        if (intent != null) {
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            startActivity(intent);
-                            Log.i(TAG, "!! DIRECT LAUNCH SUCCESS !!");
-                        } else {
-                            Log.e(TAG, "Fallback Failed: Game not installed.");
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Direct launch error during failsafe", e);
-                    }
-                    
+                    Toast.makeText(MainActivity.this, reason, Toast.LENGTH_LONG).show();
                     startGameBtn.setEnabled(true);
                     startGameBtn.setText("START GAME");
                 });
@@ -149,7 +128,10 @@ public class MainActivity extends Activity {
 
             @Override
             public void onProgress(String message) {
-                Log.i(TAG, "Engine State: " + message);
+                Log.i(TAG, "Launch Progress: " + message);
+                runOnUiThread(() -> {
+                    // Optional: update UI text during launch steps
+                });
             }
         });
     }
