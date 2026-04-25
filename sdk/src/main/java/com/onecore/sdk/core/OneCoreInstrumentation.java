@@ -69,7 +69,7 @@ public class OneCoreInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
-        Log.d(TAG, ">>> CALL: newActivity(className=" + className + ") <<<");
+        Log.i(TAG, "OneCore: newActivity intercepted: " + className);
         
         String targetActivity = intent.getStringExtra("target_activity");
         if (targetActivity != null) {

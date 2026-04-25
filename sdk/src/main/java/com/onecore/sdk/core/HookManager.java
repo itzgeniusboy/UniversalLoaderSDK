@@ -34,7 +34,7 @@ public class HookManager {
                 Log.i(TAG, "Injecting Custom Instrumentation. Base: " + (baseInstrumentation != null ? baseInstrumentation.getClass().getName() : "null"));
                 OneCoreInstrumentation customInstrumentation = new OneCoreInstrumentation(baseInstrumentation);
                 instrumentationField.set(activityThread, customInstrumentation);
-                Log.i(TAG, ">>> OneCore: Instrumentation Hook SHOT successful. <<<");
+                Log.i(TAG, "OneCore: ActivityThread hooked");
                 
                 // Double check
                 Instrumentation check = (Instrumentation) instrumentationField.get(activityThread);
