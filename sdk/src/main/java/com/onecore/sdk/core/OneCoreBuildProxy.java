@@ -33,8 +33,8 @@ public class OneCoreBuildProxy {
             modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
 
             field.set(null, value);
-        } catch (Exception e) {
-            Log.w(TAG, "Failed spoofing field: " + fieldName);
+        } catch (Throwable e) {
+            Log.w(TAG, "Failed spoofing field: " + fieldName + " -> " + e.getMessage());
         }
     }
 }

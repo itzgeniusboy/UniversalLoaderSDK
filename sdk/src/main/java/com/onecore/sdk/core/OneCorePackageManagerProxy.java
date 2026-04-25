@@ -54,6 +54,11 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
                 rawPm = ReflectionHelper.invokeMethod(null, "getPackageManager");
             }
 
+            if (rawPm != null && rawPm.getClass().getName().contains("com.onecore.sdk.core")) {
+                Log.w(TAG, "PMS already hooked, skipping.");
+                return;
+            }
+
             Class<?> iPmClass = Class.forName("android.content.pm.IPackageManager");
             Object proxy = Proxy.newProxyInstance(
                 iPmClass.getClassLoader(),

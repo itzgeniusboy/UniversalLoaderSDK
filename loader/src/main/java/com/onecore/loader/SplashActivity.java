@@ -40,15 +40,31 @@ public class SplashActivity extends Activity {
 
         setContentView(root);
         
+        // Fail-safe timer: if stuck at splash for 5s, try to proceed
+        new Handler().postDelayed(() -> {
+            if (!isFinishing()) {
+                Log.w(TAG, "Splash timeout fallback triggered.");
+                proceedToMain();
+            }
+        }, 5000);
+
         checkAndRequestPermissions();
     }
 
     private void checkAndRequestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            String[] commonPerms = {
-                Manifest.permission.READ_EXTERNAL_STORAGE,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
-            };
+            String[] commonPerms;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                commonPerms = new String[]{
+                    Manifest.permission.READ_MEDIA_IMAGES,
+                    Manifest.permission.READ_MEDIA_VIDEO
+                };
+            } else {
+                commonPerms = new String[]{
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                };
+            }
 
             boolean allGranted = true;
             for (String p : commonPerms) {
@@ -59,6 +75,7 @@ public class SplashActivity extends Activity {
             }
 
             if (!allGranted) {
+                Log.i(TAG, "Requesting basic storage permissions...");
                 requestPermissions(commonPerms, REQ_PERMS);
                 return;
             }
@@ -67,14 +84,13 @@ public class SplashActivity extends Activity {
         // Handle Android 11+ Manage External Storage
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
+                Log.i(TAG, "Requesting Manage External Storage...");
                 try {
                     Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                    intent.addCategory("android.intent.category.DEFAULT");
-                    intent.setData(Uri.parse(String.format("package:%s", getPackageName())));
+                    intent.setData(Uri.parse("package:" + getPackageName()));
                     startActivityForResult(intent, REQ_MANAGE_STORAGE);
                 } catch (Exception e) {
-                    Intent intent = new Intent();
-                    intent.setAction(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
                     startActivityForResult(intent, REQ_MANAGE_STORAGE);
                 }
                 return;

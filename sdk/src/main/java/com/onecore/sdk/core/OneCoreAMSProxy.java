@@ -44,12 +44,17 @@ public class OneCoreAMSProxy implements InvocationHandler {
             
             Object rawInstance = ReflectionHelper.invokeMethod(singleton, "get");
             if (rawInstance == null) {
-                // Direct field access if get() fails
                 rawInstance = ReflectionHelper.getFieldValue(singleton, "mInstance");
             }
 
             if (rawInstance == null) {
                  throw new RuntimeException("Could not get AMS instance from singleton");
+            }
+
+            // Check if already hooked
+            if (rawInstance.getClass().getName().contains("com.onecore.sdk.core")) {
+                Log.w(TAG, "AMS/ATMS already hooked, skipping.");
+                return;
             }
 
             Class<?> iAmClass = null;
