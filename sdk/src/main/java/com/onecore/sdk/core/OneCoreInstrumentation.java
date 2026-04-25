@@ -20,35 +20,37 @@ public class OneCoreInstrumentation extends Instrumentation {
 
     public OneCoreInstrumentation(Instrumentation base) {
         this.mBase = base;
-        Log.i(TAG, "OneCoreInstrumentation initialized with base: " + (base != null ? base.getClass().getName() : "null"));
+        Log.i(TAG, ">>> OneCore: Custom Instrumentation Installed (base=" + (base != null ? base.getClass().getName() : "null") + ") <<<");
     }
 
     /**
-     * Hidden method in Instrumentation. We override it to intercept intent launches.
+     * Hidden method in Instrumentation. Intercepts startActivity calls.
      */
     public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
         
-        Log.d(TAG, "execStartActivity intercepted for: " + intent);
+        Log.d(TAG, ">>> CALL: execStartActivity from " + who.getClass().getSimpleName() + " for " + intent);
         
         String targetPackage = intent.getComponent() != null ? intent.getComponent().getPackageName() : null;
         String targetClass = intent.getComponent() != null ? intent.getComponent().getClassName() : null;
         
-        // Redirect to StubActivity if it's an external (virtualized) activity
+        // If the activity is from a virtualized package, redirect it to our StubActivity
         if (targetClass != null && !targetClass.startsWith(who.getPackageName())) {
-            Log.i(TAG, "Redirecting launch for external activity: " + targetClass);
+            Log.i(TAG, ">>> REDIRECT: Outgoing Activity [" + targetClass + "] detected. Re-routing through StubActivity.");
             
             Intent stubIntent = new Intent();
             stubIntent.setClassName(who.getPackageName(), "com.onecore.loader.StubActivity");
             stubIntent.putExtra("target_activity", targetClass);
             stubIntent.putExtra("target_package", targetPackage);
+            
             if (intent.getExtras() != null) {
                 stubIntent.putExtras(intent.getExtras());
             }
             stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             
             intent = stubIntent;
+            Log.d(TAG, ">>> REDIRECT SUCCESS: New Intent = " + intent);
         }
 
         try {
@@ -58,7 +60,7 @@ public class OneCoreInstrumentation extends Instrumentation {
             execMethod.setAccessible(true);
             return (ActivityResult) execMethod.invoke(mBase, who, contextThread, token, target, intent, requestCode, options);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to invoke base execStartActivity", e);
+            Log.e(TAG, "!!! ERROR: execStartActivity redirection FAILED !!!", e);
             throw new RuntimeException(e);
         }
     }
@@ -67,17 +69,18 @@ public class OneCoreInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
+        Log.d(TAG, ">>> CALL: newActivity(className=" + className + ") <<<");
+        
         String targetActivity = intent.getStringExtra("target_activity");
-        Log.d(TAG, "newActivity called for: " + className + ", target_activity extra: " + targetActivity);
-
         if (targetActivity != null) {
-            Log.i(TAG, "!!! INTERCEPT SUCCESS !!! Creating target instance: " + targetActivity);
+            Log.i(TAG, ">>> INTERCEPT: Creating instance for Target Activity [" + targetActivity + "] <<<");
             ClassLoader virtualCl = VirtualContainer.getInstance().getClassLoader();
             
-            Log.d(TAG, "Using ClassLoader: " + (virtualCl != null ? "VIRTUAL" : "HOST"));
-            
             if (virtualCl != null) {
+                Log.d(TAG, ">>> USING VIRTUAL ClassLoader for instantiation.");
                 return mBase.newActivity(virtualCl, targetActivity, intent);
+            } else {
+                Log.e(TAG, ">>> CRITICAL: Virtual ClassLoader is NULL! Falling back to base loader.");
             }
         }
         

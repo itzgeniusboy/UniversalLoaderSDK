@@ -16,7 +16,13 @@ public class StubActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.i(TAG, "StubActivity onCreate (should be intercepted by OneCoreInstrumentation)");
-        finish(); // Failsafe if not intercepted
+        Log.e(TAG, "!!! OneCore CRITICAL: StubActivity reached onCreate! Swap failed. !!!");
+        
+        TextView tv = new TextView(this);
+        tv.setText("V_CORE ERROR: Activity Swap Failed.\nCheck logs for newActivity() status.");
+        tv.setTextColor(0xFFFF0000);
+        setContentView(tv);
+        
+        // finish(); // Commented out so user can see error on screen if it fails
     }
 }

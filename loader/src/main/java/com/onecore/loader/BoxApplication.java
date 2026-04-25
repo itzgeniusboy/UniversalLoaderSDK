@@ -11,8 +11,18 @@ public class BoxApplication extends Application {
     private static final String TAG = "BoxApplication";
 
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(base);
+        // Deep initial hook
+        com.onecore.sdk.core.HookManager.installInstrumentationHook();
+    }
+
+    @Override
     public void onCreate() {
         super.onCreate();
-        Log.i(TAG, "Application created.");
+        Log.i(TAG, "Application onCreate.");
+        
+        // Ensure SDK is active
+        com.onecore.sdk.OneCoreSDK.init(this);
     }
 }

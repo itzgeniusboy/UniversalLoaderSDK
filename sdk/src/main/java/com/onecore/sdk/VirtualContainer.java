@@ -79,7 +79,7 @@ public class VirtualContainer {
 
     /**
      * Launches the target activity via system intent.
-     * The Instrumentation hook will intercept this and redirect to StubActivity.
+     * The Instrumentation hook WILL intercept this and redirect to StubActivity.
      */
     public void launch(Context context, String targetActivity) {
         if (mClassLoader == null) {
@@ -87,23 +87,19 @@ public class VirtualContainer {
             return;
         }
 
-        Log.i(TAG, "Requesting launch of target activity: " + targetActivity);
+        Log.i(TAG, ">>> V_CORE: Launching Virtual Activity: " + targetActivity);
         
         try {
+            // We use a pure system Intent launch. 
+            // Our Instrumentation.execStartActivity MUST intercept this.
             Intent intent = new Intent();
-            intent.setClassName(mPackageName, targetActivity);
+            intent.setComponent(new android.content.ComponentName(mPackageName, targetActivity));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            
+            Log.d(TAG, "Dispatching system intent for virtualization...");
             context.startActivity(intent);
-            Log.d(TAG, "Launch intent sent to system.");
         } catch (Exception e) {
-            Log.e(TAG, "Failed to launch target via system intent", e);
-            // Fallback: Manually launch via StubActivity if hook didn't catch it
-            Intent intent = new Intent();
-            intent.setClassName(context.getPackageName(), "com.onecore.loader.StubActivity");
-            intent.putExtra("target_activity", targetActivity);
-            intent.putExtra("target_package", mPackageName);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            context.startActivity(intent);
+            Log.e(TAG, "Virtual Launch Dispatch Failed. This is expected if target is not in manifest AND hooks failed.", e);
         }
     }
 
