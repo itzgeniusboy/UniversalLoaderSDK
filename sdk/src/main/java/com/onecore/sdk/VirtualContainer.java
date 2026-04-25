@@ -22,6 +22,8 @@ public class VirtualContainer {
     private String mPackageName;
     private Resources mResources;
     private android.app.Application mTargetApplication;
+    private android.content.pm.ApplicationInfo mAppInfo;
+    private java.util.Map<String, Integer> mActivityThemes = new java.util.HashMap<>();
 
     private VirtualContainer() {}
 
@@ -40,10 +42,31 @@ public class VirtualContainer {
         this.mApkPath = apkPath;
         this.mPackageName = packageName;
 
-        File dexOptDir = context.getDir("v_opt", Context.MODE_PRIVATE);
-        File libDir = context.getDir("v_lib", Context.MODE_PRIVATE);
-
         try {
+            android.content.pm.PackageInfo packageInfo = context.getPackageManager().getPackageArchiveInfo(apkPath, 
+                android.content.pm.PackageManager.GET_ACTIVITIES);
+            if (packageInfo != null && packageInfo.applicationInfo != null) {
+                mAppInfo = packageInfo.applicationInfo;
+                mAppInfo.sourceDir = apkPath;
+                mAppInfo.publicSourceDir = apkPath;
+                
+                // Register in VPM
+                com.onecore.sdk.core.VPackageManager.registerPackage(packageInfo);
+                
+                if (packageInfo.activities != null) {
+                    for (android.content.pm.ActivityInfo info : packageInfo.activities) {
+                        mActivityThemes.put(info.name, info.theme != 0 ? info.theme : packageInfo.applicationInfo.theme);
+                        Log.d(TAG, "Cached theme for " + info.name + ": " + info.theme);
+                    }
+                }
+            }
+            
+            File dexOptDir = context.getDir("v_opt", Context.MODE_PRIVATE);
+            File libDir = context.getDir("v_lib", Context.MODE_PRIVATE);
+
+            // Extract native libs
+            com.onecore.sdk.core.NativeLibExtractor.extract(apkPath, libDir);
+
             // 1. Setup ClassLoader
             mClassLoader = new DexClassLoader(
                 apkPath,
@@ -55,7 +78,10 @@ public class VirtualContainer {
             // 2. Setup Resources for the target APK
             setupResources(context, apkPath);
             
-            Log.i(TAG, "Environment Initialized for " + packageName);
+            // 3. Inject LoadedApk into ActivityThread
+            com.onecore.sdk.core.LoadedApkManager.inject(context, apkPath, packageName, mClassLoader, mResources);
+            
+            Log.i(TAG, "OneCore-DEBUG: LoadedApk injected");
             return true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to initialize environment", e);
@@ -65,23 +91,27 @@ public class VirtualContainer {
 
     private void setupResources(Context context, String apkPath) {
         try {
-            AssetManager assetManager = AssetManager.class.newInstance();
-            Method addAssetPath = assetManager.getClass().getMethod("addAssetPath", String.class);
-            addAssetPath.invoke(assetManager, apkPath);
-            
-            Resources hostRes = context.getResources();
-            mResources = new Resources(assetManager, hostRes.getDisplayMetrics(), hostRes.getConfiguration());
-            Log.i(TAG, "Resources injected for APK: " + apkPath);
+            // More robust resource loading
+            mResources = context.getPackageManager().getResourcesForApplication(mAppInfo);
+            Log.i(TAG, "Resources injected via PackageManager for: " + mPackageName);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to setup virtual resources", e);
+            Log.e(TAG, "PackageManager Resources failed, falling back to manual AssetManager", e);
+            try {
+                AssetManager assetManager = AssetManager.class.newInstance();
+                Method addAssetPath = assetManager.getClass().getMethod("addAssetPath", String.class);
+                addAssetPath.invoke(assetManager, apkPath);
+                
+                Resources hostRes = context.getResources();
+                mResources = new Resources(assetManager, hostRes.getDisplayMetrics(), hostRes.getConfiguration());
+                Log.i(TAG, "Manual Resources fallback successful.");
+            } catch (Exception e2) {
+                Log.e(TAG, "Manual Resources fallback FAILED", e2);
+            }
         }
     }
 
     /**
      * Launches the target activity via system intent.
-     * The Instrumentation hook WILL intercept this and redirect to StubActivity.
-     */
-    public void launch(Context context, String targetActivity) {
         if (mClassLoader == null) {
             Log.e(TAG, "Cannot launch: ClassLoader not initialized. Call installApk first.");
             return;
@@ -135,6 +165,10 @@ public class VirtualContainer {
 
     public String getApkPath() {
         return mApkPath;
+    }
+
+    public Integer getTheme(String activityClassName) {
+        return mActivityThemes.get(activityClassName);
     }
 
     public ClassLoader getClassLoader() {

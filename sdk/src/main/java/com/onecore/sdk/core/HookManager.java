@@ -8,7 +8,7 @@ import java.lang.reflect.Method;
 public class HookManager {
     private static final String TAG = "OneCoreHookManager";
 
-    public static void installInstrumentationHook() {
+    public static void installInstrumentationHook(Context context) {
         try {
             Log.i(TAG, ">>> INITIATING OneCore SYSTEM HOOK (Phase 2) <<<");
             
@@ -40,6 +40,10 @@ public class HookManager {
                 Instrumentation check = (Instrumentation) instrumentationField.get(activityThread);
                 if (check instanceof OneCoreInstrumentation) {
                     Log.i(TAG, "Verification SUCCESS: OneCore is in control.");
+                    
+                    // Install Service Proxies
+                    VActivityManager.install(context.getPackageName());
+                    VPackageManager.install();
                 } else {
                     Log.e(TAG, "Verification FAILED: Hook was rejected or overwritten.");
                 }

@@ -17,7 +17,7 @@ public class ContextFixer {
         if (context == null) return;
         
         try {
-            Log.i(TAG, "Fixing Context for package: " + packageName);
+            Log.i(TAG, "OneCore-DEBUG: Context fixing for [" + packageName + "]");
             
             // 1. Fix ContextImpl fields
             patchContextImpl(context, packageName);
@@ -25,9 +25,16 @@ public class ContextFixer {
             // 2. Fix LoadedApk (mPackageInfo)
             patchLoadedApk(context);
             
-            Log.i(TAG, "Context fix SUCCESS.");
+            // 3. Specifically for Activities, nullify the cached LayoutInflater
+            if (context instanceof Activity) {
+                try {
+                    setField(Activity.class, context, "mInflater", null);
+                } catch (Exception ignored) {}
+            }
+            
+            Log.i(TAG, "OneCore-DEBUG: Resources switched");
         } catch (Exception e) {
-            Log.e(TAG, "Context fix FAILED", e);
+            Log.e(TAG, "!!! OneCore-ERROR: Context fix FAILED !!!", e);
         }
     }
 
@@ -52,6 +59,49 @@ public class ContextFixer {
             Resources virtualRes = VirtualContainer.getInstance().getResources();
             if (virtualRes != null) {
                 setField(contextImplClass, baseContext, "mResources", virtualRes);
+                // Clear mInflater to force re-creation with guest Resources
+                try {
+                    setField(contextImplClass, baseContext, "mInflater", null);
+                } catch (Exception ignored) {}
+            }
+
+            // Fix mPackageInfo to point to the injected LoadedApk
+            try {
+                Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+                Method currentActivityThreadMethod = activityThreadClass.getDeclaredMethod("currentActivityThread");
+                currentActivityThreadMethod.setAccessible(true);
+                Object activityThread = currentActivityThreadMethod.invoke(null);
+
+                // Patch mPackageManager if it exists in ContextImpl
+                try {
+                    Field sPmField = activityThreadClass.getDeclaredField("sPackageManager");
+                    sPmField.setAccessible(true);
+                    Object sPm = sPmField.get(null);
+                    setField(contextImplClass, baseContext, "mPackageManager", sPm);
+                } catch (Exception ignored) {}
+
+                Field mPackagesField = activityThreadClass.getDeclaredField("mPackages");
+                mPackagesField.setAccessible(true);
+                java.util.Map mPackages = (java.util.Map) mPackagesField.get(activityThread);
+                Object ref = mPackages.get(packageName);
+                if (ref != null) {
+                    Method getMethod = ref.getClass().getMethod("get");
+                    Object loadedApk = getMethod.invoke(ref);
+                    if (loadedApk != null) {
+                        setField(contextImplClass, baseContext, "mPackageInfo", loadedApk);
+                        
+                        // Patch Application instance
+                        android.app.Application virtualApp = VirtualContainer.getInstance().getTargetApplication();
+                        if (virtualApp != null) {
+                            setField(contextImplClass, baseContext, "mApplication", virtualApp);
+                            setField(loadedApk.getClass(), loadedApk, "mApplication", virtualApp);
+                        }
+                        
+                        Log.d(TAG, "OneCore-DEBUG: ContextImpl.mPackageInfo + mApplication patched.");
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed during deep context patching", e);
             }
             
             Log.d(TAG, "ContextImpl fields patched.");

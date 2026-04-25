@@ -30,28 +30,10 @@ public class OneCoreInstrumentation extends Instrumentation {
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
         
-        Log.d(TAG, ">>> CALL: execStartActivity from " + who.getClass().getSimpleName() + " for " + intent);
+        Log.d(TAG, "OneCore-DEBUG: execStartActivity intercepted. Intent=" + intent);
         
-        String targetPackage = intent.getComponent() != null ? intent.getComponent().getPackageName() : null;
-        String targetClass = intent.getComponent() != null ? intent.getComponent().getClassName() : null;
-        
-        // If the activity is from a virtualized package, redirect it to our StubActivity
-        if (targetClass != null && !targetClass.startsWith(who.getPackageName())) {
-            Log.i(TAG, ">>> REDIRECT: Outgoing Activity [" + targetClass + "] detected. Re-routing through StubActivity.");
-            
-            Intent stubIntent = new Intent();
-            stubIntent.setClassName(who.getPackageName(), "com.onecore.loader.StubActivity");
-            stubIntent.putExtra("target_activity", targetClass);
-            stubIntent.putExtra("target_package", targetPackage);
-            
-            if (intent.getExtras() != null) {
-                stubIntent.putExtras(intent.getExtras());
-            }
-            stubIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            
-            intent = stubIntent;
-            Log.d(TAG, ">>> REDIRECT SUCCESS: New Intent = " + intent);
-        }
+        // Rewrite intent for StubActivity
+        intent = StubActivityManager.replaceWithStub(intent, who.getPackageName());
 
         try {
             Method execMethod = Instrumentation.class.getDeclaredMethod("execStartActivity",
@@ -60,7 +42,7 @@ public class OneCoreInstrumentation extends Instrumentation {
             execMethod.setAccessible(true);
             return (ActivityResult) execMethod.invoke(mBase, who, contextThread, token, target, intent, requestCode, options);
         } catch (Exception e) {
-            Log.e(TAG, "!!! ERROR: execStartActivity redirection FAILED !!!", e);
+            Log.e(TAG, "!!! OneCore-ERROR: execStartActivity redirection FAILED !!!", e);
             throw new RuntimeException(e);
         }
     }
@@ -69,18 +51,22 @@ public class OneCoreInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
-        Log.i(TAG, "OneCore: newActivity intercepted: " + className);
+        Log.i(TAG, "OneCore-DEBUG: newActivity -> " + className);
         
         String targetActivity = intent.getStringExtra("target_activity");
         if (targetActivity != null) {
-            Log.i(TAG, ">>> INTERCEPT: Creating instance for Target Activity [" + targetActivity + "] <<<");
+            Log.i(TAG, "OneCore-DEBUG: Restoring Target Activity [" + targetActivity + "]");
             ClassLoader virtualCl = VirtualContainer.getInstance().getClassLoader();
             
             if (virtualCl != null) {
-                Log.d(TAG, ">>> USING VIRTUAL ClassLoader for instantiation.");
-                return mBase.newActivity(virtualCl, targetActivity, intent);
-            } else {
-                Log.e(TAG, ">>> CRITICAL: Virtual ClassLoader is NULL! Falling back to base loader.");
+                try {
+                    Log.d(TAG, "OneCore-DEBUG: Using virtual classloader for " + targetActivity);
+                    Activity activity = mBase.newActivity(virtualCl, targetActivity, intent);
+                    Log.i(TAG, "OneCore-DEBUG: Activity instantiated SUCCESS: " + activity.getClass().getName());
+                    return activity;
+                } catch (Exception e) {
+                    Log.e(TAG, "!!! OneCore-ERROR: FAILED to instantiate target !!!", e);
+                }
             }
         }
         
@@ -89,11 +75,29 @@ public class OneCoreInstrumentation extends Instrumentation {
 
     @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
-        Log.d(TAG, "callActivityOnCreate: " + activity.getClass().getName());
-        if (activity.getIntent().hasExtra("target_activity")) {
+        Log.d(TAG, "OneCore-DEBUG: callActivityOnCreate -> " + activity.getClass().getName());
+        String targetActivity = activity.getIntent().getStringExtra("target_activity");
+        if (targetActivity != null) {
+            String targetPkg = activity.getIntent().getStringExtra("target_package");
+            
+            // Ensure Application is bound
+            VirtualContainer container = VirtualContainer.getInstance();
+            if (container.getTargetApplication() == null && targetPkg != null) {
+                 Log.i(TAG, "OneCore-DEBUG: Binding Application on-the-fly for [" + targetPkg + "]");
+                 container.bindApplication(activity.getApplicationContext(), "android.app.Application", targetPkg);
+            }
+            
             fixActivityContext(activity);
+            
+            // Apply theme
+            Integer theme = container.getTheme(targetActivity);
+            if (theme != null && theme != 0) {
+                Log.d(TAG, "OneCore-DEBUG: Theme applied -> " + theme);
+                activity.setTheme(theme);
+            }
         }
         mBase.callActivityOnCreate(activity, icicle);
+        Log.d(TAG, "OneCore-DEBUG: callActivityOnCreate success.");
     }
 
     private void fixActivityContext(Activity activity) {
@@ -101,14 +105,14 @@ public class OneCoreInstrumentation extends Instrumentation {
             String targetPkg = activity.getIntent().getStringExtra("target_package");
             if (targetPkg == null) return;
 
-            Log.i(TAG, ">>> OneCore: Deep Patching Activity Context for [" + targetPkg + "] <<<");
+            Log.i(TAG, "OneCore-DEBUG: Resources switched for context fixing.");
             
             // Use specialized ContextFixer
             ContextFixer.fixContext(activity, targetPkg);
 
-            Log.i(TAG, ">>> OneCore: Activity Lifecycle ready for rendering. <<<");
+            Log.i(TAG, "OneCore-DEBUG: setContentView ready for triggering.");
         } catch (Exception e) {
-            Log.e(TAG, "!!! OneCore: Deep Patch FAILED !!!", e);
+            Log.e(TAG, "!!! OneCore-ERROR: Context fix FAILED !!!", e);
         }
     }
 }
