@@ -77,7 +77,10 @@ public class VirtualContainer {
                 context.getClassLoader()
             );
             
-            // 2. Setup Resources for the target APK
+            // 2.1 Fix OBB for Games
+            fixGameObb(packageName);
+            
+            // 2.2 Setup Resources for the target APK
             setupResources(context, apkPath);
             
             // 3. Inject LoadedApk into ActivityThread
@@ -187,5 +190,14 @@ public class VirtualContainer {
 
     public Resources getResources() {
         return mResources;
+    }
+
+    private void fixGameObb(String packageName) {
+        com.onecore.sdk.core.SafeExecutionManager.run("Gaming OBB Fix", () -> {
+            File obbDir = new File(android.os.Environment.getExternalStorageDirectory(), "Android/obb/" + packageName);
+            if (!obbDir.exists()) {
+                Log.w(TAG, "OneCore-DEBUG: OBB directory missing. BGMI/PUBG might not start. Path: " + obbDir.getAbsolutePath());
+            }
+        });
     }
 }

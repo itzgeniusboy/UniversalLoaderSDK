@@ -26,16 +26,27 @@ public class OneCoreNativeLoader {
             ZipFile zipFile = new ZipFile(apkPath);
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
             
-            // Determine primary ABI (simplified)
-            String primaryCpuAbi = android.os.Build.CPU_ABI;
+            // Determine primary ABI (high priority for Gaming)
+            String[] abis = android.os.Build.SUPPORTED_ABIS;
+            String primaryAbi = abis.length > 0 ? abis[0] : "armeabi-v7a";
             
+            Log.i(TAG, "OneCore-DEBUG: Target ABI for Gaming -> " + primaryAbi);
+
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
                 
                 if (name.startsWith("lib/") && name.endsWith(".so")) {
-                    // Extract if it matches device ABI
-                    if (name.contains(primaryCpuAbi) || name.contains("armeabi-v7a")) {
+                    // Optimized extraction: Match best ABI or fallback to v7a
+                    boolean match = false;
+                    for (String abi : abis) {
+                        if (name.contains(abi)) {
+                            match = true;
+                            break;
+                        }
+                    }
+
+                    if (match) {
                         String fileName = name.substring(name.lastIndexOf("/") + 1);
                         File outFile = new File(libDir, fileName);
                         

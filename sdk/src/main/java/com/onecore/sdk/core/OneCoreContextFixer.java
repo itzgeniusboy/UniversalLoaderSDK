@@ -35,6 +35,9 @@ public class OneCoreContextFixer {
             File dataDir = context.getDir("v_data_" + packageName, Context.MODE_PRIVATE);
             if (!dataDir.exists()) dataDir.mkdirs();
             
+            // Initialize VFS for this package
+            OneCoreVFS.init(packageName, dataDir.getAbsolutePath());
+            
             ReflectionHelper.setFieldValue(contextImpl, dataDir, "mDatadir", "mDataDir");
                 
             File filesDir = new File(dataDir, "files");

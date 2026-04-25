@@ -15,9 +15,14 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
     private static final String TAG = "OneCore-PMProxy";
     private final Object mBase;
     private static final Map<String, android.content.pm.PackageInfo> sVirtualPackages = new HashMap<>();
+    private static final java.util.Set<String> sHiddenPackages = new java.util.HashSet<>();
 
     public OneCorePackageManagerProxy(Object base) {
         this.mBase = base;
+    }
+
+    public static void hidePackage(String packageName) {
+        sHiddenPackages.add(packageName);
     }
 
     public static void registerPackage(android.content.pm.PackageInfo info) {
@@ -69,11 +74,13 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
         
         if ("getPackageInfo".equals(methodName)) {
             String pkg = (String) args[0];
+            if (sHiddenPackages.contains(pkg)) return null;
             if (sVirtualPackages.containsKey(pkg)) {
                 return sVirtualPackages.get(pkg);
             }
         } else if ("getApplicationInfo".equals(methodName)) {
             String pkg = (String) args[0];
+            if (sHiddenPackages.contains(pkg)) return null;
             if (sVirtualPackages.containsKey(pkg)) {
                 return sVirtualPackages.get(pkg).applicationInfo;
             }

@@ -47,6 +47,8 @@ public class OneCoreActivityThreadHook {
             OneCoreUidProxy.spoof();
             OneCoreDeviceSpoofing.install();
             OneCoreAccountManagerProxy.install();
+            OneCoreGLESSpoofer.apply();
+            OneCoreAntiCheatBypass.apply();
             OneCoreWebViewFixer.fix();
             OneCoreCrashHandler.install();
             OneCoreAntiDetection.apply();

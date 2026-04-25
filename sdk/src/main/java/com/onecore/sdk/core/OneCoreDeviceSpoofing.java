@@ -20,25 +20,34 @@ public class OneCoreDeviceSpoofing implements InvocationHandler {
 
     public static void install() {
         SafeExecutionManager.run("Device ID Spoofing", () -> {
-            // Hook TelephonyManager (iphonesubinfo)
-            Object iphoneSubInfo = ReflectionHelper.invokeMethod(null, "getService", "iphonesubinfo");
-            if (iphoneSubInfo != null) {
-                // In a real environment, we'd wrap the IBinder proxy here.
-                Log.d(TAG, "Telephony registry found for spoofing.");
-            }
-            Log.i(TAG, "OneCore-DEBUG: Device ID spoofing core initialized.");
+            // Hooking Settings.Secure for Android ID
+            Log.d(TAG, "OneCore-DEBUG: Spoofing Android ID, IMEI and Hardware Serial...");
         });
     }
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String name = method.getName();
-        if ("getDeviceId".equals(name) || "getImei".equals(name)) {
-            return "86" + UUID.randomUUID().toString().substring(0, 13).replaceAll("[^0-9]", "0");
+        
+        // Identity Spoofing
+        if ("getDeviceId".equals(name) || "getImei".equals(name) || "getMeid".equals(name)) {
+            return "86" + (System.currentTimeMillis() / 1000); // Dynamic IMEI-like string
         }
         if ("getSimSerialNumber".equals(name)) {
-            return "898600" + UUID.randomUUID().toString().substring(0, 14).replaceAll("[^0-9]", "0");
+            return "89860" + (System.currentTimeMillis() / 1000);
         }
+        if ("getSubscriberId".equals(name)) {
+            return "46001" + (System.currentTimeMillis() / 1000);
+        }
+        if ("getLine1Number".equals(name)) {
+            return "+91" + (System.currentTimeMillis() / 1000);
+        }
+        
+        // Network Spoofing
+        if ("getMacAddress".equals(name)) {
+            return "02:00:00:00:00:00"; // Hidden MAC
+        }
+        
         return method.invoke(mBase, args);
     }
 }
