@@ -1,104 +1,86 @@
 package com.onecore.sdk;
 
 import android.content.Context;
+import android.content.Intent;
 import android.util.Log;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import dalvik.system.DexClassLoader;
 
 /**
- * Basic Virtual Container System for OneCore.
- * Handles APK "installation" (copying to internal storage) and basic launching.
+ * Minimal Working Virtual Container Engine (Phase 1).
  */
 public class VirtualContainer {
     private static final String TAG = "VirtualContainer";
     private static VirtualContainer sInstance;
-    private Context mContext;
+    
+    private String mApkPath;
+    private DexClassLoader mClassLoader;
+    private String mPackageName;
 
-    private VirtualContainer(Context context) {
-        this.mContext = context.getApplicationContext();
-    }
+    private VirtualContainer() {}
 
-    public static synchronized VirtualContainer getInstance(Context context) {
+    public static synchronized VirtualContainer getInstance() {
         if (sInstance == null) {
-            sInstance = new VirtualContainer(context);
+            sInstance = new VirtualContainer();
         }
         return sInstance;
     }
 
     /**
-     * Installs an APK into the virtual container by copying it to internal storage.
+     * Initializes the environment for a specific APK.
      */
-    public boolean installApk(String sourcePath, String packageName) {
-        Log.i(TAG, "Installing APK: " + packageName + " from " + sourcePath);
-        File installDir = new File(mContext.getFilesDir(), "container/" + packageName);
-        if (!installDir.exists() && !installDir.mkdirs()) {
-            Log.e(TAG, "Failed to create install directory");
-            return false;
-        }
+    public boolean installApk(Context context, String apkPath, String packageName) {
+        Log.i(TAG, "Installing APK for virtualization: " + apkPath);
+        this.mApkPath = apkPath;
+        this.mPackageName = packageName;
 
-        File targetApk = new File(installDir, "base.apk");
+        File dexOptDir = context.getDir("v_opt", Context.MODE_PRIVATE);
+        File libDir = context.getDir("v_lib", Context.MODE_PRIVATE);
+
         try {
-            copyFile(new File(sourcePath), targetApk);
-            Log.i(TAG, "APK copied to " + targetApk.getAbsolutePath());
+            mClassLoader = new DexClassLoader(
+                apkPath,
+                dexOptDir.getAbsolutePath(),
+                libDir.getAbsolutePath(),
+                context.getClassLoader()
+            );
+            Log.i(TAG, "DexClassLoader initialized successfully.");
             return true;
-        } catch (IOException e) {
-            Log.e(TAG, "Failed to copy APK", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize DexClassLoader", e);
             return false;
         }
     }
 
     /**
-     * "Launches" the app by setting up a DexClassLoader.
-     * In a real implementation, this would start a StubActivity.
+     * Launches the target activity inside a StubActivity.
      */
-    public boolean launchApp(Context context, String packageName) {
-        Log.i(TAG, "Launching App: " + packageName);
-        File installDir = new File(mContext.getFilesDir(), "container/" + packageName);
-        File targetApk = new File(installDir, "base.apk");
-
-        if (!targetApk.exists()) {
-            Log.e(TAG, "APK not found for " + packageName);
-            return false;
+    public void launch(Context context, String targetActivity) {
+        if (mClassLoader == null) {
+            Log.e(TAG, "Cannot launch: ClassLoader not initialized. Call installApk first.");
+            return;
         }
 
-        File dexOptDir = new File(installDir, "oat");
-        if (!dexOptDir.exists() && !dexOptDir.mkdirs()) {
-            Log.e(TAG, "Failed to create dexopt directory");
-            return false;
-        }
-
+        Log.i(TAG, "Launching target activity: " + targetActivity);
+        
+        // We use the StubActivity defined in the loader module for UI hosting
         try {
-            // Basic classloader setup - this validates the APK can be loaded
-            DexClassLoader classLoader = new DexClassLoader(
-                targetApk.getAbsolutePath(),
-                dexOptDir.getAbsolutePath(),
-                null,
-                context.getClassLoader()
-            );
-            Log.i(TAG, "ClassLoader established for " + packageName);
-            
-            // For now, we just log success. 
-            // Future steps will implement StubActivity for true UI launch.
-            return true;
+            Intent intent = new Intent();
+            intent.setClassName(context.getPackageName(), "com.onecore.loader.StubActivity");
+            intent.putExtra("target_activity", targetActivity);
+            intent.putExtra("target_package", mPackageName);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to launch app", e);
-            return false;
+            Log.e(TAG, "Failed to start StubActivity", e);
         }
     }
 
-    private void copyFile(File source, File dest) throws IOException {
-        try (InputStream is = new FileInputStream(source);
-             OutputStream os = new FileOutputStream(dest)) {
-            byte[] buffer = new byte[1024];
-            int length;
-            while ((length = is.read(buffer)) > 0) {
-                os.write(buffer, 0, length);
-            }
-        }
+    public DexClassLoader getClassLoader() {
+        return mClassLoader;
+    }
+    
+    public String getApkPath() {
+        return mApkPath;
     }
 }

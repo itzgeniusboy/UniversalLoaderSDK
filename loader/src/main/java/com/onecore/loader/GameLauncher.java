@@ -38,29 +38,27 @@ public class GameLauncher {
 
             Log.i(TAG, "Found target package: " + targetPkg);
             
-            // REAL PROGRESS: Using VirtualContainer
-            com.onecore.sdk.VirtualContainer container = com.onecore.sdk.VirtualContainer.getInstance(context);
+            // REAL PROGRESS: Using OneCore SDK and VirtualContainer
+            com.onecore.sdk.OneCoreSDK.init(context);
+            com.onecore.sdk.VirtualContainer container = com.onecore.sdk.VirtualContainer.getInstance();
             
-            // In a real scenario, we'd get the source APK path. 
-            // For now, we simulate the "install" from the public APK location.
             String sourcePath = context.getPackageManager().getApplicationInfo(targetPkg, 0).sourceDir;
             
             if (callback != null) callback.onProgress("Preparing Virtual Space...");
-            boolean installed = container.installApk(sourcePath, targetPkg);
+            boolean installed = container.installApk(context, sourcePath, targetPkg);
             
             if (!installed) {
-                if (callback != null) callback.onFailed("Failed to install into virtual container");
+                if (callback != null) callback.onFailed("Failed to initialize virtual space");
                 return;
             }
 
             if (callback != null) callback.onProgress("Launching in Container...");
-            boolean launched = container.launchApp(context, targetPkg);
+            
+            // For Phase 1, we attempt to launch the main activity of the target package
+            String targetActivity = context.getPackageManager().getLaunchIntentForPackage(targetPkg).getComponent().getClassName();
+            container.launch(context, targetActivity);
 
-            if (launched) {
-                if (callback != null) callback.onProcessDetected(1); 
-            } else {
-                if (callback != null) callback.onFailed("Container launch failed");
-            }
+            if (callback != null) callback.onProcessDetected(1); 
 
         } catch (Exception e) {
             Log.e(TAG, "Error in GameLauncher", e);
