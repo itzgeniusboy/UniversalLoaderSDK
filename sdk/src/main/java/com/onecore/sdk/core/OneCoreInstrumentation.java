@@ -34,7 +34,8 @@ public class OneCoreInstrumentation extends Instrumentation {
         Log.d(TAG, "OneCore-DEBUG: execStartActivity intercepted. Target pkg=" + (intent != null ? intent.getPackage() : "null"));
         
         // Rewrite intent for StubActivity
-        intent = OneCoreStubManager.replaceWithStub(intent, who.getPackageName());
+        String hostPkg = (who != null) ? who.getPackageName() : (sContext != null ? sContext.getPackageName() : "com.onecore.loader");
+        intent = OneCoreStubManager.replaceWithStub(intent, hostPkg);
 
         final Intent finalIntent = intent;
         ActivityResult result = null;
@@ -80,19 +81,21 @@ public class OneCoreInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl, String className, Intent intent) 
             throws InstantiationException, IllegalAccessException, ClassNotFoundException {
         
-        String targetActivity = intent.getStringExtra("target_activity");
-        String targetPkg = intent.getStringExtra("target_package");
-
-        if (targetPkg != null && targetActivity != null) {
-            VirtualContainer container = VirtualContainer.getInstance();
-            ClassLoader virtualCl = container.getClassLoader();
-            
-            if (virtualCl != null) {
-                try {
-                    Log.d(TAG, "OneCore-DEBUG: Instantiating activity from virtual ClassLoader: " + targetActivity);
-                    return mBase.newActivity(virtualCl, targetActivity, intent);
-                } catch (Exception e) {
-                    Log.e(TAG, "Failed virtual instantiation, falling back to provided CL", e);
+        if (intent != null) {
+            String targetActivity = intent.getStringExtra("target_activity");
+            String targetPkg = intent.getStringExtra("target_package");
+    
+            if (targetPkg != null && targetActivity != null) {
+                VirtualContainer container = VirtualContainer.getInstance();
+                ClassLoader virtualCl = container.getClassLoader();
+                
+                if (virtualCl != null) {
+                    try {
+                        Log.d(TAG, "OneCore-DEBUG: Instantiating activity from virtual ClassLoader: " + targetActivity);
+                        return mBase.newActivity(virtualCl, targetActivity, intent);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed virtual instantiation, falling back to provided CL", e);
+                    }
                 }
             }
         }
@@ -121,20 +124,23 @@ public class OneCoreInstrumentation extends Instrumentation {
     @Override
     public void callActivityOnResume(Activity activity) {
         mBase.callActivityOnResume(activity);
-        String targetActivity = activity.getIntent().getStringExtra("target_activity");
-        // Only fix rendering for virtual/guest activities to prevent rotating the loader
-        if (targetActivity != null) {
-            OneCoreRenderingFixer.fix(activity);
+        if (activity != null && activity.getIntent() != null) {
+            String targetActivity = activity.getIntent().getStringExtra("target_activity");
+            // Only fix rendering for virtual/guest activities to prevent rotating the loader
+            if (targetActivity != null) {
+                OneCoreRenderingFixer.fix(activity);
+            }
         }
     }
 
     @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
         SafeExecutionManager.run("callActivityOnCreate", () -> {
-            String targetActivity = activity.getIntent().getStringExtra("target_activity");
+            Intent intent = activity.getIntent();
+            String targetActivity = intent != null ? intent.getStringExtra("target_activity") : null;
             // Only perform guest-specific fixes if it's a virtual activity
             if (targetActivity != null) {
-                String targetPkg = activity.getIntent().getStringExtra("target_package");
+                String targetPkg = intent.getStringExtra("target_package");
                 
                 try {
                     // Boost priority for smoothness in Game Mode

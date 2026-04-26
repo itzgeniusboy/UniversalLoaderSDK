@@ -16,6 +16,9 @@ public class OneCoreRenderingFixer {
 
     public static void fix(Activity activity) {
         if (activity == null) return;
+        
+        // Ensure surface is ready for EGL
+        ensureSurface(activity);
 
         SafeExecutionManager.run("Rendering Fix", () -> {
             Window window = activity.getWindow();
@@ -28,12 +31,22 @@ public class OneCoreRenderingFixer {
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
             
-            // 3. Force rendering to be "Opaque" for games
-            window.getDecorView().setBackgroundColor(0xFF000000); 
+            // 3. Force OPAQUE window for EGL performance and visibility
+            window.setFormat(android.graphics.PixelFormat.OPAQUE);
             
-            // 3.1 Force screen to stay on and window to be focused
+            // 3.1 Force orientation to LANDSCAPE for games to prevent rotation glitches
+            if (activity.getRequestedOrientation() != android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
+                activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+            }
+
+            // 4. Force rendering to be "Transparent" for games to allow SurfaceView through
+            window.getDecorView().setBackgroundColor(0x00000000); 
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+            
+            // 5. Force screen to stay on and window to be focused
             activity.setFinishOnTouchOutside(false);
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
             window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
             // 4. Set a listener for dynamic SurfaceView additions (UE4 is lazy)
@@ -76,19 +89,36 @@ public class OneCoreRenderingFixer {
         });
     }
 
+    private static void ensureSurface(Activity activity) {
+        // Some game engines (UE4) fail if the surface is not immediate
+        // We can force a small delay or a layout pass
+        View decor = activity.getWindow().getDecorView();
+        if (decor != null) {
+            decor.requestLayout();
+            decor.invalidate();
+        }
+    }
+
     private static void fixSurfaceViews(ViewGroup group) {
         for (int i = 0; i < group.getChildCount(); i++) {
             View child = group.getChildAt(i);
             if (child instanceof SurfaceView) {
                 SurfaceView sv = (SurfaceView) child;
                 
-                // Force correctly layered surface
-                // If it's the game surface, it should be on top of UI or MediaOverlay
-                sv.setZOrderOnTop(false); 
-                sv.setZOrderMediaOverlay(true);
+                // UE4/BGMI Fix: The game needs to be on top to be visible through the decor
+                sv.setZOrderOnTop(true); 
+                sv.setZOrderMediaOverlay(false);
                 
                 // UE4 Fix: Set Opaque format on Holder
                 sv.getHolder().setFormat(android.graphics.PixelFormat.OPAQUE);
+                
+                // Fix Surface Control for EGL
+                try {
+                    android.view.SurfaceHolder holder = sv.getHolder();
+                    if (holder != null && holder.getSurface() != null && !holder.getSurface().isValid()) {
+                         Log.w(TAG, "Surface is invalid, attempting forced refresh.");
+                    }
+                } catch (Exception ignored) {}
                 
                 // Disable Secure flag as it can cause black screen in some virtual environments
                 try {

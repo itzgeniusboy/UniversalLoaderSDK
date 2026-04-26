@@ -33,6 +33,10 @@ public class OneCoreActivityThreadHook {
             final Object at = activityThread;
             SafeExecutionManager.run("Instrumentation Hook", () -> {
                 android.app.Instrumentation baseInstrumentation = (android.app.Instrumentation) ReflectionHelper.getFieldValue(at, "mInstrumentation");
+                if (baseInstrumentation instanceof com.onecore.sdk.core.OneCoreInstrumentation) {
+                    Log.i(TAG, "OneCore-DEBUG: Instrumentation already hooked.");
+                    return;
+                }
                 OneCoreInstrumentation customInstrumentation = new OneCoreInstrumentation(baseInstrumentation);
                 ReflectionHelper.setFieldValue(at, customInstrumentation, "mInstrumentation");
             });
