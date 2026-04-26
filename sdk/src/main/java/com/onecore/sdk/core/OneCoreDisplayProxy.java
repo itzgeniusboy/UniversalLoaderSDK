@@ -62,13 +62,20 @@ public class OneCoreDisplayProxy implements InvocationHandler {
         String name = method.getName();
         
         if (name.equals("getDisplayInfo")) {
-            Log.d(TAG, "Intercepted getDisplayInfo");
+            // Force primary display (0) info
+            if (args != null && args.length > 0) {
+                args[0] = 0; // Set displayId to 0
+            }
+            Log.d(TAG, "Intercepted getDisplayInfo -> Forced Display 0");
         } else if (name.equals("getDisplayIds")) {
-            // Return at least display 0
+            // Always include display 0
             return new int[]{0};
         } else if (name.equals("getDisplay")) {
-            // Android 12+ display handling
-            Log.d(TAG, "Intercepted getDisplay");
+            // Android 12+ display handling: Ensure display 0 is used
+            if (args != null && args.length > 0) {
+                args[0] = 0; 
+            }
+            Log.d(TAG, "Intercepted getDisplay -> Forced Display 0");
         }
         
         try {

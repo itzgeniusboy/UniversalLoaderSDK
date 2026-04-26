@@ -96,6 +96,9 @@ public class OneCoreRenderingFixer {
                      Log.w(TAG, "Detected suspiciously small SurfaceView, might be hidden UE4 layer.");
                 }
                 
+                // Force buffer update
+                sv.getHolder().setFixedSize(sv.getWidth(), sv.getHeight());
+                
                 // Wake up the surface if it's stalled
                 sv.postInvalidate();
                 

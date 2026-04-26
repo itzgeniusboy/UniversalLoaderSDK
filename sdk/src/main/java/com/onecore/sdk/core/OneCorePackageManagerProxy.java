@@ -117,6 +117,27 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
             if (sVirtualPackages.containsKey(pkg)) {
                 return sVirtualPackages.get(pkg).applicationInfo;
             }
+        } else if ("getServiceInfo".equals(methodName)) {
+            android.content.ComponentName component = (android.content.ComponentName) args[0];
+            if (component != null && ("com.google.android.gms".equals(component.getPackageName()) || "com.android.vending".equals(component.getPackageName()))) {
+                android.content.pm.ServiceInfo si = new android.content.pm.ServiceInfo();
+                si.packageName = component.getPackageName();
+                si.name = component.getClassName();
+                si.applicationInfo = sVirtualPackages.get(si.packageName).applicationInfo;
+                return si;
+            }
+        } else if ("queryIntentServices".equals(methodName)) {
+             Intent intent = (Intent) args[0];
+             if (intent != null && intent.getAction() != null && intent.getAction().contains("com.google.android.gms")) {
+                 // Return a mock result to satisfy game checks
+                 android.content.pm.ResolveInfo ri = new android.content.pm.ResolveInfo();
+                 ri.serviceInfo = new android.content.pm.ServiceInfo();
+                 ri.serviceInfo.packageName = "com.google.android.gms";
+                 ri.serviceInfo.name = "com.google.android.gms.common.api.GoogleApiActivity";
+                 java.util.List<android.content.pm.ResolveInfo> list = new java.util.ArrayList<>();
+                 list.add(ri);
+                 return list;
+             }
         } else if ("checkPermission".equals(methodName)) {
             String pkg = (String) args[args.length - 1] instanceof String ? (String) args[args.length - 1] : null;
             if (pkg != null && sVirtualPackages.containsKey(pkg)) {

@@ -19,8 +19,14 @@ public class OneCoreVFS {
             mRedirects.put("/data/data/" + packageName, virtualDataPath);
             mRedirects.put("/data/user/0/" + packageName, virtualDataPath);
             
-            // Redirect OBB check paths
+            // Redirect Data and OBB paths for Native Layer (Common patterns)
             mRedirects.put("/Android/obb/" + packageName, "/sdcard/Android/obb/" + packageName);
+            mRedirects.put("/Android/data/" + packageName, "/sdcard/Android/data/" + packageName);
+            mRedirects.put("/storage/emulated/0/Android/obb/" + packageName, "/sdcard/Android/obb/" + packageName);
+            mRedirects.put("/storage/emulated/0/Android/data/" + packageName, "/sdcard/Android/data/" + packageName);
+            
+            // Critical for UE4: Redirect the base OBB dir to search within sandbox
+            mRedirects.put("/obb/" + packageName, "/sdcard/Android/obb/" + packageName);
             
             // Logic to hide 'v_data' from File.getAbsolutePath() would go here 
             // if we were using native hooks.

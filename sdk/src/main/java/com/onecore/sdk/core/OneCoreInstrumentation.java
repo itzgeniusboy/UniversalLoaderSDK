@@ -202,7 +202,14 @@ public class OneCoreInstrumentation extends Instrumentation {
                     if (android.os.Build.VERSION.SDK_INT >= 31) {
                         try {
                             android.view.Display display = activity.getWindowManager().getDefaultDisplay();
+                            // Force displayId to 0 in ContextImpl mDisplay
                             ReflectionHelper.setFieldValue(activity, display, "mDisplay");
+                            
+                            // Also fix ContextImpl's own mDisplay field
+                            Object contextImpl = ReflectionHelper.getFieldValue(activity, "mBase");
+                            if (contextImpl != null) {
+                                ReflectionHelper.setFieldValue(contextImpl, display, "mDisplay");
+                            }
                         } catch (Exception ignored) {}
                     }
                     
