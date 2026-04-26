@@ -117,11 +117,14 @@ public class OneCoreAMSProxy implements InvocationHandler {
             Object result = method.invoke(mBase, args);
             if (result instanceof java.util.List) {
                 java.util.List list = (java.util.List) result;
+                String targetPkg = VirtualContainer.getInstance().getPackageName();
+                if (targetPkg == null) targetPkg = "com.pubg.imobile";
+                
                 for (Object item : list) {
                     try {
                         String procName = (String) ReflectionHelper.getFieldValue(item, "processName");
                         if (procName != null && (procName.contains(sHostPackage) || procName.contains(":virtual"))) {
-                            ReflectionHelper.setFieldValue(item, "com.tencent.ig", "processName");
+                            ReflectionHelper.setFieldValue(item, targetPkg, "processName");
                         }
                     } catch (Exception ignored) {}
                 }

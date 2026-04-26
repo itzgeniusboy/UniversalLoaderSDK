@@ -68,16 +68,19 @@ public class SplashActivity extends Activity {
 
     private void checkOBB() {
         try {
-            // Check for BGMI OBB as an example
-            java.io.File obb = new java.io.File(Environment.getExternalStorageDirectory(), "Android/obb/com.tencent.ig");
-            if (!obb.exists() || obb.listFiles() == null || obb.listFiles().length == 0) {
-                // Also check for PUBG Mobile (global)
-                java.io.File obb2 = new java.io.File(Environment.getExternalStorageDirectory(), "Android/obb/com.tencent.tmgp.pubgmhd");
-                if (!obb2.exists()) {
-                    Toast.makeText(this, "LOG: OBB check skipped or files not found in /Android/obb/", Toast.LENGTH_SHORT).show();
+            // Check for common PUBG/BGMI variants
+            String[] packages = {"com.pubg.imobile", "com.pubg.imbile", "com.tencent.ig", "com.tencent.tmgp.pubgmhd", "com.pubg.krmobile"};
+            boolean found = false;
+            for (String pkg : packages) {
+                java.io.File obb = new java.io.File(Environment.getExternalStorageDirectory(), "Android/obb/" + pkg);
+                if (obb.exists() && obb.listFiles() != null && obb.listFiles().length > 0) {
+                    Log.i(TAG, "FOUND OBB for: " + pkg);
+                    found = true;
+                    break;
                 }
-            } else {
-                 Log.i(TAG, "OBB files detected. Continuing...");
+            }
+            if (!found) {
+                Toast.makeText(this, "LOG: No OBB found in /Android/obb/. Game may fail to start.", Toast.LENGTH_LONG).show();
             }
         } catch (Exception ignored) {}
     }
@@ -193,6 +196,7 @@ public class SplashActivity extends Activity {
     }
 
     private void proceedToMain() {
+        checkOBB();
         new Handler().postDelayed(() -> {
             if (!isFinishing()) {
                 Intent intent = new Intent(this, MainActivity.class);

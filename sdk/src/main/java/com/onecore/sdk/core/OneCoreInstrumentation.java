@@ -143,6 +143,9 @@ public class OneCoreInstrumentation extends Instrumentation {
                     if (ai != null && ai.className != null) {
                         appClass = ai.className;
                     }
+                    if (ai != null && ai.nativeLibraryDir != null) {
+                        Log.i(TAG, "Native Library Path: " + ai.nativeLibraryDir + " (Exists: " + new java.io.File(ai.nativeLibraryDir).exists() + ")");
+                    }
                     container.bindApplication(activity.getApplicationContext(), appClass, targetPkg);
                     
                     // CRITICAL: Swap ActivityThread.mInitialApplication to mask virtualization from AppGlobals
@@ -168,12 +171,19 @@ public class OneCoreInstrumentation extends Instrumentation {
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                     
-                    // Critical: BGMI and heavy games often need the window to be explicitly opaque
-                    // to trigger the correct SurfaceView initialization.
+                    // Critical for UE4: some devices require OPAQUE, others TRANSLUCENT.
+                    // For now, we stick to OPAQUE but ensure the surface isn't obscured.
                     activity.getWindow().setFormat(android.graphics.PixelFormat.OPAQUE);
                     
-                    // Force the activity to use the target orientation if set in APK
-                    // activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                    // Force navigation hiding for immersive mode
+                    android.view.View decorView = activity.getWindow().getDecorView();
+                    decorView.setSystemUiVisibility(
+                        android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
                 }
 
                 // Fixed context includes Resources and LayoutInflater swap

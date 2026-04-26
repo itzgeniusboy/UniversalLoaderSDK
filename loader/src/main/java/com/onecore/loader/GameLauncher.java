@@ -62,12 +62,11 @@ public class GameLauncher {
                 
                 new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
                     try {
-                        container.bindApplication(context, appClass, finalPkg);
-                        
-                        // Launch the main activity
+                        // Launch the main activity via Stub
                         android.content.Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(finalPkg);
                         if (launchIntent != null && launchIntent.getComponent() != null) {
                             String targetActivity = launchIntent.getComponent().getClassName();
+                            Log.i(TAG, "Redirecting launch to Stub: " + targetActivity);
                             container.launch(context, targetActivity);
                             if (callback != null) callback.onProcessDetected(1); 
                         } else {
