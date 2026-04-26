@@ -2,7 +2,7 @@ package com.onecore.sdk.core;
 
 import android.content.Context;
 import android.util.Log;
-import com.onecore.sdk.core.reflex.ReflectionHelper;
+import com.onecore.sdk.utils.ReflectionHelper;
 import java.lang.reflect.Method;
 
 /**

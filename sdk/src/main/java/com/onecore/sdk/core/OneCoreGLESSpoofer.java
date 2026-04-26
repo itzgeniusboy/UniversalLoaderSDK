@@ -1,7 +1,7 @@
 package com.onecore.sdk.core;
 
 import android.util.Log;
-import com.onecore.sdk.core.reflex.ReflectionHelper;
+import com.onecore.sdk.utils.ReflectionHelper;
 import javax.microedition.khronos.opengles.GL10;
 
 /**

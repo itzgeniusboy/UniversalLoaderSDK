@@ -4,7 +4,7 @@ import android.content.Intent;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
-import com.onecore.sdk.core.reflex.ReflectionHelper;
+import com.onecore.sdk.utils.ReflectionHelper;
 import java.util.List;
 
 /**

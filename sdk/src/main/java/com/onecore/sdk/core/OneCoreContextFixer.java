@@ -5,7 +5,7 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.util.Log;
 import com.onecore.sdk.VirtualContainer;
-import com.onecore.sdk.core.reflex.ReflectionHelper;
+import com.onecore.sdk.utils.ReflectionHelper;
 import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.Map;

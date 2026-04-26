@@ -8,7 +8,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 import com.onecore.sdk.VirtualContainer;
-import com.onecore.sdk.core.reflex.ReflectionHelper;
+import com.onecore.sdk.utils.ReflectionHelper;
 import java.lang.reflect.Method;
 
 /**

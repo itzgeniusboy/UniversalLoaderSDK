@@ -1,7 +1,7 @@
 package com.onecore.sdk.core;
 
 import android.util.Log;
-import com.onecore.sdk.core.reflex.ReflectionHelper;
+import com.onecore.sdk.utils.ReflectionHelper;
 
 /**
  * Fixes WebView crashes in virtual environments by spoofing the package name for WebView factory.
