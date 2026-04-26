@@ -122,6 +122,7 @@ public class OneCoreInstrumentation extends Instrumentation {
     public void callActivityOnResume(Activity activity) {
         mBase.callActivityOnResume(activity);
         String targetActivity = activity.getIntent().getStringExtra("target_activity");
+        // Only fix rendering for virtual/guest activities to prevent rotating the loader
         if (targetActivity != null) {
             OneCoreRenderingFixer.fix(activity);
         }
@@ -131,6 +132,7 @@ public class OneCoreInstrumentation extends Instrumentation {
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
         SafeExecutionManager.run("callActivityOnCreate", () -> {
             String targetActivity = activity.getIntent().getStringExtra("target_activity");
+            // Only perform guest-specific fixes if it's a virtual activity
             if (targetActivity != null) {
                 String targetPkg = activity.getIntent().getStringExtra("target_package");
                 
@@ -147,14 +149,11 @@ public class OneCoreInstrumentation extends Instrumentation {
                     if (ai != null && ai.className != null) {
                         appClass = ai.className;
                     }
-                    if (ai != null && ai.nativeLibraryDir != null) {
-                        Log.i(TAG, "Native Library Path: " + ai.nativeLibraryDir + " (Exists: " + new java.io.File(ai.nativeLibraryDir).exists() + ")");
-                    }
                     container.bindApplication(activity.getApplicationContext(), appClass, targetPkg);
                     
-                    // CRITICAL: Swap ActivityThread.mInitialApplication to mask virtualization from AppGlobals
+                    // Sync ActivityThread state
                     try {
-                        Object at = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+                        Object at = ReflectionHelper.invokeMethod("android.app.ActivityThread", "currentActivityThread");
                         if (at != null) {
                             ReflectionHelper.setFieldValue(at, container.getTargetApplication(), "mInitialApplication");
                         }
@@ -163,73 +162,38 @@ public class OneCoreInstrumentation extends Instrumentation {
                     }
                 }
                 
-                // Apply theme BEFORE context fixing
+                // Immersive and UI fixes for target activity only
                 Integer theme = container.getTheme(targetActivity);
                 if (theme != null && theme != 0) {
                     activity.setTheme(theme);
-                    Log.i(TAG, "OneCore-DEBUG: Theme applied: " + theme);
                 }
 
                 if (activity.getWindow() != null) {
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                    
-                    // Critical for UE4/BGMI: OPAQUE is required for EGL layer optimization
                     activity.getWindow().setFormat(android.graphics.PixelFormat.OPAQUE);
                     
-                    // Force navigation hiding for immersive mode (Sticky)
+                    // Sticky Immersive Mode
                     android.view.View decorView = activity.getWindow().getDecorView();
-                    if (android.os.Build.VERSION.SDK_INT >= 30) {
-                        android.view.WindowInsetsController controller = activity.getWindow().getInsetsController();
-                        if (controller != null) {
-                            controller.hide(android.view.WindowInsets.Type.statusBars() | android.view.WindowInsets.Type.navigationBars());
-                            controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-                        }
-                    } else {
-                        decorView.setSystemUiVisibility(
-                            android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                            | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                            | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                            | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
-                            | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-                    }
-
-                    // Force Focus
-                    decorView.setFocusable(true);
-                    decorView.setFocusableInTouchMode(true);
-                    decorView.requestFocus();
-
-                    // Android 12+ Display Fix
-                    if (android.os.Build.VERSION.SDK_INT >= 31) {
-                        try {
-                            android.view.Display display = activity.getWindowManager().getDefaultDisplay();
-                            // Force displayId to 0 in ContextImpl mDisplay
-                            ReflectionHelper.setFieldValue(activity, display, "mDisplay");
-                            
-                            // Also fix ContextImpl's own mDisplay field
-                            Object contextImpl = ReflectionHelper.getFieldValue(activity, "mBase");
-                            if (contextImpl != null) {
-                                ReflectionHelper.setFieldValue(contextImpl, display, "mDisplay");
-                            }
-                        } catch (Exception ignored) {}
-                    }
-                    
-                    Log.i(TAG, "Window initialized with Immersive Sticky and OPAQUE format for gaming.");
+                    decorView.setSystemUiVisibility(
+                        android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
                 }
 
-                // Fixed context includes Resources and LayoutInflater swap
                 OneCoreContextFixer.fixContext(activity, targetPkg);
-                Log.i(TAG, "OneCore-DEBUG: Resources loaded from guest: " + (activity.getResources() != null));
-                Log.i(TAG, "OneCore-DEBUG: Inflater context = guest: " + (activity.getLayoutInflater().getContext() == activity));
             }
+            
             mBase.callActivityOnCreate(activity, icicle);
             
-            // Finalize rendering pipeline
-            OneCoreRenderingFixer.fix(activity);
-            
-            Log.d(TAG, "OneCore-DEBUG: callActivityOnCreate completed, UI should be rendering.");
+            // Post-creation fixes
+            if (targetActivity != null) {
+                OneCoreRenderingFixer.fix(activity);
+            }
         });
     }
 }

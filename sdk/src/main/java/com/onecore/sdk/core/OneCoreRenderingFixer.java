@@ -24,9 +24,6 @@ public class OneCoreRenderingFixer {
             // 1. Ensure hardware acceleration is truly on
             window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
             
-            // Force Landscape for Games if not already set (BGMI requirement)
-            activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-            
             // 2. Clear translucent flags if they leaked from stub
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
@@ -40,10 +37,13 @@ public class OneCoreRenderingFixer {
             window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
             // 4. Set a listener for dynamic SurfaceView additions (UE4 is lazy)
-            window.getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(() -> {
-                View decor = window.getDecorView();
-                if (decor instanceof ViewGroup) {
-                    fixSurfaceViews((ViewGroup) decor);
+            window.getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    View decor = window.getDecorView();
+                    if (decor instanceof ViewGroup) {
+                        fixSurfaceViews((ViewGroup) decor);
+                    }
                 }
             });
 
@@ -52,6 +52,13 @@ public class OneCoreRenderingFixer {
             if (decor instanceof ViewGroup) {
                 fixSurfaceViews((ViewGroup) decor);
             }
+            
+            // UE4/BGMI Fix: Re-run after a small delay to catch lazy surface initialization
+            decor.postDelayed(() -> {
+                if (decor instanceof ViewGroup) {
+                    fixSurfaceViews((ViewGroup) decor);
+                }
+            }, 500);
             
             Log.i(TAG, "OneCore-DEBUG: Rendering Pipeline active and monitoring.");
             

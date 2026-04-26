@@ -159,9 +159,14 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
                  return list;
              }
         } else if ("checkPermission".equals(methodName)) {
-            String pkg = (String) args[args.length - 1] instanceof String ? (String) args[args.length - 1] : null;
-            if (pkg != null && sVirtualPackages.containsKey(pkg)) {
-                return android.content.pm.PackageManager.PERMISSION_GRANTED;
+            if (args != null && args.length > 0) {
+                Object lastArg = args[args.length - 1];
+                if (lastArg instanceof String) {
+                    String pkg = (String) lastArg;
+                    if (sVirtualPackages.containsKey(pkg)) {
+                        return android.content.pm.PackageManager.PERMISSION_GRANTED;
+                    }
+                }
             }
         }
         

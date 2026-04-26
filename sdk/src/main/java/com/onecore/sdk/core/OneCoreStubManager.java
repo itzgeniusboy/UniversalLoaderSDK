@@ -23,6 +23,11 @@ public class OneCoreStubManager {
         String targetClass = component.getClassName();
         
         if (targetPkg != null && !targetPkg.equals(hostPackage)) {
+            // Safety: Never wrap a StubActivity in another StubActivity
+            if (targetClass != null && targetClass.contains("StubActivity")) {
+                return intent;
+            }
+            
             Log.i(TAG, "OneCore-DEBUG: StubManager -> Redirecting " + targetClass);
             
             // Select stub based on Intent flags and launch requirements

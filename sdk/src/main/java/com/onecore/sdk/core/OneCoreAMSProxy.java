@@ -172,10 +172,12 @@ public class OneCoreAMSProxy implements InvocationHandler {
             }
             return result;
         } else if (methodName.equals("getPackagesForUid")) {
-            int uid = (int) args[0];
-            String targetPkg = VirtualContainer.getInstance().getPackageName();
-            if (targetPkg != null) {
-                return new String[]{targetPkg};
+            if (args != null && args.length > 0 && args[0] instanceof Integer) {
+                int uid = (int) args[0];
+                String targetPkg = VirtualContainer.getInstance().getPackageName();
+                if (targetPkg != null) {
+                    return new String[]{targetPkg};
+                }
             }
         } else if (methodName.equals("getRunningServices")) {
             return new java.util.ArrayList<>(); // Hide running services
