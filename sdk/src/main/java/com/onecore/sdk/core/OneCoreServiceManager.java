@@ -26,6 +26,8 @@ public class OneCoreServiceManager {
         OneCorePackageManagerProxy.install();
         
         // 3. Hook Other Services via ServiceManager.getService
+        OneCoreDisplayProxy.install();
+        
         hookServiceInServiceManager("notification");
         hookServiceInServiceManager("connectivity");
         hookServiceInServiceManager("location");

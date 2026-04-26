@@ -69,9 +69,10 @@ public class OneCoreContextFixer {
                 
                 // CRITICAL: Clone LayoutInflater and inject back
                 android.view.LayoutInflater original = (android.view.LayoutInflater) baseContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-                if (original != null && !(original.getClass().getName().contains("OneCore"))) {
+                if (original != null) {
                     android.view.LayoutInflater virtualInflater = original.cloneInContext(context);
                     ReflectionHelper.setFieldValue(contextImpl, virtualInflater, "mInflater");
+                    Log.d(TAG, "OneCore-DEBUG: LayoutInflater cloned and injected into ContextImpl");
                 }
             }
 
@@ -91,7 +92,17 @@ public class OneCoreContextFixer {
                     Log.w(TAG, "Failed to reset theme cache");
                 }
 
-                ReflectionHelper.setFieldValue(context, null, "mInflater");
+                // Inject virtual inflater directly into Activity and Window
+                android.view.LayoutInflater activityInflater = activity.getLayoutInflater().cloneInContext(activity);
+                ReflectionHelper.setFieldValue(activity, activityInflater, "mInflater");
+                
+                if (activity.getWindow() != null) {
+                    ReflectionHelper.setFieldValue(activity.getWindow(), activityInflater, "mLayoutInflater");
+                    // Ensure window is not transparent by default
+                    activity.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xFF121212)); 
+                }
+                
+                Log.d(TAG, "OneCore-DEBUG: Activity UI Pipeline successfully patched for " + packageName);
             }
 
             // 5. Shared Storage Fixing

@@ -8,6 +8,16 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -23,28 +33,25 @@
         android:label="OneCore Loader"
         android:preserveLegacyExternalStorage="true"
         android:supportsRtl="true"
+        android:hardwareAccelerated="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
         tools:replace="android:label">
         
         <activity
             android:name=".SplashActivity"
             android:exported="true"
-            android:screenOrientation="portrait">
+            android:screenOrientation="portrait"
+            android:hardwareAccelerated="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <activity android:name=".MainActivity" android:screenOrientation="portrait" />
+        <activity android:name=".MainActivity" android:screenOrientation="portrait" android:hardwareAccelerated="true" />
         <activity android:name=".SettingsActivity" android:screenOrientation="portrait" />
         <activity android:name=".StatusActivity" android:screenOrientation="portrait" />
         <activity android:name=".LicenseActivity" android:screenOrientation="portrait" />
-
-        <activity android:name="com.onecore.sdk.core.SandboxActivity" 
-                  android:screenOrientation="portrait" 
-                  android:process=":sandbox" />
-
         <activity android:name=".StubActivity"
                   android:screenOrientation="portrait"
                   android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
@@ -54,9 +61,9 @@
         <service android:name=".StubService$P1" android:process=":virtual1" android:exported="false" />
         <service android:name=".StubService$P2" android:process=":virtual2" android:exported="false" />
 
-        <activity android:name=".StubActivity_P1" android:process=":virtual1" android:launchMode="singleTop" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-        <activity android:name=".StubActivity_P2" android:process=":virtual2" android:launchMode="singleTask" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-        <activity android:name=".StubActivity_P3" android:process=":virtual1" android:launchMode="singleInstance" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name=".StubActivity_P1" android:process=":virtual1" android:launchMode="singleTop" android:theme="@android:style/Theme.NoTitleBar.Fullscreen" android:hardwareAccelerated="true" />
+        <activity android:name=".StubActivity_P2" android:process=":virtual2" android:launchMode="singleTask" android:theme="@android:style/Theme.NoTitleBar.Fullscreen" android:hardwareAccelerated="true" />
+        <activity android:name=".StubActivity_P3" android:process=":virtual1" android:launchMode="singleInstance" android:theme="@android:style/Theme.NoTitleBar.Fullscreen" android:hardwareAccelerated="true" />
 
     </application>
 

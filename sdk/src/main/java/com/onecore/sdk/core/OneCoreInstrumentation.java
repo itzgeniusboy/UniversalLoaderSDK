@@ -129,6 +129,12 @@ public class OneCoreInstrumentation extends Instrumentation {
             if (targetActivity != null) {
                 String targetPkg = activity.getIntent().getStringExtra("target_package");
                 
+                try {
+                    // Boost priority for smoothness in Game Mode
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_DISPLAY);
+                    Log.i(TAG, "OneCore-DEBUG: Render Priority Boosted for " + targetActivity);
+                } catch (Exception e) {}
+
                 VirtualContainer container = VirtualContainer.getInstance();
                 if (container.getTargetApplication() == null && targetPkg != null) {
                     String appClass = "android.app.Application";
@@ -143,12 +149,28 @@ public class OneCoreInstrumentation extends Instrumentation {
                 Integer theme = container.getTheme(targetActivity);
                 if (theme != null && theme != 0) {
                     activity.setTheme(theme);
+                    Log.i(TAG, "OneCore-DEBUG: Theme applied: " + theme);
+                }
+
+                if (activity.getWindow() != null) {
+                    activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
+                    
+                    // Critical: BGMI and heavy games often need the window to be explicitly opaque
+                    // to trigger the correct SurfaceView initialization.
+                    activity.getWindow().setFormat(android.graphics.PixelFormat.OPAQUE);
                 }
 
                 // Fixed context includes Resources and LayoutInflater swap
                 OneCoreContextFixer.fixContext(activity, targetPkg);
+                Log.i(TAG, "OneCore-DEBUG: Resources loaded from guest: " + (activity.getResources() != null));
+                Log.i(TAG, "OneCore-DEBUG: Inflater context = guest: " + (activity.getLayoutInflater().getContext() == activity));
             }
             mBase.callActivityOnCreate(activity, icicle);
+            
+            // Finalize rendering pipeline
+            OneCoreRenderingFixer.fix(activity);
+            
+            Log.d(TAG, "OneCore-DEBUG: callActivityOnCreate completed, UI should be rendering.");
         });
     }
 }

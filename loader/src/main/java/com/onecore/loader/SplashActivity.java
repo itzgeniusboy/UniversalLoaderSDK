@@ -53,30 +53,43 @@ public class SplashActivity extends Activity {
 
     private void checkAndRequestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            String[] commonPerms;
+            java.util.List<String> perms = new java.util.ArrayList<>();
+            
+            // Storage
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                commonPerms = new String[]{
-                    Manifest.permission.READ_MEDIA_IMAGES,
-                    Manifest.permission.READ_MEDIA_VIDEO
-                };
+                perms.add(Manifest.permission.READ_MEDIA_IMAGES);
+                perms.add(Manifest.permission.READ_MEDIA_VIDEO);
+                perms.add(Manifest.permission.READ_MEDIA_AUDIO);
             } else {
-                commonPerms = new String[]{
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-                };
+                perms.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+                perms.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            }
+            
+            // Critical for BGMI and Device Identity
+            perms.add(Manifest.permission.READ_PHONE_STATE);
+            
+            // Team chat and features
+            perms.add(Manifest.permission.RECORD_AUDIO);
+            perms.add(Manifest.permission.CAMERA);
+            
+            // Location
+            perms.add(Manifest.permission.ACCESS_FINE_LOCATION);
+            
+            // Notification (Android 13+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                perms.add(Manifest.permission.POST_NOTIFICATIONS);
             }
 
-            boolean allGranted = true;
-            for (String p : commonPerms) {
+            java.util.List<String> needed = new java.util.ArrayList<>();
+            for (String p : perms) {
                 if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) {
-                    allGranted = false;
-                    break;
+                    needed.add(p);
                 }
             }
 
-            if (!allGranted) {
-                Log.i(TAG, "Requesting basic storage permissions...");
-                requestPermissions(commonPerms, REQ_PERMS);
+            if (!needed.isEmpty()) {
+                Log.i(TAG, "Requesting mandatory permissions: " + needed.size());
+                requestPermissions(needed.toArray(new String[0]), REQ_PERMS);
                 return;
             }
         }
@@ -97,6 +110,17 @@ public class SplashActivity extends Activity {
             }
         }
 
+        // Overlay permission for ESP/Menus
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                Log.i(TAG, "Requesting Overlay Permission...");
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName()));
+                startActivityForResult(intent, 1003);
+                return;
+            }
+        }
+
         proceedToMain();
     }
 
@@ -111,7 +135,7 @@ public class SplashActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQ_MANAGE_STORAGE) {
+        if (requestCode == REQ_MANAGE_STORAGE || requestCode == 1003) {
             checkAndRequestPermissions();
         }
     }
