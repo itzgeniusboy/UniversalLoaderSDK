@@ -31,6 +31,11 @@ public class OneCoreContextFixer {
             // 1. Fix Package Names and UID dynamically
             ReflectionHelper.setFieldValue(contextImpl, packageName, "mPackageName", "mBasePackageName", "mOpPackageName");
             
+            // Fix mBase link in ContextImpl for newer Android versions
+            try {
+                ReflectionHelper.setFieldValue(contextImpl, packageName, "mBasePackageName");
+            } catch (Exception ignored) {}
+            
             // Fix Storage Paths
             File dataDir = context.getDir("v_data_" + packageName, Context.MODE_PRIVATE);
             if (!dataDir.exists()) dataDir.mkdirs();
@@ -105,7 +110,8 @@ public class OneCoreContextFixer {
                 if (activity.getWindow() != null) {
                     ReflectionHelper.setFieldValue(activity.getWindow(), activityInflater, "mLayoutInflater");
                     // Ensure window is not transparent by default
-                    activity.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xFF121212)); 
+                    activity.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xFF000000)); 
+                    activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
                 }
                 
                 Log.d(TAG, "OneCore-DEBUG: Activity UI Pipeline successfully patched for " + packageName);

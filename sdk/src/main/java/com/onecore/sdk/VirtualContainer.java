@@ -221,12 +221,33 @@ public class VirtualContainer {
 
     private void fixGameObb(String packageName) {
         try {
-            File obbDir = new File(android.os.Environment.getExternalStorageDirectory(), "Android/obb/" + packageName);
-            if (!obbDir.exists()) {
-                Log.w(TAG, "OneCore-DEBUG: OBB directory missing. BGMI/PUBG might not start. Path: " + obbDir.getAbsolutePath());
+            // Check multiple potential OBB locations
+            java.util.List<File> potentialPaths = new java.util.ArrayList<>();
+            potentialPaths.add(new File(android.os.Environment.getExternalStorageDirectory(), "Android/obb/" + packageName));
+            potentialPaths.add(new File("/sdcard/Android/obb/" + packageName));
+            potentialPaths.add(new File("/storage/emulated/0/Android/obb/" + packageName));
+            
+            boolean found = false;
+            for (File path : potentialPaths) {
+                if (path.exists() && path.isDirectory()) {
+                    found = true;
+                    Log.i(TAG, "OneCore-DEBUG: OBB directory found at: " + path.getAbsolutePath());
+                    // Redirect VFS to this specific path
+                    com.onecore.sdk.core.OneCoreVFS.init(packageName, getContextDataPath(packageName));
+                    break;
+                }
+            }
+            
+            if (!found) {
+                Log.w(TAG, "OneCore-DEBUG: OBB directory missing. BGMI/PUBG might not start. Please ensure OBB is in /sdcard/Android/obb/" + packageName);
             }
         } catch (Exception e) {
             Log.e(TAG, "OBB Check Failed", e);
         }
+    }
+
+    private String getContextDataPath(String packageName) {
+        // Safe way to get virtual data path
+        return "/data/data/" + com.onecore.sdk.OneCoreSDK.getContext().getPackageName() + "/app_v_data_" + packageName;
     }
 }

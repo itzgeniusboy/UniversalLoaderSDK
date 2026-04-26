@@ -87,8 +87,13 @@ public class OneCoreRenderingFixer {
                 
                 // Aggressive fix: Some devices need a brief toggle to wake up the buffer
                 if (sv.getVisibility() == View.VISIBLE) {
-                    // sv.setVisibility(View.INVISIBLE);
-                    // sv.post(() -> sv.setVisibility(View.VISIBLE));
+                    sv.setWillNotDraw(false);
+                    sv.postInvalidate();
+                }
+                
+                // UE4 specific: Set fixed size if it's too small
+                if (sv.getWidth() > 0 && sv.getWidth() < 10) {
+                     Log.w(TAG, "Detected suspiciously small SurfaceView, might be hidden UE4 layer.");
                 }
                 
                 // Wake up the surface if it's stalled

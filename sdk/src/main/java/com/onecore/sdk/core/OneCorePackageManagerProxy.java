@@ -94,11 +94,16 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String methodName = method.getName();
         
-        if ("getPackageInfo".equals(methodName)) {
+        if ("getPackageInfo".equals(methodName) || "getPackageInfoAsUser".equals(methodName)) {
             String pkg = (String) args[0];
             if (sHiddenPackages.contains(pkg)) return null;
             if (sVirtualPackages.containsKey(pkg)) {
                 return sVirtualPackages.get(pkg);
+            }
+            // Hardcoded fallback for critical game dependencies
+            if ("com.google.android.gms".equals(pkg) || "com.android.vending".equals(pkg)) {
+                 android.content.pm.PackageInfo pi = sVirtualPackages.get(pkg);
+                 if (pi != null) return pi;
             }
         } else if ("getActivityInfo".equals(methodName)) {
             android.content.ComponentName component = (android.content.ComponentName) args[0];
