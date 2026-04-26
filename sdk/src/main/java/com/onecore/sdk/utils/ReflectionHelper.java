@@ -137,6 +137,23 @@ public class ReflectionHelper {
         }
     }
 
+    /**
+     * Invoke a static method on a class.
+     */
+    public static Object invokeStaticMethod(Class<?> clazz, String methodName, Object... args) {
+        try {
+            for (java.lang.reflect.Method m : clazz.getDeclaredMethods()) {
+                if (m.getName().equals(methodName)) {
+                    m.setAccessible(true);
+                    return m.invoke(null, args);
+                }
+            }
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     public static Method findMethod(Class<?> clazz, String name, Class<?>... parameterTypes) {
         Class<?> searchType = clazz;
         while (searchType != null) {
