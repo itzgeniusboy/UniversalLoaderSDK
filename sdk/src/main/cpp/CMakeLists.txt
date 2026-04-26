@@ -6,11 +6,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(onecore_native SHARED
-        ${CMAKE_CURRENT_SOURCE_DIR}/native_hook.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/memory.cpp
+        native_hook.cpp
+        memory.cpp
 )
 
-target_include_directories(onecore_native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(onecore_native PRIVATE .)
 
 find_library(log-lib log)
 find_library(android-lib android)
