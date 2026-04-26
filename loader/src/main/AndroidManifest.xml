@@ -53,8 +53,9 @@
         <activity android:name=".StatusActivity" android:screenOrientation="portrait" />
         <activity android:name=".LicenseActivity" android:screenOrientation="portrait" />
         <activity android:name=".StubActivity"
-                  android:screenOrientation="portrait"
+                  android:screenOrientation="sensorLandscape"
                   android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+                  android:hardwareAccelerated="true"
                   android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <service android:name=".StubService" android:exported="false" />

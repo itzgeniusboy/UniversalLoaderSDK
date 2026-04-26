@@ -75,7 +75,14 @@ static std::string redirect_path(const char* path) {
     for (const char* root : obb_roots) {
         std::string target = std::string(root) + g_package_name;
         if (s_path.compare(0, target.length(), target) == 0) {
-            return g_virtual_root + "/obb" + s_path.substr(target.length());
+            std::string redirected = g_virtual_root + "/obb" + s_path.substr(target.length());
+            // Check if redirected OBB exists, if not, maybe try to access original but hide path
+            struct stat st;
+            if (orig_stat && orig_stat(redirected.c_str(), &st) == 0) {
+                return redirected;
+            }
+            LOGE("OBB MISSING IN SANDBOX: %s", redirected.c_str());
+            return s_path; // Fallback to original if sandbox version missing
         }
     }
 

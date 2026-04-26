@@ -80,6 +80,28 @@ public class OneCoreNativeLoader {
                 }
             }
             zipFile.close();
+            
+            // Initialize Native Hook Engine for the virtual app
+            try {
+                System.loadLibrary("onecore_native");
+                String vRoot = context.getDir("v_data_" + packageName, Context.MODE_PRIVATE).getAbsolutePath();
+                // Call the JNI method directly or via reflection if class is in another module
+                try {
+                     Class<?> hookMgr = Class.forName("com.onecore.sdk.NativeHookManager");
+                     java.lang.reflect.Method init = hookMgr.getDeclaredMethod("initHooks", String.class, String.class);
+                     init.invoke(null, vRoot, packageName);
+                     Log.i(TAG, "Native Hook Engine initialized for " + packageName);
+                } catch (Exception e) {
+                     // Fallback to IORedirector if NativeHookManager missing
+                     Class<?> ioRedir = Class.forName("com.onecore.sdk.IORedirector");
+                     java.lang.reflect.Method init = ioRedir.getDeclaredMethod("initNativeHooks", String.class, String.class);
+                     init.invoke(null, vRoot, packageName);
+                     Log.i(TAG, "Native Hook Engine initialized via IORedirector for " + packageName);
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Native Hook Engine link failed - non-fatal if running in host only");
+            }
+            
             return libDir.getAbsolutePath();
         } catch (Exception e) {
             Log.e(TAG, "Failed to extract native libs", e);

@@ -185,13 +185,21 @@ public class OneCoreInstrumentation extends Instrumentation {
                     
                     // Force navigation hiding for immersive mode (Sticky)
                     android.view.View decorView = activity.getWindow().getDecorView();
-                    decorView.setSystemUiVisibility(
-                        android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                    if (android.os.Build.VERSION.SDK_INT >= 30) {
+                        android.view.WindowInsetsController controller = activity.getWindow().getInsetsController();
+                        if (controller != null) {
+                            controller.hide(android.view.WindowInsets.Type.statusBars() | android.view.WindowInsets.Type.navigationBars());
+                            controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                        }
+                    } else {
+                        decorView.setSystemUiVisibility(
+                            android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                    }
 
                     // Force Focus
                     decorView.setFocusable(true);

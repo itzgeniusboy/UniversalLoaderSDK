@@ -110,6 +110,18 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
             android.content.ComponentName component = (android.content.ComponentName) args[0];
             android.content.pm.ActivityInfo ai = getActivityInfo(component);
             if (ai != null) return ai;
+            
+            // Hardcoded GMS fallback
+            if (component != null && "com.google.android.gms".equals(component.getPackageName())) {
+                 android.content.pm.ActivityInfo gmsAi = new android.content.pm.ActivityInfo();
+                 gmsAi.packageName = "com.google.android.gms";
+                 gmsAi.name = component.getClassName();
+                 gmsAi.enabled = true;
+                 gmsAi.exported = true;
+                 android.content.pm.PackageInfo gmsPi = sVirtualPackages.get("com.google.android.gms");
+                 if (gmsPi != null) gmsAi.applicationInfo = gmsPi.applicationInfo;
+                 return gmsAi;
+            }
         } else if ("getInstallerPackageName".equals(methodName)) {
             return "com.android.vending"; // Spoof Play Store as installer
         } else if ("getApplicationInfo".equals(methodName)) {

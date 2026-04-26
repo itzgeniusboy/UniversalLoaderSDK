@@ -146,16 +146,15 @@ public class VirtualContainer {
         Log.i(TAG, ">>> V_CORE: Launching Virtual Activity: " + targetActivity);
         
         try {
-            // We target our own host package and a stub activity to ensure correct system redirection.
-            // OneCoreInstrumentation will intercept this call and handle the virtual component swap.
-            Intent intent = new Intent();
-            intent.setClassName(context.getPackageName(), "com.onecore.loader.StubActivity_P1");
-            intent.putExtra("target_activity", targetActivity);
-            intent.putExtra("target_package", mPackageName);
-            intent.putExtra("target_apk_path", mApkPath);
+            // By launching the guest package/activity directly, our Instrumentation 
+            // will intercept it and automatically rewrite it to the correct StubActivity
+            // based on launchMode and taskAffinity.
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setClassName(mPackageName, targetActivity);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             
-            Log.d(TAG, "Dispatching stub intent for virtualization start...");
+            Log.d(TAG, "Dispatching guest intent. Instrumentation will handle stub redirection...");
             context.startActivity(intent);
         } catch (Exception e) {
             Log.e(TAG, "Virtual Launch Dispatch Failed.", e);

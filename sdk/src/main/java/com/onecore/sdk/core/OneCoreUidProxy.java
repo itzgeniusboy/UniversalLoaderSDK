@@ -18,13 +18,10 @@ public class OneCoreUidProxy {
         try {
             Log.i(TAG, "OneCore-DEBUG: Spoofing UID/PID...");
             
-            // We can't easily hook Process.myUid() as it's a native method usually.
-            // But we can hook Binder.getCallingUid().
+            // Apply native UID spoofing
+            UidSpoofing.apply(sVirtualUid);
             
-            // For many apps, just spoofing the fields in ApplicationInfo (managed by PMProxy) 
-            // is enough to trick them.
-            
-            Log.d(TAG, "UID spoofing applied conceptually via PMProxy.");
+            Log.d(TAG, "UID spoofing applied conceptually via PMProxy and Native.");
         } catch (Exception e) {
             Log.e(TAG, "UID spoofing failed", e);
         }
