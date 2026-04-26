@@ -1,6 +1,7 @@
 package com.onecore.sdk.core;
 
 import android.util.Log;
+import android.content.Intent;
 import com.onecore.sdk.utils.ReflectionHelper;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
