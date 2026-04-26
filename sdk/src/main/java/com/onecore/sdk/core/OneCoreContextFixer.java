@@ -79,6 +79,12 @@ public class OneCoreContextFixer {
             // 3. Fix mPackageInfo (LoadedApk) safely across versions
             injectLoadedApk(contextImpl, packageName);
 
+            // Additional fix for Application object link in ContextImpl
+            android.app.Application virtualApp = VirtualContainer.getInstance().getTargetApplication();
+            if (virtualApp != null) {
+                ReflectionHelper.setFieldValue(contextImpl, virtualApp, "mInitialApplication", "mApplication");
+            }
+
             // 4. Activity specific fixes
             if (context instanceof Activity) {
                 Activity activity = (Activity) context;

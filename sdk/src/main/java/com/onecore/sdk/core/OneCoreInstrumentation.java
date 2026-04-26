@@ -144,6 +144,16 @@ public class OneCoreInstrumentation extends Instrumentation {
                         appClass = ai.className;
                     }
                     container.bindApplication(activity.getApplicationContext(), appClass, targetPkg);
+                    
+                    // CRITICAL: Swap ActivityThread.mInitialApplication to mask virtualization from AppGlobals
+                    try {
+                        Object at = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+                        if (at != null) {
+                            ReflectionHelper.setFieldValue(at, container.getTargetApplication(), "mInitialApplication");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to swap mInitialApplication", e);
+                    }
                 }
                 
                 // Apply theme BEFORE context fixing

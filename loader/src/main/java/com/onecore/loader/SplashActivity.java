@@ -62,7 +62,24 @@ public class SplashActivity extends Activity {
             }
         }, 3000);
 
+        new Handler().postDelayed(this::checkOBB, 1500);
         new Handler().postDelayed(this::checkNextPermission, 400);
+    }
+
+    private void checkOBB() {
+        try {
+            // Check for BGMI OBB as an example
+            java.io.File obb = new java.io.File(Environment.getExternalStorageDirectory(), "Android/obb/com.tencent.ig");
+            if (!obb.exists() || obb.listFiles() == null || obb.listFiles().length == 0) {
+                // Also check for PUBG Mobile (global)
+                java.io.File obb2 = new java.io.File(Environment.getExternalStorageDirectory(), "Android/obb/com.tencent.tmgp.pubgmhd");
+                if (!obb2.exists()) {
+                    Toast.makeText(this, "LOG: OBB check skipped or files not found in /Android/obb/", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                 Log.i(TAG, "OBB files detected. Continuing...");
+            }
+        } catch (Exception ignored) {}
     }
 
     private void checkNextPermission() {

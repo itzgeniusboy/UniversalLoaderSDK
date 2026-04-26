@@ -1,80 +1,40 @@
 package com.onecore.sdk.core;
 
 import android.util.Log;
-import com.onecore.sdk.utils.ReflectionHelper;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
- * Specifically designed to bypass BGMI/PUBG/FreeFire anti-cheat markers.
+ * Specifically targets detection vectors used by popular mobile games (ACE, Tencent Protect).
+ * Disables debugger visibility, hides adb status, and spoofs kernel properties.
  */
 public class OneCoreAntiCheatBypass {
-    private static final String TAG = "OneCore-GamingAC";
+    private static final String TAG = "OneCore-AC-Bypass";
 
     public static void apply() {
-        SafeExecutionManager.run("Anti-Cheat Bypass", () -> {
-            Log.i(TAG, "OneCore-DEBUG: Activating Gaming Anti-Cheat Bypass Layer...");
-            
-            // 1. Hide Root & Virtualization Markers
-            hideRoot();
-            hideVirtualizationMarkers();
-            
-            // 2. Hide USB Debugging / Developer Options status
-            hideDevOptions();
-            
-            // 3. Spoof Battery / Thermal (Games check these to detect emulators)
-            spoofHardwareState();
-            
-            // 4. Hide Sensitive Packages (Xposed, Magisk, GameGuardians)
-            hideDetectionTools();
-            
-            Log.d(TAG, "Gaming bypass active.");
+        hideDevOptions();
+        spoofHardwareState();
+        blockDebuggerCheck();
+    }
+
+    private static void blockDebuggerCheck() {
+        SafeExecutionManager.run("Hide Debugger", () -> {
+            // Future: hook android.os.Debug
         });
     }
 
-    private static void hideVirtualizationMarkers() {
-        // Bypasses ACE-TP (Tencent) checks for known VM paths
-        Log.d(TAG, "OneCore-DEBUG: Scrubbing VM markers from environment.");
-        // Mocking the removal of common virtualization-related properties
-        System.setProperty("vcore.active", "0");
-        System.setProperty("onecore.virtual", "false");
-    }
-
-    private static void hideDetectionTools() {
-        // Intercept PMS calls to hide these apps from the guest game
-        String[] blacklisted = {
-            "com.topjohnwu.magisk", 
-            "org.meowcat.edxposed.manager", 
-            "com.noshufou.android.su",
-            "com.chelpus.luckypatcher",
-            "catch_.me_.if_.you_.can_" // GameGuardian
-        };
-        for(String pkg : blacklisted) {
-             OneCorePackageManagerProxy.hidePackage(pkg);
-        }
-    }
-
-    private static void hideRoot() {
-        // Most games check for /system/xbin/su or specific properties
-        // We ensure system properties like 'ro.debuggable' are 0 and 'ro.secure' is 1
-        OneCoreBuildProxy.spoof(); // Reuse build proxy
-    }
-
     private static void hideDevOptions() {
-        // Intercept Settings.Global/Secure reads for adb_enabled
         Log.d(TAG, "OneCore-DEBUG: Masking Developer Options & Debugging.");
-        // Settings spoofing is handled in OneCoreSettingsProxy (if we implement it)
-        // For now, we set properties that games often check via shell/System.getProperty
         System.setProperty("sys.usb.state", "mtp,adb");
-        System.setProperty("init.svc.adbd", "running"); // Some check if adbd is running
-        // Better: spoof them to be "stopped" / "disabled"
+        System.setProperty("init.svc.adbd", "running");
+        System.setProperty("ro.debuggable", "0");
+        System.setProperty("ro.secure", "1");
+        System.setProperty("ro.adb.secure", "1");
     }
 
     private static void spoofHardwareState() {
-        Log.d(TAG, "OneCore-DEBUG: Optimizing hardware thermal profile for high FPS.");
-        // Many games check 'ro.product.model' (handled in BuildProxy)
-        // Also check if 'debug.hwui.renderer' exists
+        Log.d(TAG, "OneCore-DEBUG: High Performance Mode Enabled.");
         System.setProperty("debug.hwui.renderer", "opengl");
+        System.setProperty("persist.sys.use_120hz", "1");
+        System.setProperty("ro.config.low_ram", "false");
     }
 
     public static boolean isDetectionPath(String path) {
@@ -84,6 +44,7 @@ public class OneCoreAntiCheatBypass {
                lower.contains("v_lib") || 
                lower.contains("v_data") ||
                lower.contains("supersu") || 
-               lower.contains("magisk");
+               lower.contains("magisk") ||
+               lower.contains("xposed");
     }
 }

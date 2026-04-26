@@ -18,6 +18,7 @@ public class OneCoreHCallback implements Handler.Callback {
     // Message codes
     private static final int EXECUTE_TRANSACTION = 159;
     private static final int LAUNCH_ACTIVITY = 100;
+    private static final int BIND_APPLICATION = 110;
 
     public OneCoreHCallback(Handler base) {
         this.mBase = base;
@@ -30,6 +31,8 @@ public class OneCoreHCallback implements Handler.Callback {
                 handleTransaction(msg.obj);
             } else if (msg.what == LAUNCH_ACTIVITY) {
                 handleLaunchActivity(msg.obj);
+            } else if (msg.what == BIND_APPLICATION) {
+                handleBindApplication(msg.obj);
             }
         } catch (Throwable t) {
             Log.e(TAG, "Error in HCallback", t);
@@ -38,6 +41,20 @@ public class OneCoreHCallback implements Handler.Callback {
         // Let the base handler process the message
         mBase.handleMessage(msg);
         return true; 
+    }
+
+    private void handleBindApplication(Object data) {
+        if (data == null) return;
+        SafeExecutionManager.run("H-Handler BindApp", () -> {
+            try {
+                android.content.pm.ApplicationInfo ai = (android.content.pm.ApplicationInfo) ReflectionHelper.getFieldValue(data, "appInfo");
+                if (ai != null && !ai.packageName.equals(com.onecore.sdk.OneCoreSDK.getContext().getPackageName())) {
+                    // This is likely our virtual app being bound!
+                    Log.i(TAG, "OneCore-DEBUG: H-Handler detected BindApplication for: " + ai.packageName);
+                    // We can swap deeper fields here if needed.
+                }
+            } catch (Exception ignored) {}
+        });
     }
 
     private void handleTransaction(Object transaction) {

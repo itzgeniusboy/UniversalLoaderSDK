@@ -70,6 +70,11 @@ public class OneCoreNativeLoader {
                         }
                         fos.close();
                         is.close();
+                        
+                        // Critical: Ensure library is executable for the system linker
+                        outFile.setExecutable(true, false);
+                        outFile.setReadable(true, false);
+                        
                         Log.d(TAG, "Extracted: " + fileName);
                     }
                 }
