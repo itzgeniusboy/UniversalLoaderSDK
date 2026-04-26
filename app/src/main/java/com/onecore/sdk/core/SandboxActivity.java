@@ -57,52 +57,39 @@ public class SandboxActivity extends Activity {
     private void continueLaunch() {
         Logger.i(TAG, "Executing Step: Environment Synchronization");
         try {
+            VirtualContainer container = VirtualContainer.getInstance();
+            
             // 0. Ensure Virtual Environment is ready in this process
-            boolean synced = VirtualContainer.getInstance().prepareGuestEnvironment(this, targetPackage);
+            boolean synced = container.installApk(this, container.getApkPath(), targetPackage);
             if (!synced) {
                 Logger.e(TAG, "Process Environment Sync Failed!");
                 handleLaunchFailure("Process Out of Sync");
                 return;
             }
 
-            ClassLoader guestLoader = VirtualContainer.getInstance().getGuestClassLoader();
+            ClassLoader guestLoader = container.getClassLoader();
             if (guestLoader != null) {
                 Logger.d(TAG, "Patching Thread Context ClassLoader...");
                 Thread.currentThread().setContextClassLoader(guestLoader);
-                
-                // 🔥 Critical: Trigger Application Creation
-                com.onecore.sdk.core.hook.ApplicationHook.createApplication(targetPackage);
             }
 
             // 1. Basic hooks (UID, Filesystem redirection)
-            String virtualRoot = getFilesDir().getAbsolutePath() + "/virtual/" + targetPackage;
-            NativeHookManager.setupIsolation(this, virtualRoot, targetPackage);
+            String virtualRoot = "/data/data/" + getPackageName() + "/files/virtual/" + targetPackage;
+            com.onecore.sdk.IORedirector.ensureVirtualEnv(this, targetPackage);
             
             // 1.5 Apply Deep System Hooks
             Logger.i(TAG, "Applying Anti-Root & Virtualization Hooks...");
-            EnvironmentHooker.apply(this, targetPackage, virtualRoot);
-            UidSpoofing.apply(this, 10000 + (int)(Math.random() * 5000));
+            container.installApk(this, container.getApkPath(), targetPackage);
+            com.onecore.sdk.core.UidSpoofing.apply(10000 + (int)(Math.random() * 5000));
             
-            // 2. Resolve target activity from virtual metadata
-            Logger.d(TAG, "Resolving Guest Entry Point from Virtual Metadata...");
+            // 2. Resolve target activity
             String mainActivity = getIntent().getStringExtra("main_activity");
-            
             if (mainActivity == null) {
-                // Try to find it from VirtualContainer metadata
-                PackageInfo info = VirtualContainer.getInstance().getClonedPackage(targetPackage);
-                if (info != null && info.activities != null && info.activities.length > 0) {
-                    mainActivity = info.activities[0].name;
-                    for (android.content.pm.ActivityInfo ai : info.activities) {
-                        if (ai.name.toLowerCase().contains("main") || ai.name.toLowerCase().contains("splash")) {
-                            mainActivity = ai.name;
-                            break;
-                        }
-                    }
-                }
+                mainActivity = mainActivityClass;
             }
 
             if (mainActivity == null) {
-                Logger.e(TAG, "Launch Resolution Failed: Could not find main activity in virtual metadata");
+                Logger.e(TAG, "Launch Resolution Failed");
                 handleLaunchFailure("Metadata Resolution Failed");
                 return;
             }
@@ -112,12 +99,8 @@ public class SandboxActivity extends Activity {
             Intent intent = new Intent(this, StubActivity.class);
             intent.putExtra("target_package", targetPackage);
             intent.putExtra("target_activity", mainActivity);
-            
-            Intent targetIntent = new Intent();
-            targetIntent.setClassName(targetPackage, mainActivity);
-            intent.putExtra("EXTRA_TARGET_INTENT", targetIntent);
-            
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             
             startActivity(intent);
             

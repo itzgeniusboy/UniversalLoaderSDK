@@ -141,28 +141,28 @@ public class VirtualContainer {
     /**
      * Launches the target activity via system intent redirected through stubs.
      */
-    public void launch(Context context, String targetActivity) {
+    public boolean launch(Context context, String targetActivity) {
         if (mClassLoader == null) {
             Log.e(TAG, "Cannot launch: ClassLoader not initialized. Call installApk first.");
-            return;
+            return false;
         }
 
         Log.i(TAG, ">>> V_CORE: Launching Virtual Activity: " + targetActivity);
         
         try {
-            // By launching the guest package/activity directly, our Instrumentation 
-            // will intercept it and automatically rewrite it to the correct StubActivity
-            // based on launchMode and taskAffinity.
+            // Check if we already have a StubActivity to host this
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
             intent.setClassName(mPackageName, targetActivity);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             
-            Log.d(TAG, "Dispatching guest intent. Instrumentation will handle stub redirection...");
+            Log.d(TAG, "Dispatching guest intent via context. Instrumentation will handle stub redirection...");
             context.startActivity(intent);
+            return true;
         } catch (Exception e) {
             Log.e(TAG, "Virtual Launch Dispatch Failed.", e);
+            return false;
         }
     }
 

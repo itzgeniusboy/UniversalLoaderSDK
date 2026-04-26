@@ -32,9 +32,20 @@ public class IORedirector {
 
         String virtualRoot = "/data/data/com.onecore.loader/files/virtual/" + packageName;
 
-        // Simple Java fallback for display names or logging
+        // 1. Data redirection
         if (originalPath.startsWith("/data/data/" + packageName)) {
             return originalPath.replace("/data/data/" + packageName, virtualRoot + "/data");
+        }
+        if (originalPath.startsWith("/data/user/0/" + packageName)) {
+            return originalPath.replace("/data/user/0/" + packageName, virtualRoot + "/data");
+        }
+
+        // 2. OBB redirection
+        if (originalPath.contains("/Android/obb/" + packageName)) {
+            // Usually OBB is moved to sandbox or the hook handles it
+            // We ensure we redirect to the sandbox OBB path
+            String suffix = originalPath.substring(originalPath.indexOf("/Android/obb/" + packageName) + ("/Android/obb/" + packageName).length());
+            return virtualRoot + "/obb" + suffix;
         }
 
         return originalPath;

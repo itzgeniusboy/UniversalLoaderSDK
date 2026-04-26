@@ -76,7 +76,14 @@ public class GameLauncher {
                                 com.onecore.sdk.OneCoreSDK.init(context);
                             }
                             
-                            container.launch(context, targetActivity);
+                            // Instead of direct launch, we move to SandboxActivity which handles stubbing
+                            android.content.Intent sandboxIntent = new android.content.Intent();
+                            sandboxIntent.setClassName(context.getPackageName(), "com.onecore.sdk.core.SandboxActivity");
+                            sandboxIntent.putExtra("target_package", finalPkg);
+                            sandboxIntent.putExtra("main_activity", targetActivity);
+                            sandboxIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                            
+                            context.startActivity(sandboxIntent);
                             if (callback != null) callback.onProcessDetected(1); 
                         } else {
                             Log.e(TAG, "Launch intent or component is null for " + finalPkg);

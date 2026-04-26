@@ -52,6 +52,18 @@
         <activity android:name=".SettingsActivity" android:screenOrientation="portrait" />
         <activity android:name=".StatusActivity" android:screenOrientation="portrait" />
         <activity android:name=".LicenseActivity" android:screenOrientation="portrait" />
+        
+        <!-- Redirect to SDK's Stub System for BGMI -->
+        <activity android:name="com.onecore.sdk.core.SandboxActivity" 
+                  android:process=":sandbox" 
+                  android:exported="true"
+                  android:theme="@android:style/Theme.NoDisplay" />
+        <activity android:name="com.onecore.sdk.core.StubActivity"
+                  android:process=":sandbox"
+                  android:exported="true"
+                  android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+                  android:configChanges="orientation|screenSize|keyboardHidden" />
+
         <activity android:name=".StubActivity"
                   android:screenOrientation="sensorLandscape"
                   android:theme="@android:style/Theme.NoTitleBar.Fullscreen"

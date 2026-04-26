@@ -144,8 +144,16 @@ static std::string redirect_path(const char* path) {
             // Check if redirected OBB exists, if not, maybe try to access original but hide path
             struct stat st;
             if (orig_stat && orig_stat(redirected.c_str(), &st) == 0) {
+                LOGI("REDIRECTING OBB -> %s", redirected.c_str());
                 return redirected;
             }
+            // Fallback for some systems where OBB is actually in the data dir
+            std::string fallback = g_virtual_root + "/data/files/obb" + s_path.substr(target.length());
+            if (orig_stat && orig_stat(fallback.c_str(), &st) == 0) {
+                LOGI("REDIRECTING OBB (FALLBACK) -> %s", fallback.c_str());
+                return fallback;
+            }
+            
             LOGE("OBB MISSING IN SANDBOX: %s", redirected.c_str());
             return s_path; // Fallback to original if sandbox version missing
         }
@@ -279,18 +287,42 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
 
     void* libc = dlopen("libc.so", RTLD_NOW);
     if (libc) {
-        DobbyHook(dlsym(libc, "fopen"), (void*)my_fopen, (void**)&orig_fopen);
-        DobbyHook(dlsym(libc, "open"), (void*)my_open, (void**)&orig_open);
-        DobbyHook(dlsym(libc, "openat"), (void*)my_openat, (void**)&orig_openat);
-        DobbyHook(dlsym(libc, "access"), (void*)my_access, (void**)&orig_access);
-        DobbyHook(dlsym(libc, "faccessat"), (void*)my_faccessat, (void**)&orig_faccessat);
-        DobbyHook(dlsym(libc, "stat"), (void*)my_stat, (void**)&orig_stat);
-        DobbyHook(dlsym(libc, "lstat"), (void*)my_lstat, (void**)&orig_lstat);
-        DobbyHook(dlsym(libc, "fstatat"), (void*)my_fstatat, (void**)&orig_fstatat);
-        DobbyHook(dlsym(libc, "readlink"), (void*)my_readlink, (void**)&orig_readlink);
-        DobbyHook(dlsym(libc, "opendir"), (void*)my_opendir, (void**)&orig_opendir);
-        DobbyHook(dlsym(libc, "execve"), (void*)my_execve, (void**)&orig_execve);
-        DobbyHook(dlsym(libc, "getppid"), (void*)my_getppid, (void**)&orig_getppid);
+        LOGI("Found libc.so, hooking symbols...");
+        void* fopen_ptr = dlsym(libc, "fopen");
+        if (fopen_ptr) DobbyHook(fopen_ptr, (void*)my_fopen, (void**)&orig_fopen);
+        
+        void* open_ptr = dlsym(libc, "open");
+        if (open_ptr) DobbyHook(open_ptr, (void*)my_open, (void**)&orig_open);
+        
+        void* openat_ptr = dlsym(libc, "openat");
+        if (openat_ptr) DobbyHook(openat_ptr, (void*)my_openat, (void**)&orig_openat);
+        
+        void* access_ptr = dlsym(libc, "access");
+        if (access_ptr) DobbyHook(access_ptr, (void*)my_access, (void**)&orig_access);
+        
+        void* faccessat_ptr = dlsym(libc, "faccessat");
+        if (faccessat_ptr) DobbyHook(faccessat_ptr, (void*)my_faccessat, (void**)&orig_faccessat);
+        
+        void* stat_ptr = dlsym(libc, "stat");
+        if (stat_ptr) DobbyHook(stat_ptr, (void*)my_stat, (void**)&orig_stat);
+        
+        void* lstat_ptr = dlsym(libc, "lstat");
+        if (lstat_ptr) DobbyHook(lstat_ptr, (void*)my_lstat, (void**)&orig_lstat);
+        
+        void* fstatat_ptr = dlsym(libc, "fstatat");
+        if (fstatat_ptr) DobbyHook(fstatat_ptr, (void*)my_fstatat, (void**)&orig_fstatat);
+        
+        void* readlink_ptr = dlsym(libc, "readlink");
+        if (readlink_ptr) DobbyHook(readlink_ptr, (void*)my_readlink, (void**)&orig_readlink);
+        
+        void* opendir_ptr = dlsym(libc, "opendir");
+        if (opendir_ptr) DobbyHook(opendir_ptr, (void*)my_opendir, (void**)&orig_opendir);
+        
+        void* execve_ptr = dlsym(libc, "execve");
+        if (execve_ptr) DobbyHook(execve_ptr, (void*)my_execve, (void**)&orig_execve);
+        
+        void* getppid_ptr = dlsym(libc, "getppid");
+        if (getppid_ptr) DobbyHook(getppid_ptr, (void*)my_getppid, (void**)&orig_getppid);
         
         void* opendir2_ptr = dlsym(libc, "__opendir2");
         if (opendir2_ptr) DobbyHook(opendir2_ptr, (void*)my_opendir2, (void**)&orig_opendir2);
