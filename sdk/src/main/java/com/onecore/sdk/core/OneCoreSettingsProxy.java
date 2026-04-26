@@ -22,10 +22,7 @@ public class OneCoreSettingsProxy {
         
         switch (name) {
             case Settings.Global.ADB_ENABLED:
-            case "adb_enabled":
-                return "0";
             case Settings.Global.DEVELOPMENT_SETTINGS_ENABLED:
-            case "development_settings_enabled":
                 return "0";
             case "usb_mass_storage_enabled":
                 return "1";
