@@ -3,6 +3,7 @@ package com.onecore.loader;
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
+import com.onecore.sdk.VirtualContainer;
 
 public class StubActivity_P2 extends Activity {
     @Override
