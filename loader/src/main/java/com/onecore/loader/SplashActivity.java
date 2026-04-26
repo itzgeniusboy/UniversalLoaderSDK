@@ -62,90 +62,103 @@ public class SplashActivity extends Activity {
             }
         }, 3000);
 
-        new Handler().postDelayed(this::checkNextPermission, 1000);
+        new Handler().postDelayed(this::checkNextPermission, 400);
     }
 
     private void checkNextPermission() {
         if (isFinishing()) return;
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            // Step 1: Storage
-            if (currentStep == 0) {
-                statusText.setText("REQUESTING STORAGE ACCESS...");
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    if (checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
-                        requestPermissions(new String[]{
-                                Manifest.permission.READ_MEDIA_IMAGES,
-                                Manifest.permission.READ_MEDIA_VIDEO,
-                                Manifest.permission.READ_MEDIA_AUDIO
-                        }, REQ_PERMS);
+        // Ensure we are on UI thread
+        runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // Step 1: Storage
+                if (currentStep == 0) {
+                    statusText.setText("SYNCING STORAGE...");
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+                            requestPermissions(new String[]{
+                                    Manifest.permission.READ_MEDIA_IMAGES,
+                                    Manifest.permission.READ_MEDIA_VIDEO,
+                                    Manifest.permission.READ_MEDIA_AUDIO
+                            }, REQ_PERMS);
+                            return;
+                        }
+                    } else {
+                        if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                            requestPermissions(new String[]{
+                                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                            }, REQ_PERMS);
+                            return;
+                        }
+                    }
+                    currentStep++;
+                }
+
+                // Step 2: Device Identity (Phone)
+                if (currentStep == 1) {
+                    statusText.setText("VIRTUALIZING DEVICE IDENTIFIERS...");
+                    if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{Manifest.permission.READ_PHONE_STATE}, REQ_PERMS);
                         return;
                     }
-                } else {
-                    if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                        requestPermissions(new String[]{
-                                Manifest.permission.READ_EXTERNAL_STORAGE,
-                                Manifest.permission.WRITE_EXTERNAL_STORAGE
-                        }, REQ_PERMS);
+                    currentStep++;
+                }
+
+                // Step 3: Media & Audio
+                if (currentStep == 2) {
+                    statusText.setText("BOOTING MEDIA SUBSYSTEMS...");
+                    if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA}, REQ_PERMS);
                         return;
                     }
+                    currentStep++;
                 }
-                currentStep++;
-            }
 
-            // Step 2: Device Identity (Phone)
-            if (currentStep == 1) {
-                statusText.setText("VERIFYING DEVICE IDENTITY...");
-                if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(new String[]{Manifest.permission.READ_PHONE_STATE}, REQ_PERMS);
-                    return;
-                }
-                currentStep++;
-            }
-
-            // Step 3: Media & Audio
-            if (currentStep == 2) {
-                statusText.setText("INITIALIZING MEDIA ENGINE...");
-                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA}, REQ_PERMS);
-                    return;
-                }
-                currentStep++;
-            }
-
-            // Step 4: Manage Storage (Special)
-            if (currentStep == 3) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
-                    statusText.setText("WAITING FOR ALL-FILES ACCESS...");
-                    try {
-                        Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                        intent.setData(Uri.parse("package:" + getPackageName()));
-                        startActivityForResult(intent, REQ_MANAGE_STORAGE);
-                    } catch (Exception e) {
-                        Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
-                        startActivityForResult(intent, REQ_MANAGE_STORAGE);
+                // Step 4: Manage Storage (Special)
+                if (currentStep == 3) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+                        statusText.setText("AUTHORIZING FILE-SYSTEM ACCESS...");
+                        try {
+                            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                            intent.setData(Uri.parse("package:" + getPackageName()));
+                            startActivityForResult(intent, REQ_MANAGE_STORAGE);
+                        } catch (Exception e) {
+                            try {
+                                Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                                startActivityForResult(intent, REQ_MANAGE_STORAGE);
+                            } catch (Exception fatal) {
+                                currentStep++;
+                                checkNextPermission();
+                            }
+                        }
+                        return;
                     }
-                    return;
+                    currentStep++;
                 }
-                currentStep++;
+
+                // Step 5: Overlay
+                if (currentStep == 4) {
+                    if (!Settings.canDrawOverlays(this)) {
+                        statusText.setText("INITIALIZING OVERLAY ENGINE...");
+                        try {
+                            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:" + getPackageName()));
+                            startActivityForResult(intent, 1003);
+                        } catch (Exception e) {
+                            currentStep++;
+                            checkNextPermission();
+                        }
+                        return;
+                    }
+                    currentStep++;
+                }
             }
 
-            // Step 5: Overlay
-            if (currentStep == 4) {
-                if (!Settings.canDrawOverlays(this)) {
-                    statusText.setText("ENABLING OVERLAY SYSTEM...");
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:" + getPackageName()));
-                    startActivityForResult(intent, 1003);
-                    return;
-                }
-                currentStep++;
-            }
-        }
-
-        statusText.setText("ALL SYSTEMS GO");
-        statusText.setTextColor(0xFF39FF14);
-        proceedToMain();
+            statusText.setText("SECURITY ENGINE ONLINE");
+            statusText.setTextColor(0xFF39FF14);
+            new Handler().postDelayed(this::proceedToMain, 300);
+        });
     }
 
     @Override

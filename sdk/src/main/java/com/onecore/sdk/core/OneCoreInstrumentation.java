@@ -155,10 +155,15 @@ public class OneCoreInstrumentation extends Instrumentation {
 
                 if (activity.getWindow() != null) {
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
+                    activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                    activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                     
                     // Critical: BGMI and heavy games often need the window to be explicitly opaque
                     // to trigger the correct SurfaceView initialization.
                     activity.getWindow().setFormat(android.graphics.PixelFormat.OPAQUE);
+                    
+                    // Force the activity to use the target orientation if set in APK
+                    // activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
                 }
 
                 // Fixed context includes Resources and LayoutInflater swap

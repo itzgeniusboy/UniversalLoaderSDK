@@ -113,9 +113,23 @@ public class OneCoreAMSProxy implements InvocationHandler {
                     }
                 }
             }
-        } else if (methodName.contains("scheduleJob")) {
-            Log.d(TAG, "OneCore-DEBUG: JobScheduler intercepted.");
-        } else if (methodName.contains("getContentProvider")) {
+        } else if (methodName.equals("getRunningAppProcesses")) {
+            Object result = method.invoke(mBase, args);
+            if (result instanceof java.util.List) {
+                java.util.List list = (java.util.List) result;
+                for (Object item : list) {
+                    try {
+                        String procName = (String) ReflectionHelper.getFieldValue(item, "processName");
+                        if (procName != null && (procName.contains(sHostPackage) || procName.contains(":virtual"))) {
+                            ReflectionHelper.setFieldValue(item, "com.tencent.ig", "processName");
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+            return result;
+        } else if (methodName.equals("getRunningServices")) {
+            return new java.util.ArrayList<>(); // Hide running services
+        } else if (methodName.equals("getContentProvider")) {
             // getContentProvider(callingThread, callingPackage, name, userId, stable)
             String authority = null;
             for (Object arg : args) {

@@ -43,7 +43,9 @@ public class OneCoreLoadedApkManager {
             ai.publicSourceDir = apkPath;
             ai.dataDir = context.getDir("v_data_" + packageName, Context.MODE_PRIVATE).getAbsolutePath();
             ai.uid = context.getApplicationInfo().uid;
-            ai.nativeLibraryDir = context.getDir("v_lib", Context.MODE_PRIVATE).getAbsolutePath();
+            
+            File libDir = context.getDir("v_lib_" + packageName, Context.MODE_PRIVATE);
+            ai.nativeLibraryDir = libDir.getAbsolutePath();
             
             // CompatibilityInfo
             Class<?> compatInfoClass = Class.forName("android.content.res.CompatibilityInfo");

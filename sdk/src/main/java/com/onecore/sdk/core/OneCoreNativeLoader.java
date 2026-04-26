@@ -30,14 +30,19 @@ public class OneCoreNativeLoader {
             String bestAbi = null;
             String[] supportedAbis = android.os.Build.SUPPORTED_ABIS;
             
-            // First pass: find the best ABI that actually has libraries in this ZIP
+            // Priority list for Games (prefer 64-bit)
+            java.util.List<String> priorityAbis = new java.util.ArrayList<>();
+            priorityAbis.add("arm64-v8a");
+            priorityAbis.add("armeabi-v7a");
+            
             for (String abi : supportedAbis) {
-                Enumeration<? extends ZipEntry> checkEntries = zipFile.entries();
-                while (checkEntries.hasMoreElements()) {
-                    ZipEntry entry = checkEntries.nextElement();
-                    if (entry.getName().startsWith("lib/" + abi + "/")) {
-                        bestAbi = abi;
-                        break;
+                if (priorityAbis.contains(abi)) {
+                    Enumeration<? extends ZipEntry> checkEntries = zipFile.entries();
+                    while (checkEntries.hasMoreElements()) {
+                        if (checkEntries.nextElement().getName().startsWith("lib/" + abi + "/")) {
+                            bestAbi = abi;
+                            break;
+                        }
                     }
                 }
                 if (bestAbi != null) break;

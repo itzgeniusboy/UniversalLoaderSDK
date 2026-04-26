@@ -125,6 +125,12 @@ public class OneCoreContextFixer {
                     if (loadedApk != null) {
                         ReflectionHelper.setFieldValue(contextImpl, loadedApk, "mPackageInfo");
                         
+                        // Fix ApplicationInfo within LoadedApk
+                        android.content.pm.ApplicationInfo virtualInfo = VirtualContainer.getInstance().getAppInfo();
+                        if (virtualInfo != null) {
+                            ReflectionHelper.setFieldValue(loadedApk, virtualInfo, "mApplicationInfo");
+                        }
+
                         // Fix Application link in LoadedApk
                         android.app.Application virtualApp = VirtualContainer.getInstance().getTargetApplication();
                         if (virtualApp != null) {

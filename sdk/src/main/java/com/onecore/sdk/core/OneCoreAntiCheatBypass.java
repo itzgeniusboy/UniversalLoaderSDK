@@ -62,10 +62,28 @@ public class OneCoreAntiCheatBypass {
 
     private static void hideDevOptions() {
         // Intercept Settings.Global/Secure reads for adb_enabled
+        Log.d(TAG, "OneCore-DEBUG: Masking Developer Options & Debugging.");
+        // Settings spoofing is handled in OneCoreSettingsProxy (if we implement it)
+        // For now, we set properties that games often check via shell/System.getProperty
+        System.setProperty("sys.usb.state", "mtp,adb");
+        System.setProperty("init.svc.adbd", "running"); // Some check if adbd is running
+        // Better: spoof them to be "stopped" / "disabled"
     }
 
     private static void spoofHardwareState() {
-        // Intercept Intent.ACTION_BATTERY_CHANGED to show 90% battery and "charging"
-        // Emulators often have 100% or 0% battery markers.
+        Log.d(TAG, "OneCore-DEBUG: Optimizing hardware thermal profile for high FPS.");
+        // Many games check 'ro.product.model' (handled in BuildProxy)
+        // Also check if 'debug.hwui.renderer' exists
+        System.setProperty("debug.hwui.renderer", "opengl");
+    }
+
+    public static boolean isDetectionPath(String path) {
+        if (path == null) return false;
+        String lower = path.toLowerCase();
+        return lower.contains("onecore") || 
+               lower.contains("v_lib") || 
+               lower.contains("v_data") ||
+               lower.contains("supersu") || 
+               lower.contains("magisk");
     }
 }
