@@ -28,6 +28,12 @@ public class OneCoreAntiCheatBypass {
         System.setProperty("ro.debuggable", "0");
         System.setProperty("ro.secure", "1");
         System.setProperty("ro.adb.secure", "1");
+        
+        // Anti-Emulator / Anti-Virtualization properties
+        System.setProperty("ro.kernel.qemu", "0");
+        System.setProperty("ro.kernel.android.qemu", "0");
+        System.setProperty("ro.product.model", "SM-S908B"); // S22 Ultra
+        System.setProperty("ro.product.brand", "samsung");
     }
 
     private static void spoofHardwareState() {

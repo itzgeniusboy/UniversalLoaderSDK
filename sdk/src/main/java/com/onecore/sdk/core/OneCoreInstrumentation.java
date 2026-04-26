@@ -124,6 +124,15 @@ public class OneCoreInstrumentation extends Instrumentation {
     }
 
     @Override
+    public void callActivityOnResume(Activity activity) {
+        mBase.callActivityOnResume(activity);
+        String targetActivity = activity.getIntent().getStringExtra("target_activity");
+        if (targetActivity != null) {
+            OneCoreRenderingFixer.fix(activity);
+        }
+    }
+
+    @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle) {
         SafeExecutionManager.run("callActivityOnCreate", () -> {
             String targetActivity = activity.getIntent().getStringExtra("target_activity");

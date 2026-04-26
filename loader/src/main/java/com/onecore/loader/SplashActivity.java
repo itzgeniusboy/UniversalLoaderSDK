@@ -71,7 +71,6 @@ public class SplashActivity extends Activity {
             // Check for common PUBG/BGMI variants
             String[] packages = {
                 "com.pubg.imobile", 
-                "com.pubg.imbile", 
                 "com.tencent.ig", 
                 "com.tencent.tmgp.pubgmhd", 
                 "com.pubg.krmobile",

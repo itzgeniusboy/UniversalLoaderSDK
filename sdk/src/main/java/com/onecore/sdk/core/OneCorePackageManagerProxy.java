@@ -83,6 +83,10 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
             if (sVirtualPackages.containsKey(pkg)) {
                 return sVirtualPackages.get(pkg);
             }
+        } else if ("getActivityInfo".equals(methodName)) {
+            android.content.ComponentName component = (android.content.ComponentName) args[0];
+            android.content.pm.ActivityInfo ai = getActivityInfo(component);
+            if (ai != null) return ai;
         } else if ("getInstallerPackageName".equals(methodName)) {
             return "com.android.vending"; // Spoof Play Store as installer
         } else if ("getApplicationInfo".equals(methodName)) {

@@ -28,16 +28,29 @@ public class OneCoreRenderingFixer {
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
             
-            // 3. Force rendering to be "Opaque" for games like BGMI
-            window.getDecorView().setBackgroundColor(0xFF000000); // Black background fallback
+            // 3. Force rendering to be "Opaque" for games
+            window.getDecorView().setBackgroundColor(0xFF000000); 
             
-            // 4. Staggered search for SurfaceViews to ensure they are on top
+            // 3.1 Force screen to stay on and window to be focused
+            activity.setFinishOnTouchOutside(false);
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+
+            // 4. Set a listener for dynamic SurfaceView additions (UE4 is lazy)
+            window.getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+                View decor = window.getDecorView();
+                if (decor instanceof ViewGroup) {
+                    fixSurfaceViews((ViewGroup) decor);
+                }
+            });
+
+            // Initial run
             View decor = window.getDecorView();
             if (decor instanceof ViewGroup) {
                 fixSurfaceViews((ViewGroup) decor);
             }
             
-            Log.i(TAG, "OneCore-DEBUG: Rendering Pipeline fully optimized for Gaming.");
+            Log.i(TAG, "OneCore-DEBUG: Rendering Pipeline fully optimized and monitoring for dynamic content.");
         });
     }
 
@@ -46,9 +59,13 @@ public class OneCoreRenderingFixer {
             View child = group.getChildAt(i);
             if (child instanceof SurfaceView) {
                 SurfaceView sv = (SurfaceView) child;
-                // Force SurfaceView to be on top of the window decor but behind any UI overlays
+                // Force SurfaceView to be correctly layered
+                sv.setZOrderOnTop(false); // Game should be behind UI but visible
                 sv.setZOrderMediaOverlay(true);
-                Log.d(TAG, "Optimized SurfaceView found: " + sv.toString());
+                
+                // Trigger an invalidate to wake up EGL context
+                sv.invalidate();
+                Log.d(TAG, "Optimized SurfaceView detected and stabilized: " + sv.toString());
             } else if (child instanceof ViewGroup) {
                 fixSurfaceViews((ViewGroup) child);
             }
