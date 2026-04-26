@@ -90,9 +90,10 @@ public class OneCoreInstrumentation extends Instrumentation {
             // Auto-init in child process if needed
             if (container.getClassLoader() == null && targetApk != null) {
                 Log.i(TAG, "OneCore-DEBUG: Child process initializing virtual environment for " + targetPkg);
-                // We need a context. Our custom Instrumentation can't easily get one here, 
-                // but we can try to use the ClassLoader's parent or a reflected system context.
-                // However, by the time newActivity is called, ActivityThread is active.
+                Context context = com.onecore.sdk.OneCoreSDK.getContext();
+                if (context != null) {
+                    container.installApk(context, targetApk, targetPkg);
+                }
             }
 
             ClassLoader virtualCl = container.getClassLoader();

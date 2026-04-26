@@ -23,6 +23,9 @@ public class SplashActivity extends Activity {
     private static final int REQ_PERMS = 1001;
     private static final int REQ_MANAGE_STORAGE = 1002;
 
+    private TextView statusText;
+    private int currentStep = 0;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -30,97 +33,118 @@ public class SplashActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(android.view.Gravity.CENTER);
-        root.setBackgroundColor(0xFF121212);
+        root.setBackgroundColor(0xFF000000);
         
-        TextView statusText = new TextView(this);
-        statusText.setText("ONECORE INITIALIZING...");
-        statusText.setTextColor(0xFFFFFFFF);
-        statusText.setPadding(20, 20, 20, 20);
+        // Progress logo or initial
+        TextView logo = new TextView(this);
+        logo.setText("ONECORE");
+        logo.setTextSize(32);
+        logo.setTypeface(null, android.graphics.Typeface.BOLD);
+        logo.setTextColor(0xFF39FF14);
+        logo.setLetterSpacing(0.2f);
+        root.addView(logo);
+
+        statusText = new TextView(this);
+        statusText.setText("PREPARING SECURITY ENGINE...");
+        statusText.setTextColor(0x88FFFFFF);
+        statusText.setTextSize(10);
+        statusText.setPadding(0, 40, 0, 0);
+        statusText.setLetterSpacing(0.1f);
         root.addView(statusText);
 
         setContentView(root);
         
-        // Fail-safe timer: if stuck at splash for 5s, try to proceed
+        // Fail-safe timer
         new Handler().postDelayed(() -> {
-            if (!isFinishing()) {
-                Log.w(TAG, "Splash timeout fallback triggered.");
-                proceedToMain();
+            if (!isFinishing() && currentStep < 5) {
+                Log.w(TAG, "Splash semi-stuck, manually checking permissions.");
+                checkNextPermission();
             }
-        }, 5000);
+        }, 3000);
 
-        checkAndRequestPermissions();
+        new Handler().postDelayed(this::checkNextPermission, 1000);
     }
 
-    private void checkAndRequestPermissions() {
+    private void checkNextPermission() {
+        if (isFinishing()) return;
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            java.util.List<String> perms = new java.util.ArrayList<>();
-            
-            // Storage
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                perms.add(Manifest.permission.READ_MEDIA_IMAGES);
-                perms.add(Manifest.permission.READ_MEDIA_VIDEO);
-                perms.add(Manifest.permission.READ_MEDIA_AUDIO);
-            } else {
-                perms.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-                perms.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            }
-            
-            // Critical for BGMI and Device Identity
-            perms.add(Manifest.permission.READ_PHONE_STATE);
-            
-            // Team chat and features
-            perms.add(Manifest.permission.RECORD_AUDIO);
-            perms.add(Manifest.permission.CAMERA);
-            
-            // Location
-            perms.add(Manifest.permission.ACCESS_FINE_LOCATION);
-            
-            // Notification (Android 13+)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                perms.add(Manifest.permission.POST_NOTIFICATIONS);
-            }
-
-            java.util.List<String> needed = new java.util.ArrayList<>();
-            for (String p : perms) {
-                if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) {
-                    needed.add(p);
+            // Step 1: Storage
+            if (currentStep == 0) {
+                statusText.setText("REQUESTING STORAGE ACCESS...");
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{
+                                Manifest.permission.READ_MEDIA_IMAGES,
+                                Manifest.permission.READ_MEDIA_VIDEO,
+                                Manifest.permission.READ_MEDIA_AUDIO
+                        }, REQ_PERMS);
+                        return;
+                    }
+                } else {
+                    if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{
+                                Manifest.permission.READ_EXTERNAL_STORAGE,
+                                Manifest.permission.WRITE_EXTERNAL_STORAGE
+                        }, REQ_PERMS);
+                        return;
+                    }
                 }
+                currentStep++;
             }
 
-            if (!needed.isEmpty()) {
-                Log.i(TAG, "Requesting mandatory permissions: " + needed.size());
-                requestPermissions(needed.toArray(new String[0]), REQ_PERMS);
-                return;
-            }
-        }
-        
-        // Handle Android 11+ Manage External Storage
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                Log.i(TAG, "Requesting Manage External Storage...");
-                try {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                    intent.setData(Uri.parse("package:" + getPackageName()));
-                    startActivityForResult(intent, REQ_MANAGE_STORAGE);
-                } catch (Exception e) {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
-                    startActivityForResult(intent, REQ_MANAGE_STORAGE);
+            // Step 2: Device Identity (Phone)
+            if (currentStep == 1) {
+                statusText.setText("VERIFYING DEVICE IDENTITY...");
+                if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.READ_PHONE_STATE}, REQ_PERMS);
+                    return;
                 }
-                return;
+                currentStep++;
+            }
+
+            // Step 3: Media & Audio
+            if (currentStep == 2) {
+                statusText.setText("INITIALIZING MEDIA ENGINE...");
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA}, REQ_PERMS);
+                    return;
+                }
+                currentStep++;
+            }
+
+            // Step 4: Manage Storage (Special)
+            if (currentStep == 3) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+                    statusText.setText("WAITING FOR ALL-FILES ACCESS...");
+                    try {
+                        Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                        intent.setData(Uri.parse("package:" + getPackageName()));
+                        startActivityForResult(intent, REQ_MANAGE_STORAGE);
+                    } catch (Exception e) {
+                        Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                        startActivityForResult(intent, REQ_MANAGE_STORAGE);
+                    }
+                    return;
+                }
+                currentStep++;
+            }
+
+            // Step 5: Overlay
+            if (currentStep == 4) {
+                if (!Settings.canDrawOverlays(this)) {
+                    statusText.setText("ENABLING OVERLAY SYSTEM...");
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivityForResult(intent, 1003);
+                    return;
+                }
+                currentStep++;
             }
         }
 
-        // Overlay permission for ESP/Menus
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!Settings.canDrawOverlays(this)) {
-                Log.i(TAG, "Requesting Overlay Permission...");
-                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:" + getPackageName()));
-                startActivityForResult(intent, 1003);
-                return;
-            }
-        }
-
+        statusText.setText("ALL SYSTEMS GO");
+        statusText.setTextColor(0xFF39FF14);
         proceedToMain();
     }
 
@@ -128,16 +152,14 @@ public class SplashActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQ_PERMS) {
-            checkAndRequestPermissions();
+            checkNextPermission();
         }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQ_MANAGE_STORAGE || requestCode == 1003) {
-            checkAndRequestPermissions();
-        }
+        checkNextPermission();
     }
 
     private void proceedToMain() {

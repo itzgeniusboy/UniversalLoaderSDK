@@ -152,6 +152,7 @@ public class VirtualContainer {
             intent.setClassName(context.getPackageName(), "com.onecore.loader.StubActivity_P1");
             intent.putExtra("target_activity", targetActivity);
             intent.putExtra("target_package", mPackageName);
+            intent.putExtra("target_apk_path", mApkPath);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             
             Log.d(TAG, "Dispatching stub intent for virtualization start...");
