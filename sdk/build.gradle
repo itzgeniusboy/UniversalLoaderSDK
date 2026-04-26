@@ -26,11 +26,11 @@ android {
 
     externalNativeBuild {
         cmake {
-            path file("src/main/cpp/CMakeLists.txt")
+            path "src/main/cpp/CMakeLists.txt"
         }
     }
 
-    ndkVersion "25.2.9519653"
+    // ndkVersion removed to use default compatible version
 
     buildTypes {
         release {
