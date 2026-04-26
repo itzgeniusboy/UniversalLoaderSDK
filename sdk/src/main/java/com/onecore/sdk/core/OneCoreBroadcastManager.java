@@ -41,7 +41,13 @@ public class OneCoreBroadcastManager {
                     filter.addAction(Intent.ACTION_BOOT_COMPLETED);
                 }
                 
-                context.registerReceiver(receiver, filter);
+                if (android.os.Build.VERSION.SDK_INT >= 34) {
+                    // RECEIVER_EXPORTED = 2, RECEIVER_NOT_EXPORTED = 4
+                    int flags = receiverInfo.exported ? 2 : 4;
+                    context.registerReceiver(receiver, filter, flags);
+                } else {
+                    context.registerReceiver(receiver, filter);
+                }
                 
                 Log.d(TAG, "Registered receiver: " + receiverInfo.name);
                 mRegisteredReceivers.add(receiver);

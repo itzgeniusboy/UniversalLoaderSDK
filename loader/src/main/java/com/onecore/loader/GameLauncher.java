@@ -58,7 +58,6 @@ public class GameLauncher {
                 
                 // Phase 3: Bind Application with correct context
                 final String finalPkg = targetPkg;
-                String appClass = hostAppInfo.className != null ? hostAppInfo.className : "android.app.Application";
                 
                 new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
                     try {
@@ -67,12 +66,24 @@ public class GameLauncher {
                         if (launchIntent != null && launchIntent.getComponent() != null) {
                             String targetActivity = launchIntent.getComponent().getClassName();
                             Log.i(TAG, "Redirecting launch to Stub: " + targetActivity);
+                            
+                            // Add suggested flags for better reliability
+                            launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                            launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                            
+                            // Important: ensure OneCoreSDK is initialized if not already
+                            if (!com.onecore.sdk.OneCoreSDK.isInitialized()) {
+                                com.onecore.sdk.OneCoreSDK.init(context);
+                            }
+                            
                             container.launch(context, targetActivity);
                             if (callback != null) callback.onProcessDetected(1); 
                         } else {
+                            Log.e(TAG, "Launch intent or component is null for " + finalPkg);
                             if (callback != null) callback.onFailed("Failed to find main activity for " + finalPkg);
                         }
                     } catch (Exception e) {
+                        Log.e(TAG, "Critical error during launch dispatch", e);
                         if (callback != null) callback.onFailed("Launch internal error: " + e.getMessage());
                     }
                 });

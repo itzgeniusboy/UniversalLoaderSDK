@@ -157,6 +157,7 @@ public class VirtualContainer {
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
             intent.setClassName(mPackageName, targetActivity);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             
             Log.d(TAG, "Dispatching guest intent. Instrumentation will handle stub redirection...");
             context.startActivity(intent);

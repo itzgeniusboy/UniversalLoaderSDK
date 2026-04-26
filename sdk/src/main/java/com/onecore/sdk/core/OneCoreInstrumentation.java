@@ -39,6 +39,8 @@ public class OneCoreInstrumentation extends Instrumentation {
         String hostPkg = (context != null) ? context.getPackageName() : "com.onecore.loader";
         intent = OneCoreStubManager.replaceWithStub(intent, hostPkg);
 
+        if (intent == null) return null;
+
         final Intent finalIntent = intent;
         ActivityResult result = null;
         
@@ -46,28 +48,40 @@ public class OneCoreInstrumentation extends Instrumentation {
             // Try different signatures for execStartActivity (Android versions vary)
             Method execMethod = null;
             try {
-                // Signature 1: Standard
+                // Signature 1: Standard (Context, IBinder, IBinder, Activity, Intent, int, Bundle)
                 execMethod = ReflectionHelper.findMethod(Instrumentation.class, "execStartActivity",
                         Context.class, IBinder.class, IBinder.class, Activity.class,
                         Intent.class, int.class, Bundle.class);
             } catch (Exception e) {
                 try {
-                    // Signature 2: Some older versions or specific vendors
+                    // Signature 2: Context, IBinder, IBinder, Activity, Intent, int
                     execMethod = ReflectionHelper.findMethod(Instrumentation.class, "execStartActivity",
                             Context.class, IBinder.class, IBinder.class, Activity.class,
                             Intent.class, int.class);
                 } catch (Exception e2) {
-                    Log.e(TAG, "Failed to find execStartActivity signature", e2);
+                    try {
+                        // Signature 3: Context, IBinder, IBinder, Fragment, Intent, int, Bundle (just in case)
+                        execMethod = ReflectionHelper.findMethod(Instrumentation.class, "execStartActivity",
+                            Context.class, IBinder.class, IBinder.class, String.class,
+                            Intent.class, int.class, Bundle.class);
+                    } catch (Exception e3) {
+                        Log.e(TAG, "Failed all execStartActivity signatures", e3);
+                    }
                 }
             }
 
             if (execMethod != null) {
                 execMethod.setAccessible(true);
-                if (execMethod.getParameterTypes().length == 7) {
+                int paramCount = execMethod.getParameterTypes().length;
+                if (paramCount == 7) {
                     result = (ActivityResult) execMethod.invoke(mBase, who, contextThread, token, target, finalIntent, requestCode, options);
-                } else {
+                } else if (paramCount == 6) {
                     result = (ActivityResult) execMethod.invoke(mBase, who, contextThread, token, target, finalIntent, requestCode);
                 }
+            } else {
+                // Extreme fallback: Try to call mBase directly if it's not a proxy
+                // But it's risky if mBase is also hooked or a specific subclass
+                Log.w(TAG, "Executing extreme fallback for execStartActivity");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error invoking execStartActivity", e);
