@@ -2,6 +2,7 @@ package com.onecore.sdk.core;
 
 import android.content.Intent;
 import android.util.Log;
+import com.onecore.sdk.VirtualContainer;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -58,7 +59,7 @@ public class OneCoreStubManager {
             stubIntent.putExtra("target_package", targetPkg);
             
             // Pass APK path for child process initialization
-            String apkPath = com.onecore.sdk.VirtualContainer.getInstance().getApkPath();
+            String apkPath = VirtualContainer.getInstance().getApkPath();
             if (apkPath != null) {
                 stubIntent.putExtra("target_apk_path", apkPath);
             }

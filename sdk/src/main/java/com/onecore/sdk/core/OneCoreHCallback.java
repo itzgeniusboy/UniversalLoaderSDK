@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
+import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.ReflectionHelper;
 import java.util.List;
 
@@ -99,7 +100,7 @@ public class OneCoreHCallback implements Handler.Callback {
             
             // Dynamic initialization in child process
             if (targetApk != null) {
-                com.onecore.sdk.VirtualContainer container = com.onecore.sdk.VirtualContainer.getInstance();
+                VirtualContainer container = VirtualContainer.getInstance();
                 if (container.getClassLoader() == null) {
                     try {
                         Object at = ReflectionHelper.invokeMethod(null, "currentActivityThread");

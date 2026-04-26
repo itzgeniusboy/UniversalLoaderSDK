@@ -215,6 +215,10 @@ public class VirtualContainer {
         return mAppInfo;
     }
 
+    public String getPackageName() {
+        return mPackageName;
+    }
+
     private void fixGameObb(String packageName) {
         try {
             File obbDir = new File(android.os.Environment.getExternalStorageDirectory(), "Android/obb/" + packageName);
