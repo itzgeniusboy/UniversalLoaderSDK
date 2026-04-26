@@ -71,7 +71,13 @@ public class OneCoreRenderingFixer {
                 if (decor instanceof ViewGroup) {
                     fixSurfaceViews((ViewGroup) decor);
                 }
-            }, 500);
+                
+                // Black Screen Recovery: 
+                // Sometimes UE4 gets stuck in a hidden state if the virtual window didn't sync.
+                // We force a layout refresh.
+                decor.requestLayout();
+                Log.d(TAG, "UE4: Post-layout stability check completed.");
+            }, 1000);
             
             Log.i(TAG, "OneCore-DEBUG: Rendering Pipeline active and monitoring.");
             

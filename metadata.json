@@ -1,6 +1,6 @@
 {
-  "name": "OneCore SDK Engine",
-  "description": "OneCore SDK Engine - Advanced Android Virtualization & Hooking Framework",
+  "name": "TaskOrbit",
+  "description": "Minimal, powerful task management app with user profiles, real-time sync, and settings.",
   "requestFramePermissions": [],
   "majorCapabilities": [],
   "cloningMetadata": [

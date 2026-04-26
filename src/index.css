@@ -1,21 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --font-display: "Space Grotesk", sans-serif;
 }
 
 :root {
-  --bg: #000000;
-  --fg: #FFFFFF;
-  --accent: #39FF14;
-  --accent-glow: rgba(57, 255, 20, 0.3);
-  --line: #2C2C2E;
-  --surface: #1C1C1E;
-  --surface-hover: #2C2C2E;
-  --text-dim: #8E8E93;
+  --bg: #fdfdfd;
+  --fg: #0a0a0a;
 }
 
 body {
@@ -25,45 +18,26 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.premium-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2);
+/* Custom transitions */
+.transition-card {
+  transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
 }
 
-.ios-glass {
-  background: rgba(28, 28, 30, 0.7);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+/* Glassmorphism utility */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.accent-glow {
-  box-shadow: 0 0 20px var(--accent-glow);
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
-.status-glow {
-  box-shadow: 0 0 10px var(--accent);
-}
-
-pre {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  line-height: 1.5;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--bg);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--line);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--accent);
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }

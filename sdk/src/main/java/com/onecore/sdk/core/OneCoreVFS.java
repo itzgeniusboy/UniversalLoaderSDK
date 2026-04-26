@@ -32,9 +32,12 @@ public class OneCoreVFS {
             // Critical for UE4: Redirect the base OBB dir to search within sandbox
             mRedirects.put("/obb/" + packageName, "/sdcard/Android/obb/" + packageName);
             
-            // Logic to hide 'v_data' from File.getAbsolutePath() would go here 
-            // if we were using native hooks.
-            Log.i(TAG, "OneCore-DEBUG: VFS initialized for " + packageName);
+            // BGMI specific: Internal Tencent paths that might leak
+            mRedirects.put("/Tencent/TGPPA", virtualDataPath + "/files/TGPPA");
+            mRedirects.put("/.Tencent", virtualDataPath + "/files/.Tencent");
+            mRedirects.put("/Tencent", "/sdcard/Android/data/" + packageName + "/files/Tencent");
+
+            Log.i(TAG, "OneCore-DEBUG: VFS initialized with BGMI/UE4 path masking.");
         });
     }
 

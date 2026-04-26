@@ -13,8 +13,13 @@ public class OneCoreSDK {
         if (sInitialized) return;
         sContext = context.getApplicationContext();
         
-        // Phase 2: Hook system early
+        // 1. Hook system early
         com.onecore.sdk.core.OneCoreActivityThreadHook.install(sContext);
+        
+        // 2. Initialize BGMI Optimization Engines
+        com.onecore.sdk.core.OneCoreAntiDetection.apply();
+        com.onecore.sdk.core.OneCorePerformanceEngine.boost();
+        com.onecore.sdk.core.OneCoreMemoryOptimizer.optimize();
         
         sInitialized = true;
     }

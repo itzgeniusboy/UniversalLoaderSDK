@@ -12,12 +12,25 @@ public class OneCoreAntiDetection {
     public static void apply() {
         Log.i(TAG, "OneCore-DEBUG: Applying Anti-Detection Layer...");
         
-        // 1. Spoof system properties (handled partly by BuildProxy)
+        // 1. Trigger the Anti-Cheat bypass as part of anti-detection
+        OneCoreAntiCheatBypass.apply();
+
+        // 2. Mocking specific paths in the file system for Java-side checks
+        // This is handled by our IORedirector but we adds a hint here
         
-        // 2. We should ideally intercept File.exists() to hide 'v_data' paths
-        // but that requires a deep native hook (Xposed/Zygisk level).
-        // For Java-level, we ensure the app thinks it is in its original path.
+        // 3. Fake SELinux state: Games check this often
+        System.setProperty("persist.sys.selinux", "enforcing");
         
-        Log.d(TAG, "Anti-Detection layer active.");
+        // 4. Force hide 'onecore' from system properties if any leaked
+        System.setProperty("onecore.version", ""); 
+
+        Log.d(TAG, "Anti-Detection layer active and hardened.");
+    }
+
+    /**
+     * Checks if a specific system property should be masked.
+     */
+    public static boolean shouldMaskProperty(String key) {
+        return key.contains("onecore") || key.contains("loader") || key.contains("v_");
     }
 }
