@@ -47,6 +47,23 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
 
     public static void install() {
         SafeExecutionManager.run("PMS Hook", () -> {
+            // Mock GMS and Play Store for games
+            android.content.pm.PackageInfo gms = new android.content.pm.PackageInfo();
+            gms.packageName = "com.google.android.gms";
+            gms.versionCode = 233013000;
+            gms.applicationInfo = new android.content.pm.ApplicationInfo();
+            gms.applicationInfo.packageName = gms.packageName;
+            gms.applicationInfo.flags = android.content.pm.ApplicationInfo.FLAG_SYSTEM;
+            sVirtualPackages.put(gms.packageName, gms);
+
+            android.content.pm.PackageInfo vending = new android.content.pm.PackageInfo();
+            vending.packageName = "com.android.vending";
+            vending.versionCode = 83611310;
+            vending.applicationInfo = new android.content.pm.ApplicationInfo();
+            vending.applicationInfo.packageName = vending.packageName;
+            vending.applicationInfo.flags = android.content.pm.ApplicationInfo.FLAG_SYSTEM;
+            sVirtualPackages.put(vending.packageName, vending);
+
             Object rawPm = ReflectionHelper.invokeMethod(null, "getPackageManager");
             if (rawPm == null) {
                 // Fallback attempt via ActivityThread

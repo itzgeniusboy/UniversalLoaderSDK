@@ -57,6 +57,8 @@ public class OneCoreRenderingFixer {
                 @Override
                 public void doFrame(long frameTimeNanos) {
                     if (!activity.isFinishing()) {
+                        // Force invalidate of decor to keep compositor active
+                        window.getDecorView().postInvalidateOnAnimation();
                         android.view.Choreographer.getInstance().postFrameCallback(this);
                     }
                 }
@@ -71,11 +73,23 @@ public class OneCoreRenderingFixer {
                 SurfaceView sv = (SurfaceView) child;
                 
                 // Force correctly layered surface
+                // If it's the game surface, it should be on top of UI or MediaOverlay
                 sv.setZOrderOnTop(false); 
                 sv.setZOrderMediaOverlay(true);
                 
                 // UE4 Fix: Set Opaque format on Holder
                 sv.getHolder().setFormat(android.graphics.PixelFormat.OPAQUE);
+                
+                // Disable Secure flag as it can cause black screen in some virtual environments
+                try {
+                    sv.setSecure(false);
+                } catch (Exception ignored) {}
+                
+                // Aggressive fix: Some devices need a brief toggle to wake up the buffer
+                if (sv.getVisibility() == View.VISIBLE) {
+                    // sv.setVisibility(View.INVISIBLE);
+                    // sv.post(() -> sv.setVisibility(View.VISIBLE));
+                }
                 
                 // Wake up the surface if it's stalled
                 sv.postInvalidate();

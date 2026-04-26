@@ -34,6 +34,14 @@ public class OneCoreAntiCheatBypass {
         System.setProperty("ro.kernel.android.qemu", "0");
         System.setProperty("ro.product.model", "SM-S908B"); // S22 Ultra
         System.setProperty("ro.product.brand", "samsung");
+        System.setProperty("ro.product.manufacturer", "samsung");
+        System.setProperty("ro.product.device", "b0s");
+        System.setProperty("ro.product.board", "universal2200");
+        System.setProperty("ro.hardware", "exynos2200");
+        System.setProperty("ro.board.platform", "exynos");
+        System.setProperty("ro.build.type", "user");
+        System.setProperty("ro.build.tags", "release-keys");
+        System.setProperty("ro.build.display.id", "SP1A.210812.016.S908BXXU1AVCJ");
     }
 
     private static void spoofHardwareState() {

@@ -197,6 +197,14 @@ public class OneCoreInstrumentation extends Instrumentation {
                     decorView.setFocusable(true);
                     decorView.setFocusableInTouchMode(true);
                     decorView.requestFocus();
+
+                    // Android 12+ Display Fix
+                    if (android.os.Build.VERSION.SDK_INT >= 31) {
+                        try {
+                            android.view.Display display = activity.getWindowManager().getDefaultDisplay();
+                            ReflectionHelper.setFieldValue(activity, display, "mDisplay");
+                        } catch (Exception ignored) {}
+                    }
                     
                     Log.i(TAG, "Window initialized with Immersive Sticky and OPAQUE format for gaming.");
                 }
