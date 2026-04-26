@@ -180,11 +180,10 @@ public class OneCoreInstrumentation extends Instrumentation {
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                     
-                    // Critical for UE4: some devices require OPAQUE, others TRANSLUCENT.
-                    // For now, we stick to OPAQUE but ensure the surface isn't obscured.
+                    // Critical for UE4/BGMI: OPAQUE is required for EGL layer optimization
                     activity.getWindow().setFormat(android.graphics.PixelFormat.OPAQUE);
                     
-                    // Force navigation hiding for immersive mode
+                    // Force navigation hiding for immersive mode (Sticky)
                     android.view.View decorView = activity.getWindow().getDecorView();
                     decorView.setSystemUiVisibility(
                         android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -193,6 +192,13 @@ public class OneCoreInstrumentation extends Instrumentation {
                         | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
                         | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+
+                    // Force Focus
+                    decorView.setFocusable(true);
+                    decorView.setFocusableInTouchMode(true);
+                    decorView.requestFocus();
+                    
+                    Log.i(TAG, "Window initialized with Immersive Sticky and OPAQUE format for gaming.");
                 }
 
                 // Fixed context includes Resources and LayoutInflater swap

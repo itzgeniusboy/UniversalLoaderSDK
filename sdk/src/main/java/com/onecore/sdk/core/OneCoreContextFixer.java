@@ -111,6 +111,22 @@ public class OneCoreContextFixer {
                 Log.d(TAG, "OneCore-DEBUG: Activity UI Pipeline successfully patched for " + packageName);
             }
 
+            // Fix Display (Android 12+ Fix)
+            try {
+                android.view.Display display = null;
+                if (context instanceof Activity) {
+                    display = ((Activity) context).getWindowManager().getDefaultDisplay();
+                } else {
+                    android.view.WindowManager wm = (android.view.WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+                    if (wm != null) display = wm.getDefaultDisplay();
+                }
+                if (display != null) {
+                    ReflectionHelper.setFieldValue(contextImpl, display, "mDisplay");
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to fix mDisplay field");
+            }
+
             // 5. Shared Storage Fixing
             OneCoreStorageFix.fix(context, packageName);
             

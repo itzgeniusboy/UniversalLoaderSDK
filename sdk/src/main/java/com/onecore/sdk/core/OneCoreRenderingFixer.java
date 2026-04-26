@@ -50,7 +50,17 @@ public class OneCoreRenderingFixer {
                 fixSurfaceViews((ViewGroup) decor);
             }
             
-            Log.i(TAG, "OneCore-DEBUG: Rendering Pipeline fully optimized and monitoring for dynamic content.");
+            Log.i(TAG, "OneCore-DEBUG: Rendering Pipeline active and monitoring.");
+            
+            // Frame Spoofer: Keep Choreographer active to prevent UI stall
+            android.view.Choreographer.getInstance().postFrameCallback(new android.view.Choreographer.FrameCallback() {
+                @Override
+                public void doFrame(long frameTimeNanos) {
+                    if (!activity.isFinishing()) {
+                        android.view.Choreographer.getInstance().postFrameCallback(this);
+                    }
+                }
+            });
         });
     }
 
@@ -59,13 +69,18 @@ public class OneCoreRenderingFixer {
             View child = group.getChildAt(i);
             if (child instanceof SurfaceView) {
                 SurfaceView sv = (SurfaceView) child;
-                // Force SurfaceView to be correctly layered
-                sv.setZOrderOnTop(false); // Game should be behind UI but visible
+                
+                // Force correctly layered surface
+                sv.setZOrderOnTop(false); 
                 sv.setZOrderMediaOverlay(true);
                 
-                // Trigger an invalidate to wake up EGL context
-                sv.invalidate();
-                Log.d(TAG, "Optimized SurfaceView detected and stabilized: " + sv.toString());
+                // UE4 Fix: Set Opaque format on Holder
+                sv.getHolder().setFormat(android.graphics.PixelFormat.OPAQUE);
+                
+                // Wake up the surface if it's stalled
+                sv.postInvalidate();
+                
+                Log.d(TAG, "UE4-Surface-Wakeup: SurfaceView stabilized: " + sv.toString());
             } else if (child instanceof ViewGroup) {
                 fixSurfaceViews((ViewGroup) child);
             }

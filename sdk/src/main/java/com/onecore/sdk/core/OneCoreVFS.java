@@ -19,6 +19,9 @@ public class OneCoreVFS {
             mRedirects.put("/data/data/" + packageName, virtualDataPath);
             mRedirects.put("/data/user/0/" + packageName, virtualDataPath);
             
+            // Redirect OBB check paths
+            mRedirects.put("/Android/obb/" + packageName, "/sdcard/Android/obb/" + packageName);
+            
             // Logic to hide 'v_data' from File.getAbsolutePath() would go here 
             // if we were using native hooks.
             Log.i(TAG, "OneCore-DEBUG: VFS initialized for " + packageName);
