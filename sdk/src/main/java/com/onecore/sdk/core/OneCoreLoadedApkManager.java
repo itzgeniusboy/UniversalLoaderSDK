@@ -3,6 +3,7 @@ package com.onecore.sdk.core;
 import android.content.Context;
 import android.util.Log;
 import com.onecore.sdk.utils.ReflectionHelper;
+import java.io.File;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
