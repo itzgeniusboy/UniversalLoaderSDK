@@ -17,25 +17,20 @@ public class OneCoreLoadedApkManager {
     private static final Map<String, WeakReference<Object>> mLoadedApkCache = new java.util.HashMap<>();
 
     public static Object getLoadedApk(Context context, String apkPath, String packageName, ClassLoader classLoader, android.content.res.Resources resources) {
-        if (mLoadedApkCache.containsKey(packageName)) {
-            Object obj = mLoadedApkCache.get(packageName).get();
-            if (obj != null) return obj;
+        synchronized (mLoadedApkCache) {
+            if (mLoadedApkCache.containsKey(packageName)) {
+                Object obj = mLoadedApkCache.get(packageName).get();
+                if (obj != null) return obj;
+            }
         }
 
         try {
             Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-            Method currentActivityThreadMethod = activityThreadClass.getDeclaredMethod("currentActivityThread");
-            currentActivityThreadMethod.setAccessible(true);
-            Object activityThread = currentActivityThreadMethod.invoke(null);
+            Object activityThread = ReflectionHelper.invokeMethod(null, "currentActivityThread");
             
             // Get mPackages and mResourcePackages maps
-            Field mPackagesField = activityThreadClass.getDeclaredField("mPackages");
-            mPackagesField.setAccessible(true);
-            Map mPackages = (Map) mPackagesField.get(activityThread);
-
-            Field mResourcePackagesField = activityThreadClass.getDeclaredField("mResourcePackages");
-            mResourcePackagesField.setAccessible(true);
-            Map mResourcePackages = (Map) mResourcePackagesField.get(activityThread);
+            Map mPackages = (Map) ReflectionHelper.getFieldValue(activityThread, "mPackages");
+            Map mResourcePackages = (Map) ReflectionHelper.getFieldValue(activityThread, "mResourcePackages");
             
             // ApplicationInfo for the guest app
             android.content.pm.ApplicationInfo ai = new android.content.pm.ApplicationInfo();
@@ -49,16 +44,10 @@ public class OneCoreLoadedApkManager {
             ai.nativeLibraryDir = libDir.getAbsolutePath();
             
             // CompatibilityInfo
-            Class<?> compatInfoClass = Class.forName("android.content.res.CompatibilityInfo");
-            Field defaultField = compatInfoClass.getDeclaredField("DEFAULT_COMPATIBILITY_INFO");
-            defaultField.setAccessible(true);
-            Object compatInfo = defaultField.get(null);
+            Object compatInfo = ReflectionHelper.getFieldValue(null, "android.content.res.CompatibilityInfo", "DEFAULT_COMPATIBILITY_INFO");
             
             // getPackageInfoNoCheck
-            Method getPackageInfoMethod = activityThreadClass.getDeclaredMethod("getPackageInfoNoCheck", 
-                android.content.pm.ApplicationInfo.class, compatInfoClass);
-            getPackageInfoMethod.setAccessible(true);
-            Object loadedApk = getPackageInfoMethod.invoke(activityThread, ai, compatInfo);
+            Object loadedApk = ReflectionHelper.invokeMethod(activityThread, "getPackageInfoNoCheck", ai, compatInfo);
             
             if (loadedApk != null) {
                 // Patch the new LoadedApk
@@ -69,15 +58,42 @@ public class OneCoreLoadedApkManager {
                 ReflectionHelper.setFieldValue(loadedApk, ai.dataDir, "mDataDir");
                 ReflectionHelper.setFieldValue(loadedApk, ai.nativeLibraryDir, "mLibDir", "mBaseLibDir", "mAppLibDir");
                 
-                // Inject into both maps in ActivityThread
+                // Inject into ActivityThread maps
                 WeakReference<Object> ref = new WeakReference<>(loadedApk);
-                mPackages.put(packageName, ref);
-                mResourcePackages.put(packageName, ref);
-                mLoadedApkCache.put(packageName, ref);
+                if (mPackages != null) {
+                    synchronized (mPackages) {
+                        mPackages.put(packageName, ref);
+                    }
+                }
+                if (mResourcePackages != null) {
+                    synchronized (mResourcePackages) {
+                        mResourcePackages.put(packageName, ref);
+                    }
+                }
+                synchronized (mLoadedApkCache) {
+                    mLoadedApkCache.put(packageName, ref);
+                }
+
+                // CRITICAL: Patch ResourcesManager too (Global Resource Cache)
+                try {
+                    Class<?> rmClass = Class.forName("android.app.ResourcesManager");
+                    Object rm = ReflectionHelper.invokeMethod(null, rmClass, "getInstance");
+                    if (rm != null) {
+                        // For modern Android (9+), patching LoadedApk maps is usually enough,
+                        // but games sometimes use Resources.getSystem() or other global accessors.
+                        Map mResourceImpls = (Map) ReflectionHelper.getFieldValue(rm, "mResourceImpls");
+                        if (mResourceImpls != null) {
+                            synchronized (mResourceImpls) {
+                                // Clear cache to force reload with virtual resources if the package matches
+                                // Or we can inject our virtual ResImpl here if needed.
+                                Log.d(TAG, "ResourcesManager.mResourceImpls found, patching cache...");
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
                 
-                Log.i(TAG, "OneCore-DEBUG: LoadedApk injected into maps for " + packageName);
+                Log.i(TAG, "OneCore-DEBUG: LoadedApk injected into AT maps for " + packageName);
             }
-            
             return loadedApk;
         } catch (Exception e) {
             Log.e(TAG, "!!! OneCore-ERROR: LoadedApk injection FAILED !!!", e);

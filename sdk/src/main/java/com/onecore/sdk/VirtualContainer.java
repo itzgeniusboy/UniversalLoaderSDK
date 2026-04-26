@@ -162,31 +162,65 @@ public class VirtualContainer {
     }
 
     /**
-     * Loads and initializes the target application instance.
+     * Loads and initializes the target application instance using the real Android lifecycle.
      */
     public void bindApplication(Context context, String applicationClassName, String packageName) {
         if (mClassLoader == null || mTargetApplication != null) return;
         
+        Log.i(TAG, ">>> V_CORE: Binding Target Application [" + applicationClassName + "] <<<");
+        
+        SafeExecutionManager.run("bindApplication", () -> {
+            try {
+                // 1. Get ActivityThread
+                Object activityThread = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+                
+                // 2. Install Content Providers BEFORE Application.onCreate
+                android.content.pm.PackageInfo packageInfo = context.getPackageManager().getPackageArchiveInfo(mApkPath, android.content.pm.PackageManager.GET_PROVIDERS);
+                if (packageInfo != null && packageInfo.providers != null) {
+                    com.onecore.sdk.core.OneCoreContentProviderManager.installProviders(context, packageInfo.providers);
+                }
+                
+                // 3. Create Application instance via LoadedApk to ensure proper integration
+                Object loadedApk = com.onecore.sdk.core.OneCoreLoadedApkManager.getLoadedApk(context, mApkPath, packageName, mClassLoader, mResources);
+                if (loadedApk != null) {
+                    // This triggers attachBaseContext and onCreate via ActivityThread logic
+                    mTargetApplication = (android.app.Application) ReflectionHelper.invokeMethod(loadedApk, "makeApplication", false, null);
+                    
+                    if (mTargetApplication != null) {
+                        // Spoof process name for anti-detection and consistency
+                        OneCoreProcessManager.spoofProcessName(packageName);
+
+                        // Sync with ActivityThread's initial application field so AppGlobals returns virtual app
+                        ReflectionHelper.setFieldValue(activityThread, mTargetApplication, "mInitialApplication");
+                        
+                        // Also sync active applications list
+                        java.util.List list = (java.util.List) ReflectionHelper.getFieldValue(activityThread, "mAllApplications");
+                        if (list != null && !list.contains(mTargetApplication)) {
+                            list.add(mTargetApplication);
+                        }
+                        
+                        Log.i(TAG, ">>> V_CORE: Application Lifecycle SYNCED correctly. mTargetApplication=" + mTargetApplication);
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "!!! V_CORE: bindApplication FAILED !!!", e);
+                // Last resort manual bind if LoadedApk fails
+                manualBindLegacy(context, applicationClassName, packageName);
+            }
+        });
+    }
+
+    private void manualBindLegacy(Context context, String applicationClassName, String packageName) {
         try {
-            Log.i(TAG, ">>> V_CORE: Binding Target Application [" + applicationClassName + "] <<<");
-            
-            // 1. Fix base context first
             com.onecore.sdk.core.OneCoreContextFixer.fixContext(context, packageName);
-            
-            // 2. Create instance
             Class<?> appClass = mClassLoader.loadClass(applicationClassName);
             mTargetApplication = (android.app.Application) appClass.newInstance();
-            
-            // 3. Attach base context
             Method attach = android.app.Application.class.getDeclaredMethod("attach", Context.class);
             attach.setAccessible(true);
             attach.invoke(mTargetApplication, context);
-            
-            // 4. Call onCreate
             mTargetApplication.onCreate();
-            Log.i(TAG, ">>> V_CORE: Application Bound and Active. <<<");
         } catch (Exception e) {
-            Log.e(TAG, "!!! V_CORE: Application Binding FAILED !!!", e);
+            Log.e(TAG, "Legacy bind also failed", e);
         }
     }
 

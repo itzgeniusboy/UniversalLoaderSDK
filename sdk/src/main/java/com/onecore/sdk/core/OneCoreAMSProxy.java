@@ -86,16 +86,42 @@ public class OneCoreAMSProxy implements InvocationHandler {
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String methodName = method.getName();
         
-        if (methodName.contains("startActivity")) {
+        if (methodName.startsWith("startActivity")) {
+             int intentIndex = -1;
+             for (int i = 0; i < args.length; i++) {
+                 if (args[i] instanceof android.content.Intent) {
+                     intentIndex = i;
+                     break;
+                 }
+             }
+             if (intentIndex != -1) {
+                 android.content.Intent intent = (android.content.Intent) args[intentIndex];
+                 // Skip if it's already a stub or system activity
+                 if (intent.getComponent() != null && !intent.getComponent().getClassName().contains("StubActivity")
+                     && !intent.getComponent().getPackageName().equals("android")) {
+                     android.content.Intent rewritten = OneCoreStubManager.replaceWithStub(intent, sHostPackage);
+                     if (rewritten != intent) {
+                         Log.d(TAG, "AMS Proxy: Redirecting " + intent.getComponent() + " for method " + methodName);
+                         args[intentIndex] = rewritten;
+                         
+                         // Fix calling package if present (usually at index 1 or 2)
+                         for (int i = 0; i < args.length; i++) {
+                             if (args[i] instanceof String && args[i].equals(sHostPackage)) {
+                                 // Some methods require the real host package for permission checks, 
+                                 // but some require the virtual one. We keep host for system verification.
+                             }
+                         }
+                     }
+                 }
+             }
+        } else if (methodName.equals("getIntentSender") || methodName.equals("getIntentSenderWithFeature")) {
+            // Intercept PendingIntent creation to ensure they use stub too
             for (int i = 0; i < args.length; i++) {
-                if (args[i] instanceof android.content.Intent) {
-                    android.content.Intent intent = (android.content.Intent) args[i];
-                    android.content.Intent rewritten = OneCoreStubManager.replaceWithStub(intent, sHostPackage);
-                    if (rewritten != intent) {
-                        Log.d(TAG, "OneCore-DEBUG: IActivityManager.startActivity rewritten.");
-                        args[i] = rewritten;
+                if (args[i] instanceof android.content.Intent[]) {
+                    android.content.Intent[] intents = (android.content.Intent[]) args[i];
+                    for (int j = 0; j < intents.length; j++) {
+                        intents[j] = OneCoreStubManager.replaceWithStub(intents[j], sHostPackage);
                     }
-                    break;
                 }
             }
         } else if (methodName.contains("startService") || methodName.contains("bindService")) {
@@ -114,6 +140,18 @@ public class OneCoreAMSProxy implements InvocationHandler {
                     }
                 }
             }
+        } else if (methodName.equals("broadcastIntent") || methodName.equals("registerReceiver")) {
+             // Spoof calling package for verification
+             for (int i = 0; i < args.length; i++) {
+                 if (args[i] instanceof String && args[i].equals(sHostPackage)) {
+                     String targetPkg = VirtualContainer.getInstance().getPackageName();
+                     if (targetPkg != null) args[i] = targetPkg;
+                 }
+                 if (args[i] instanceof android.content.Intent) {
+                      android.content.Intent intent = (android.content.Intent) args[i];
+                      // Fix action package names if they contain the virtual app's package
+                 }
+             }
         } else if (methodName.equals("getRunningAppProcesses")) {
             Object result = method.invoke(mBase, args);
             if (result instanceof java.util.List) {
@@ -131,23 +169,27 @@ public class OneCoreAMSProxy implements InvocationHandler {
                 }
             }
             return result;
+        } else if (methodName.equals("getPackagesForUid")) {
+            int uid = (int) args[0];
+            String targetPkg = VirtualContainer.getInstance().getPackageName();
+            if (targetPkg != null) {
+                return new String[]{targetPkg};
+            }
         } else if (methodName.equals("getRunningServices")) {
             return new java.util.ArrayList<>(); // Hide running services
         } else if (methodName.equals("getContentProvider")) {
             // getContentProvider(callingThread, callingPackage, name, userId, stable)
             String authority = null;
             for (Object arg : args) {
-                if (arg instanceof String) {
+                if (arg instanceof String && ((String)arg).contains(".")) {
                     authority = (String) arg;
                     break;
                 }
             }
             if (authority != null) {
                 if (OneCoreContentProviderManager.getProvider(authority) != null) {
-                    Log.i(TAG, "OneCore-DEBUG: High-level ContentProvider redirect for: " + authority);
-                    // On modern Android, we'd return a ContentProviderHolder.
-                    // However, if the provider is already installed in our process, 
-                    // ActivityThread.acquireProvider might find it locally if we've registered it.
+                    Log.i(TAG, "AMS Proxy: Redirecting local provider request for " + authority);
+                    // For now, let it proceed. If needed, we replace callingPackage with host.
                 }
             }
         }

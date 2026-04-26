@@ -36,12 +36,10 @@ public class OneCoreHCallback implements Handler.Callback {
                 handleBindApplication(msg.obj);
             }
         } catch (Throwable t) {
-            Log.e(TAG, "Error in HCallback", t);
+            Log.e(TAG, "Error in HCallback: " + msg.what, t);
         }
         
-        // Let the base handler process the message
-        mBase.handleMessage(msg);
-        return true; 
+        return false; // Return false to let mH handle it normally after our interception
     }
 
     private void handleBindApplication(Object data) {
@@ -49,12 +47,28 @@ public class OneCoreHCallback implements Handler.Callback {
         SafeExecutionManager.run("H-Handler BindApp", () -> {
             try {
                 android.content.pm.ApplicationInfo ai = (android.content.pm.ApplicationInfo) ReflectionHelper.getFieldValue(data, "appInfo");
-                if (ai != null && !ai.packageName.equals(com.onecore.sdk.OneCoreSDK.getContext().getPackageName())) {
-                    // This is likely our virtual app being bound!
-                    Log.i(TAG, "OneCore-DEBUG: H-Handler detected BindApplication for: " + ai.packageName);
-                    // We can swap deeper fields here if needed.
+                String targetPkg = VirtualContainer.getInstance().getPackageName();
+                
+                if (ai != null && targetPkg != null && ai.packageName.equals(targetPkg)) {
+                    Log.i(TAG, ">>> H-Handler BIND_APPLICATION for virtual: " + targetPkg);
+                    
+                    // Replace LoadedApk in AppBindData
+                    Object loadedApk = OneCoreLoadedApkManager.getLoadedApk(
+                        com.onecore.sdk.OneCoreSDK.getContext(),
+                        VirtualContainer.getInstance().getApkPath(),
+                        targetPkg,
+                        VirtualContainer.getInstance().getClassLoader(),
+                        VirtualContainer.getInstance().getResources()
+                    );
+                    
+                    if (loadedApk != null) {
+                        ReflectionHelper.setFieldValue(data, loadedApk, "info");
+                        Log.d(TAG, "LoadedApk swapped in AppBindData successfully.");
+                    }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to patch BindApplication", e);
+            }
         });
     }
 
@@ -62,16 +76,24 @@ public class OneCoreHCallback implements Handler.Callback {
         if (transaction == null) return;
         
         try {
-            // Android 9-17 uses ClientTransaction
+            // Android 9+ uses ClientTransaction
+            // mActivityCallbacks contains a list of ClientTransactionItem
             List callbacks = (List) ReflectionHelper.getFieldValue(transaction, "mActivityCallbacks", "mCallbacks");
             if (callbacks != null) {
                 for (Object item : callbacks) {
                     String className = item.getClass().getName();
+                    // Check for LaunchActivityItem or standard ActivityLaunchItem
                     if (className.contains("LaunchActivityItem") || className.contains("ActivityLaunchItem")) {
                         Intent intent = (Intent) ReflectionHelper.getFieldValue(item, "mIntent");
                         redirectIntent(intent, item);
                     }
                 }
+            }
+            
+            // Also check LifecycleItem (e.g. ResumeActivityItem)
+            Object lifecycleItem = ReflectionHelper.getFieldValue(transaction, "mLifecycleItem");
+            if (lifecycleItem != null) {
+                // We might need to adjust based on state if it uses tokens we've swapped
             }
         } catch (Exception e) {
             // Log.d(TAG, "Not a ClientTransaction or reflection failed");

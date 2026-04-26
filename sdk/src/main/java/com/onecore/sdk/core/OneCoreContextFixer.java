@@ -29,12 +29,29 @@ public class OneCoreContextFixer {
             final Object contextImpl = baseContext;
             
             // 1. Fix Package Names and UID dynamically
-            ReflectionHelper.setFieldValue(contextImpl, packageName, "mPackageName", "mBasePackageName", "mOpPackageName");
+            String[] fields = {"mPackageName", "mBasePackageName", "mOpPackageName", "mAttributionTag", "mAttributionSource"};
+            for (String field : fields) {
+                try {
+                    ReflectionHelper.setFieldValue(contextImpl, packageName, field);
+                } catch (Exception ignored) {}
+            }
             
-            // Fix mBase link in ContextImpl for newer Android versions
-            try {
-                ReflectionHelper.setFieldValue(contextImpl, packageName, "mBasePackageName");
-            } catch (Exception ignored) {}
+            // Fix AttributionSource (Android 12+)
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                try {
+                    Object attributionSource = ReflectionHelper.getFieldValue(contextImpl, "mAttributionSource");
+                    if (attributionSource != null) {
+                        ReflectionHelper.setFieldValue(attributionSource, packageName, "mPackageName");
+                    }
+                } catch (Exception ignored) {}
+            }
+            
+            // Fix PackageName in ContextWrapper (e.g. Application, Activity)
+            if (context instanceof android.content.ContextWrapper) {
+                 try {
+                     ReflectionHelper.setFieldValue(context, packageName, "mBasePackageName", "mOpPackageName");
+                 } catch (Exception ignored) {}
+            }
             
             // Fix Storage Paths
             File dataDir = context.getDir("v_data_" + packageName, Context.MODE_PRIVATE);
@@ -66,10 +83,12 @@ public class OneCoreContextFixer {
                 
                 // Fix AssetManager specifically for Android 10+
                 try {
-                    Object assetManager = virtualRes.getAssets();
+                    android.content.res.AssetManager assetManager = virtualRes.getAssets();
                     ReflectionHelper.setFieldValue(contextImpl, assetManager, "mAssets");
+                    // CRITICAL: Ensure the APK path is in the AssetManager used by this context
+                    ReflectionHelper.invokeMethod(assetManager, "addAssetPath", VirtualContainer.getInstance().getApkPath());
                 } catch (Exception e) {
-                    Log.w(TAG, "Failed to inject AssetManager specifically");
+                    Log.w(TAG, "Failed to inject or update AssetManager");
                 }
                 
                 // CRITICAL: Clone LayoutInflater and inject back

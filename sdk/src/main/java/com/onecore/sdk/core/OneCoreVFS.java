@@ -24,6 +24,10 @@ public class OneCoreVFS {
             mRedirects.put("/Android/data/" + packageName, "/sdcard/Android/data/" + packageName);
             mRedirects.put("/storage/emulated/0/Android/obb/" + packageName, "/sdcard/Android/obb/" + packageName);
             mRedirects.put("/storage/emulated/0/Android/data/" + packageName, "/sdcard/Android/data/" + packageName);
+            mRedirects.put("/storage/self/primary/Android/obb/" + packageName, "/sdcard/Android/obb/" + packageName);
+            mRedirects.put("/storage/self/primary/Android/data/" + packageName, "/sdcard/Android/data/" + packageName);
+            mRedirects.put("/mnt/shell/emulated/0/Android/obb/" + packageName, "/sdcard/Android/obb/" + packageName);
+            mRedirects.put("/data/media/0/Android/obb/" + packageName, "/sdcard/Android/obb/" + packageName);
             
             // Critical for UE4: Redirect the base OBB dir to search within sandbox
             mRedirects.put("/obb/" + packageName, "/sdcard/Android/obb/" + packageName);

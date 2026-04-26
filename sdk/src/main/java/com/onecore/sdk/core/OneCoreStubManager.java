@@ -57,6 +57,11 @@ public class OneCoreStubManager {
             stubIntent.setClassName(hostPackage, stubClass);
             stubIntent.putExtra("target_activity", targetClass);
             stubIntent.putExtra("target_package", targetPkg);
+            // Include application class if known
+            android.content.pm.ApplicationInfo vAi = VirtualContainer.getInstance().getAppInfo();
+            if (vAi != null && vAi.className != null) {
+                stubIntent.putExtra("target_application", vAi.className);
+            }
             
             // Pass APK path for child process initialization
             String apkPath = VirtualContainer.getInstance().getApkPath();

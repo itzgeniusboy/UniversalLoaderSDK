@@ -26,13 +26,20 @@ public class OneCoreContentProviderManager {
             }
             
             Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-            Method currentActivityThreadMethod = activityThreadClass.getDeclaredMethod("currentActivityThread");
-            currentActivityThreadMethod.setAccessible(true);
-            Object activityThread = currentActivityThreadMethod.invoke(null);
+            Object activityThread = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+            
+            Object app = VirtualContainer.getInstance().getTargetApplication();
+            if (app == null) {
+                // If app is not bound yet, we search for mInitialApplication in ActivityThread
+                app = ReflectionHelper.getFieldValue(activityThread, "mInitialApplication");
+            }
+            
+            if (app == null) app = context.getApplicationContext();
 
             // On modern Android, installContentProviders is called within ActivityThread
-            ReflectionHelper.invokeMethod(activityThread, "installContentProviders", 
-                ReflectionHelper.getFieldValue(activityThread, "mInitialApplication"), Arrays.asList(providers));
+            // Method signature: installContentProviders(Context context, List<ProviderInfo> providers)
+            ReflectionHelper.invokeMethod(activityThread, "installContentProviders", app, Arrays.asList(providers));
+            Log.i(TAG, "Content Providers installed successfully.");
         } catch (Exception e) {
             Log.e(TAG, "Failed to install virtual providers", e);
         }

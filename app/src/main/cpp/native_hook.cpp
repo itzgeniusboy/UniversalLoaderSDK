@@ -28,15 +28,39 @@ static ssize_t (*orig_readlink)(const char *pathname, char *buf, size_t bufsiz) 
 static void* (*orig_opendir)(const char *name) = nullptr;
 static void* (*orig_opendir2)(const char *name, int flags) = nullptr;
 static int (*orig_execve)(const char *filename, char *const argv[], char *const envp[]) = nullptr;
+static void* (*orig_dlopen)(const char* filename, int flags) = nullptr;
+static void* (*orig_dlopen_ext)(const char* filename, int flags, const void* extinfo) = nullptr;
+static FILE* (*orig_fopen)(const char* filename, const char* mode) = nullptr;
+static pid_t (*orig_getppid)() = nullptr;
+
+// --- EGL Hooks ---
+static const char* (*orig_glGetString)(int name) = nullptr;
+const char* my_glGetString(int name) {
+    if (name == 0x1F00) return "Qualcomm"; // GL_VENDOR
+    if (name == 0x1F01) return "Adreno (TM) 650"; // GL_RENDERER
+    return orig_glGetString(name);
+}
 
 /**
  * Path Redirection Engine for BGMI Sandbox.
- * Maps original paths to the virtual session root.
  */
 static std::string redirect_path(const char* path) {
     if (!path || g_virtual_root.empty()) return path ? path : "";
     
     std::string s_path(path);
+    
+    // Auto-rewrite lib paths if they point to system or host but should be in sandbox
+    if (s_path.find("/data/app/") != std::string::npos && s_path.find("/lib/") != std::string::npos) {
+         size_t last_slash = s_path.find_last_of("/");
+         if (last_slash != std::string::npos) {
+             std::string lib_name = s_path.substr(last_slash + 1);
+             std::string v_lib_path = g_virtual_root + "/v_lib/" + lib_name;
+             struct stat st;
+             if (orig_stat && orig_stat(v_lib_path.c_str(), &st) == 0) {
+                 return v_lib_path;
+             }
+         }
+    }
     
     // Normalize path: handle double slashes and trailing slashes
     while (s_path.find("//") != std::string::npos) {
@@ -44,6 +68,10 @@ static std::string redirect_path(const char* path) {
     }
     
     // Anti-Detection: Proc Spoofing
+    if (s_path == "/proc/self/exe") {
+        return "/system/bin/app_process"; // Simulated for anti-detection or return target APK
+    }
+
     if (s_path == "/proc/self/cmdline" || s_path == "/proc/cmdline") {
         std::string fake_cmd = g_virtual_root + "/proc_cmdline";
         FILE* f = fopen(fake_cmd.c_str(), "w");
@@ -52,6 +80,43 @@ static std::string redirect_path(const char* path) {
             fclose(f);
         }
         return fake_cmd;
+    }
+
+    if (s_path == "/proc/self/maps" || s_path == "/proc/maps") {
+        // We redirect maps to a filtered version that hides 'onecore' and 'v_lib'
+        std::string fake_maps = g_virtual_root + "/proc_maps";
+        FILE* original = fopen("/proc/self/maps", "r");
+        FILE* filtered = fopen(fake_maps.c_str(), "w");
+        if (original && filtered) {
+            char line[1024];
+            while (fgets(line, sizeof(line), original)) {
+                if (strstr(line, "onecore") == nullptr && strstr(line, "v_lib") == nullptr) {
+                    fputs(line, filtered);
+                }
+            }
+            fclose(original);
+            fclose(filtered);
+        }
+        return fake_maps;
+    }
+
+    if (s_path == "/proc/self/status") {
+        std::string fake_status = g_virtual_root + "/proc_status";
+        FILE* original = fopen("/proc/self/status", "r");
+        FILE* filtered = fopen(fake_status.c_str(), "w");
+        if (original && filtered) {
+            char line[1024];
+            while (fgets(line, sizeof(line), original)) {
+                if (strstr(line, "TracerPid:") != nullptr) {
+                    fputs("TracerPid:\t0\n", filtered);
+                } else {
+                    fputs(line, filtered);
+                }
+            }
+            fclose(original);
+            fclose(filtered);
+        }
+        return fake_status;
     }
 
     // 1. Data Dir Redirection (/data/user/0/... or /data/data/...)
@@ -170,6 +235,37 @@ int my_execve(const char *filename, char *const argv[], char *const envp[]) {
     return orig_execve(filename, argv, envp);
 }
 
+void* my_dlopen_ext(const char* filename, int flags, const void* extinfo) {
+    if (filename) {
+        std::string path = redirect_path(filename);
+        return orig_dlopen_ext(path.c_str(), flags, extinfo);
+    }
+    return orig_dlopen_ext(filename, flags, extinfo);
+}
+
+void* my_dlopen(const char* filename, int flags) {
+    if (filename) {
+        std::string path = redirect_path(filename);
+        if (path != filename) {
+            LOGI("HOOK: dlopen redirected %s -> %s", filename, path.c_str());
+        }
+        return orig_dlopen(path.c_str(), flags);
+    }
+    return orig_dlopen(filename, flags);
+}
+
+FILE* my_fopen(const char* filename, const char* mode) {
+    if (filename) {
+        std::string path = redirect_path(filename);
+        return orig_fopen(path.c_str(), mode);
+    }
+    return orig_fopen(filename, mode);
+}
+
+pid_t my_getppid() {
+    return 1; // System process parent
+}
+
 // --- JNI Implementation for NativeHookManager ---
 
 extern "C" JNIEXPORT void JNICALL
@@ -183,6 +279,7 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
 
     void* libc = dlopen("libc.so", RTLD_NOW);
     if (libc) {
+        DobbyHook(dlsym(libc, "fopen"), (void*)my_fopen, (void**)&orig_fopen);
         DobbyHook(dlsym(libc, "open"), (void*)my_open, (void**)&orig_open);
         DobbyHook(dlsym(libc, "openat"), (void*)my_openat, (void**)&orig_openat);
         DobbyHook(dlsym(libc, "access"), (void*)my_access, (void**)&orig_access);
@@ -193,12 +290,29 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
         DobbyHook(dlsym(libc, "readlink"), (void*)my_readlink, (void**)&orig_readlink);
         DobbyHook(dlsym(libc, "opendir"), (void*)my_opendir, (void**)&orig_opendir);
         DobbyHook(dlsym(libc, "execve"), (void*)my_execve, (void**)&orig_execve);
+        DobbyHook(dlsym(libc, "getppid"), (void*)my_getppid, (void**)&orig_getppid);
         
         void* opendir2_ptr = dlsym(libc, "__opendir2");
         if (opendir2_ptr) DobbyHook(opendir2_ptr, (void*)my_opendir2, (void**)&orig_opendir2);
         
         LOGI("Extended Native Hooks (IO + PROC + EXEC) INSTALLED.");
         dlclose(libc);
+    }
+
+    void* libdl = dlopen("libdl.so", RTLD_NOW);
+    if (libdl) {
+        void* dlopen_ptr = dlsym(libdl, "dlopen");
+        if (dlopen_ptr) DobbyHook(dlopen_ptr, (void*)my_dlopen, (void**)&orig_dlopen);
+        
+        void* dlopen_ext_ptr = dlsym(libdl, "android_dlopen_ext");
+        if (dlopen_ext_ptr) DobbyHook(dlopen_ext_ptr, (void*)my_dlopen_ext, (void**)&orig_dlopen_ext);
+        dlclose(libdl);
+    }
+    
+    void* libgles = dlopen("libGLESv2.so", RTLD_NOW);
+    if (libgles) {
+        DobbyHook(dlsym(libgles, "glGetString"), (void*)my_glGetString, (void**)&orig_glGetString);
+        dlclose(libgles);
     }
 
     env->ReleaseStringUTFChars(virtual_root, v_root);
@@ -247,17 +361,28 @@ Java_com_onecore_sdk_NativeHook_writeMemoryNative(JNIEnv* env, jobject obj, jlon
 }
 
 // --- UID Spoofing Hook ---
+static uid_t g_fake_uid = 10100;
 static uid_t (*orig_getuid)() = nullptr;
+static uid_t (*orig_geteuid)() = nullptr;
+
 uid_t my_getuid() {
-    return 10100; // Simulated sandbox UID
+    return g_fake_uid;
+}
+
+uid_t my_geteuid() {
+    return g_fake_uid;
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_onecore_sdk_core_UidSpoofing_applyNative(JNIEnv* env, jclass clazz, jint fakeUid) {
+    g_fake_uid = (uid_t)fakeUid;
     void* libc = dlopen("libc.so", RTLD_NOW);
     if (libc) {
         DobbyHook(dlsym(libc, "getuid"), (void*)my_getuid, (void**)&orig_getuid);
-        DobbyHook(dlsym(libc, "getcallinguid"), (void*)my_getuid, nullptr);
+        DobbyHook(dlsym(libc, "geteuid"), (void*)my_geteuid, (void**)&orig_geteuid);
+        // Some games use getcallinguid from binder, but that's usually at service level.
+        // We'll hook getuid and geteuid which are common in native layer.
+        LOGI("Native UID Spoof applied: %d", fakeUid);
         dlclose(libc);
     }
 }

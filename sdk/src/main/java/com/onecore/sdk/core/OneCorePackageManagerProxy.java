@@ -97,9 +97,16 @@ public class OneCorePackageManagerProxy implements InvocationHandler {
         
         if ("getPackageInfo".equals(methodName) || "getPackageInfoAsUser".equals(methodName)) {
             String pkg = (String) args[0];
+            int flags = (int) args[1];
             if (sHiddenPackages.contains(pkg)) return null;
             if (sVirtualPackages.containsKey(pkg)) {
-                return sVirtualPackages.get(pkg);
+                android.content.pm.PackageInfo info = sVirtualPackages.get(pkg);
+                // Dynamically apply signatures if requested
+                if ((flags & android.content.pm.PackageManager.GET_SIGNATURES) != 0 || 
+                    (flags & android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES) != 0) {
+                     OneCoreSignatureProxy.spoofSignature(info);
+                }
+                return info;
             }
             // Hardcoded fallback for critical game dependencies
             if ("com.google.android.gms".equals(pkg) || "com.android.vending".equals(pkg)) {

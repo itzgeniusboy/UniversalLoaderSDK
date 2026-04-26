@@ -82,28 +82,17 @@ public class OneCoreInstrumentation extends Instrumentation {
         
         String targetActivity = intent.getStringExtra("target_activity");
         String targetPkg = intent.getStringExtra("target_package");
-        String targetApk = intent.getStringExtra("target_apk_path");
 
-        if (targetActivity != null && targetPkg != null) {
+        if (targetPkg != null && targetActivity != null) {
             VirtualContainer container = VirtualContainer.getInstance();
-            
-            // Auto-init in child process if needed
-            if (container.getClassLoader() == null && targetApk != null) {
-                Log.i(TAG, "OneCore-DEBUG: Child process initializing virtual environment for " + targetPkg);
-                Context context = com.onecore.sdk.OneCoreSDK.getContext();
-                if (context != null) {
-                    container.installApk(context, targetApk, targetPkg);
-                }
-            }
-
             ClassLoader virtualCl = container.getClassLoader();
+            
             if (virtualCl != null) {
                 try {
-                    Log.d(TAG, "OneCore-DEBUG: Instantiating virtual activity: " + targetActivity);
+                    Log.d(TAG, "OneCore-DEBUG: Instantiating activity from virtual ClassLoader: " + targetActivity);
                     return mBase.newActivity(virtualCl, targetActivity, intent);
                 } catch (Exception e) {
-                    Log.e(TAG, "!!! OneCore-ERROR: Failed to instantiate virtual activity: " + targetActivity, e);
-                    throw new ClassNotFoundException("Virtual Activity not found: " + targetActivity, e);
+                    Log.e(TAG, "Failed virtual instantiation, falling back to provided CL", e);
                 }
             }
         }
@@ -114,13 +103,19 @@ public class OneCoreInstrumentation extends Instrumentation {
     @Override
     public void callApplicationOnCreate(android.app.Application app) {
         String pkg = app.getPackageName();
-        if (pkg != null && !pkg.equals(VirtualContainer.getInstance().getAppInfo() == null ? "" : VirtualContainer.getInstance().getAppInfo().packageName)) {
-            // This is the host app, do nothing special
-        } else {
-             // If this is the virtual app...
-             OneCoreContextFixer.fixContext(app, pkg);
+        VirtualContainer container = VirtualContainer.getInstance();
+        
+        // If this is our virtual application instance
+        if (app == container.getTargetApplication()) {
+            Log.i(TAG, ">>> callApplicationOnCreate: Initializing Virtual Application for " + pkg);
+            OneCoreContextFixer.fixContext(app, container.getPackageName());
         }
-        mBase.callApplicationOnCreate(app);
+        
+        try {
+            mBase.callApplicationOnCreate(app);
+        } catch (Exception e) {
+            Log.e(TAG, "Application.onCreate crashed", e);
+        }
     }
 
     @Override

@@ -24,6 +24,9 @@ public class OneCoreRenderingFixer {
             // 1. Ensure hardware acceleration is truly on
             window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
             
+            // Force Landscape for Games if not already set (BGMI requirement)
+            activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+            
             // 2. Clear translucent flags if they leaked from stub
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);

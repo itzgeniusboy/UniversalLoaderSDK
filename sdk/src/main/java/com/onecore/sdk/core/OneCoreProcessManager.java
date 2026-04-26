@@ -22,6 +22,25 @@ public class OneCoreProcessManager {
         return mPackageProcessMap.get(packageName);
     }
     
+    public static void spoofProcessName(String targetProcessName) {
+        SafeExecutionManager.run("Process Spoof", () -> {
+            try {
+                Object activityThread = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+                if (activityThread != null) {
+                    ReflectionHelper.setFieldValue(activityThread, targetProcessName, "mProcessName");
+                }
+                
+                // Also spoof for AppGlobals
+                Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+                ReflectionHelper.setFieldValue(null, activityThreadClass, "sCurrentProcessName", targetProcessName);
+                
+                Log.i(TAG, "Process name spoofed to: " + targetProcessName);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to spoof process name", e);
+            }
+        });
+    }
+
     public static String getProcessName() {
         // Return current process name (simulated check)
         return "virtual_process_" + Process.myPid();
