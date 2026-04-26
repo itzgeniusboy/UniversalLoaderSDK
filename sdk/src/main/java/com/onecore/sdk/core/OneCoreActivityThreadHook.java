@@ -21,7 +21,7 @@ public class OneCoreActivityThreadHook {
             OneCoreHiddenApiFixer.bypass();
             
             Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-            Object activityThread = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+            Object activityThread = ReflectionHelper.invokeMethod(activityThreadClass, "currentActivityThread");
             if (activityThread == null) {
                 // Fallback attempt
                 Method m = activityThreadClass.getDeclaredMethod("currentActivityThread");

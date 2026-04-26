@@ -3,32 +3,38 @@ package com.onecore.sdk.utils;
 import android.util.Log;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
 
 /**
  * Enhanced Reflection Utility for OneCore SDK.
- * Supports recursive field searching and fallback field names.
+ * Supports recursive field searching, fallback field names, and static/instance handling.
  */
 public class ReflectionHelper {
     private static final String TAG = "OneCore-Reflection";
 
     /**
-     * Set a field value on a target object, searching through classes and fallbacks.
+     * Set a field value on a target. 
+     * If target is a Class, it treats it as a static field on that class.
+     * If target is null, it returns immediately.
      */
     public static void setFieldValue(Object target, Object value, String... fieldNames) {
         if (target == null || fieldNames == null || fieldNames.length == 0) return;
 
-        Class<?> clazz = target.getClass();
+        Class<?> clazz = (target instanceof Class) ? (Class<?>) target : target.getClass();
+        Object instance = (target instanceof Class) ? null : target;
+
         while (clazz != null && !clazz.equals(Object.class)) {
             for (String name : fieldNames) {
                 try {
                     Field field = clazz.getDeclaredField(name);
                     field.setAccessible(true);
-                    field.set(target, value);
-                    return; // Success
+                    field.set(instance, value);
+                    return; 
                 } catch (NoSuchFieldException e) {
-                    // Try next fallback name or move to superclass
+                    // Try next fallback
                 } catch (Exception e) {
-                    Log.e(TAG, "Failed to set field " + name + " on " + target.getClass().getName(), e);
+                    Log.e(TAG, "Failed to set field " + name + " on " + clazz.getName(), e);
                 }
             }
             clazz = clazz.getSuperclass();
@@ -36,22 +42,25 @@ public class ReflectionHelper {
     }
 
     /**
-     * Get a field value on a target object.
+     * Get a field value from a target.
+     * If target is a Class, it treats it as a static field.
      */
     public static Object getFieldValue(Object target, String... fieldNames) {
         if (target == null || fieldNames == null || fieldNames.length == 0) return null;
 
-        Class<?> clazz = target.getClass();
+        Class<?> clazz = (target instanceof Class) ? (Class<?>) target : target.getClass();
+        Object instance = (target instanceof Class) ? null : target;
+
         while (clazz != null && !clazz.equals(Object.class)) {
             for (String name : fieldNames) {
                 try {
                     Field field = clazz.getDeclaredField(name);
                     field.setAccessible(true);
-                    return field.get(target);
+                    return field.get(instance);
                 } catch (NoSuchFieldException e) {
-                    // Try next fallback
+                    // Try next
                 } catch (Exception e) {
-                    Log.e(TAG, "Failed to get field " + name + " on " + target.getClass().getName(), e);
+                    Log.e(TAG, "Failed to get field " + name + " from " + clazz.getName(), e);
                 }
             }
             clazz = clazz.getSuperclass();
@@ -60,35 +69,43 @@ public class ReflectionHelper {
     }
 
     /**
-     * Invoke a method on a target object.
+     * Special case for static fields where class name is provided as string.
      */
-    public static Object invokeMethod(Object target, String methodName, Object... args) {
-        if (target == null) return null;
-        
-        Class<?>[] argTypes = null;
-        if (args != null && args.length > 0) {
-            argTypes = new Class[args.length];
-            for (int i = 0; i < args.length; i++) {
-                argTypes[i] = args[i] != null ? args[i].getClass() : Object.class;
-            }
-        }
-
+    public static Object getStaticFieldValue(String className, String... fieldNames) {
         try {
-            Method method = findMethod(target.getClass(), methodName, argTypes);
-            if (method != null) {
-                method.setAccessible(true);
-                return method.invoke(target, args);
-            }
+            return getFieldValue(Class.forName(className), fieldNames);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to invoke method " + methodName + " on " + target.getClass().getName(), e);
+            return null;
         }
-        return null;
     }
 
     /**
-     * Static version of invokeMethod for static methods.
+     * Invoke a method on a target.
+     * If target is a Class, it treats it as a static method on that class if instance lookup fails.
      */
-    public static Object invokeStaticMethod(Class<?> clazz, String methodName, Object... args) {
+    public static Object invokeMethod(Object target, String methodName, Object... args) {
+        if (methodName == null) return null;
+        
+        Class<?> clazz;
+        Object instance;
+        
+        if (target == null) {
+            // If target is null, we might be looking for a static method on ActivityThread
+            // by default in our SDK logic.
+            try {
+                clazz = Class.forName("android.app.ActivityThread");
+                instance = null;
+            } catch (Exception e) {
+                return null;
+            }
+        } else if (target instanceof Class) {
+            clazz = (Class<?>) target;
+            instance = null;
+        } else {
+            clazz = target.getClass();
+            instance = target;
+        }
+
         Class<?>[] argTypes = null;
         if (args != null && args.length > 0) {
             argTypes = new Class[args.length];
@@ -101,22 +118,32 @@ public class ReflectionHelper {
             Method method = findMethod(clazz, methodName, argTypes);
             if (method != null) {
                 method.setAccessible(true);
-                return method.invoke(null, args);
+                return method.invoke(instance, args);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Failed to invoke static method " + methodName + " on " + clazz.getName(), e);
+            Log.e(TAG, "Failed to invoke method " + methodName + " on " + clazz.getName(), e);
         }
         return null;
+    }
+
+    /**
+     * Helper for specific static method calls by class name string.
+     */
+    public static Object invokeMethod(String className, String methodName, Object... args) {
+        try {
+            return invokeMethod(Class.forName(className), methodName, args);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public static Method findMethod(Class<?> clazz, String name, Class<?>... parameterTypes) {
         Class<?> searchType = clazz;
         while (searchType != null) {
-            Method[] methods = searchType.isInterface() ? searchType.getMethods() : searchType.getDeclaredMethods();
+            Method[] methods = searchType.getDeclaredMethods();
             for (Method method : methods) {
                 if (method.getName().equals(name)) {
-                    // Loose type matching for simplicity in SDK hooks
-                    if (parameterTypes == null || method.getParameterTypes().length == parameterTypes.length) {
+                    if (parameterTypes == null || parameterTypesMatch(method.getParameterTypes(), parameterTypes)) {
                         return method;
                     }
                 }
@@ -124,5 +151,22 @@ public class ReflectionHelper {
             searchType = searchType.getSuperclass();
         }
         return null;
+    }
+
+    private static boolean parameterTypesMatch(Class<?>[] declaredTypes, Class<?>[] passedTypes) {
+        if (declaredTypes.length != passedTypes.length) return false;
+        for (int i = 0; i < declaredTypes.length; i++) {
+            if (passedTypes[i] == null || declaredTypes[i].isAssignableFrom(passedTypes[i])) {
+                continue;
+            }
+            // Basic primitive handling
+            if (declaredTypes[i].isPrimitive()) {
+                if (declaredTypes[i] == int.class && passedTypes[i] == Integer.class) continue;
+                if (declaredTypes[i] == boolean.class && passedTypes[i] == Boolean.class) continue;
+                if (declaredTypes[i] == long.class && passedTypes[i] == Long.class) continue;
+            }
+            return false;
+        }
+        return true;
     }
 }

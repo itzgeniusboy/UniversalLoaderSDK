@@ -161,7 +161,7 @@ public class OneCoreContextFixer {
 
     private static void injectLoadedApk(Object contextImpl, String packageName) {
         SafeExecutionManager.run("LoadedApk Injection", () -> {
-            Object activityThread = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+            Object activityThread = ReflectionHelper.invokeMethod("android.app.ActivityThread", "currentActivityThread");
             if (activityThread == null) return;
 
             Map<String, WeakReference<Object>> mPackages = (Map) ReflectionHelper.getFieldValue(activityThread, "mPackages");

@@ -26,7 +26,7 @@ public class OneCoreLoadedApkManager {
 
         try {
             Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-            Object activityThread = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+            Object activityThread = ReflectionHelper.invokeMethod(activityThreadClass, "currentActivityThread");
             
             // Get mPackages and mResourcePackages maps
             Map mPackages = (Map) ReflectionHelper.getFieldValue(activityThread, "mPackages");
@@ -44,7 +44,7 @@ public class OneCoreLoadedApkManager {
             ai.nativeLibraryDir = libDir.getAbsolutePath();
             
             // CompatibilityInfo
-            Object compatInfo = ReflectionHelper.getFieldValue(null, "android.content.res.CompatibilityInfo", "DEFAULT_COMPATIBILITY_INFO");
+            Object compatInfo = ReflectionHelper.getStaticFieldValue("android.content.res.CompatibilityInfo", "DEFAULT_COMPATIBILITY_INFO");
             
             // getPackageInfoNoCheck
             Object loadedApk = ReflectionHelper.invokeMethod(activityThread, "getPackageInfoNoCheck", ai, compatInfo);
@@ -77,7 +77,7 @@ public class OneCoreLoadedApkManager {
                 // CRITICAL: Patch ResourcesManager too (Global Resource Cache)
                 try {
                     Class<?> rmClass = Class.forName("android.app.ResourcesManager");
-                    Object rm = ReflectionHelper.invokeMethod(null, rmClass, "getInstance");
+                    Object rm = ReflectionHelper.invokeMethod(rmClass, "getInstance");
                     if (rm != null) {
                         // For modern Android (9+), patching LoadedApk maps is usually enough,
                         // but games sometimes use Resources.getSystem() or other global accessors.

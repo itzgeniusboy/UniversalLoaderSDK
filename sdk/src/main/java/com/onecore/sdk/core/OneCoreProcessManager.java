@@ -4,6 +4,7 @@ import android.os.Process;
 import android.util.Log;
 import java.util.HashMap;
 import java.util.Map;
+import com.onecore.sdk.utils.ReflectionHelper;
 
 /**
  * Manages virtual process assignment for guest applications.
@@ -25,14 +26,14 @@ public class OneCoreProcessManager {
     public static void spoofProcessName(String targetProcessName) {
         SafeExecutionManager.run("Process Spoof", () -> {
             try {
-                Object activityThread = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+                Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+                Object activityThread = ReflectionHelper.invokeMethod(activityThreadClass, "currentActivityThread");
                 if (activityThread != null) {
                     ReflectionHelper.setFieldValue(activityThread, targetProcessName, "mProcessName");
                 }
                 
                 // Also spoof for AppGlobals
-                Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-                ReflectionHelper.setFieldValue(null, activityThreadClass, "sCurrentProcessName", targetProcessName);
+                ReflectionHelper.setFieldValue(activityThreadClass, targetProcessName, "sCurrentProcessName");
                 
                 Log.i(TAG, "Process name spoofed to: " + targetProcessName);
             } catch (Exception e) {

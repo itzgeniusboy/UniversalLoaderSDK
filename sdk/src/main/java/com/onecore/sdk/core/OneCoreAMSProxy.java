@@ -29,14 +29,16 @@ public class OneCoreAMSProxy implements InvocationHandler {
             if (SystemVersionManager.isAndroid10OrAbove()) {
                 try {
                     Class<?> atmClass = Class.forName("android.app.ActivityTaskManager");
-                    singleton = ReflectionHelper.getFieldValue(null, "IActivityTaskManagerSingleton");
+                    singleton = ReflectionHelper.getFieldValue(atmClass, "IActivityTaskManagerSingleton");
                 } catch (Exception ignored) {}
             }
             
             // Fallback to ActivityManager
             if (singleton == null) {
-                Class<?> amClass = Class.forName("android.app.ActivityManager");
-                singleton = ReflectionHelper.getFieldValue(null, "IActivityManagerSingleton", "gDefault");
+                try {
+                    Class<?> amClass = Class.forName("android.app.ActivityManager");
+                    singleton = ReflectionHelper.getFieldValue(amClass, "IActivityManagerSingleton", "gDefault");
+                } catch (Exception ignored) {}
             }
             
             if (singleton == null) {

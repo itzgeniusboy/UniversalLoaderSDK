@@ -125,7 +125,7 @@ public class OneCoreHCallback implements Handler.Callback {
                 VirtualContainer container = VirtualContainer.getInstance();
                 if (container.getClassLoader() == null) {
                     try {
-                        Object at = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+                        Object at = ReflectionHelper.invokeMethod("android.app.ActivityThread", "currentActivityThread");
                         android.app.Application app = (android.app.Application) ReflectionHelper.getFieldValue(at, "mInitialApplication");
                         if (app != null) {
                             Log.i(TAG, ">>> Performing Dynamic Process Initialization for: " + targetPkg);

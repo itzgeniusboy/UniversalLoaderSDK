@@ -9,6 +9,10 @@ import android.content.res.AssetManager;
 import android.content.res.Resources;
 import java.lang.reflect.Method;
 
+import com.onecore.sdk.core.SafeExecutionManager;
+import com.onecore.sdk.core.OneCoreProcessManager;
+import com.onecore.sdk.utils.ReflectionHelper;
+
 /**
  * Minimal Working Virtual Container Engine (Phase 2).
  * Handles APK Installation, Resources Injection, and Hooking.
