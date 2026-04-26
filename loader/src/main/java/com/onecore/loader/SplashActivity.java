@@ -69,20 +69,58 @@ public class SplashActivity extends Activity {
     private void checkOBB() {
         try {
             // Check for common PUBG/BGMI variants
-            String[] packages = {"com.pubg.imobile", "com.pubg.imbile", "com.tencent.ig", "com.tencent.tmgp.pubgmhd", "com.pubg.krmobile"};
+            String[] packages = {
+                "com.pubg.imobile", 
+                "com.pubg.imbile", 
+                "com.tencent.ig", 
+                "com.tencent.tmgp.pubgmhd", 
+                "com.pubg.krmobile",
+                "com.vng.pubgmobile",
+                "com.rekoo.pubgm"
+            };
+            
+            java.io.File obbRoot = new java.io.File(Environment.getExternalStorageDirectory(), "Android/obb");
+            if (!obbRoot.exists()) {
+                Log.e(TAG, "Critical: /Android/obb root not found!");
+                return;
+            }
+
             boolean found = false;
             for (String pkg : packages) {
-                java.io.File obb = new java.io.File(Environment.getExternalStorageDirectory(), "Android/obb/" + pkg);
-                if (obb.exists() && obb.listFiles() != null && obb.listFiles().length > 0) {
-                    Log.i(TAG, "FOUND OBB for: " + pkg);
-                    found = true;
-                    break;
+                java.io.File obbDir = new java.io.File(obbRoot, pkg);
+                if (obbDir.exists()) {
+                    Log.i(TAG, "Found OBB Directory: " + pkg);
+                    // Even if we can't list files due to Android 11+ restrictions, 
+                    // if the folder exists, it's a good sign.
+                    if (obbDir.isDirectory()) {
+                        found = true;
+                        break;
+                    }
                 }
             }
+
             if (!found) {
-                Toast.makeText(this, "LOG: No OBB found in /Android/obb/. Game may fail to start.", Toast.LENGTH_LONG).show();
+                // Last ditch effort: list all folders and see if any look like PUBG
+                java.io.File[] files = obbRoot.listFiles();
+                if (files != null) {
+                    for (java.io.File f : files) {
+                        if (f.isDirectory() && (f.getName().contains("pubg") || f.getName().contains("tencent"))) {
+                            Log.i(TAG, "Detected potential OBB folder: " + f.getName());
+                            found = true;
+                            break;
+                        }
+                    }
+                }
             }
-        } catch (Exception ignored) {}
+
+            if (!found) {
+                Toast.makeText(this, "LOG: No matching OBB folder found in /Android/obb/. Please check folder name.", Toast.LENGTH_LONG).show();
+            } else {
+                Log.i(TAG, "OBB detection successful.");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking OBB", e);
+        }
     }
 
     private void checkNextPermission() {
