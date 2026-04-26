@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
+import com.onecore.sdk.OneCoreSDK;
 import com.onecore.sdk.VirtualContainer;
 import com.onecore.sdk.utils.ReflectionHelper;
 import java.lang.reflect.Method;
@@ -34,7 +35,8 @@ public class OneCoreInstrumentation extends Instrumentation {
         Log.d(TAG, "OneCore-DEBUG: execStartActivity intercepted. Target pkg=" + (intent != null ? intent.getPackage() : "null"));
         
         // Rewrite intent for StubActivity
-        String hostPkg = (who != null) ? who.getPackageName() : (sContext != null ? sContext.getPackageName() : "com.onecore.loader");
+        Context context = (who != null) ? who : OneCoreSDK.getContext();
+        String hostPkg = (context != null) ? context.getPackageName() : "com.onecore.loader";
         intent = OneCoreStubManager.replaceWithStub(intent, hostPkg);
 
         final Intent finalIntent = intent;
