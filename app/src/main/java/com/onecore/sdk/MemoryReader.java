@@ -23,6 +23,16 @@ public class MemoryReader {
     }
 
     /**
+     * Powerful: Scans memory for a pattern (AOB Scanning).
+     */
+    public native long scanSignature(long start, long end, String signature);
+
+    /**
+     * Finds the base address of a loaded library (e.g., "libunity.so").
+     */
+    public native long findModuleBase(String moduleName);
+
+    /**
      * Reads memory. Redirects to virtual memory for apps in the container.
      */
     public byte[] readMemory(int pid, long address, int size) {

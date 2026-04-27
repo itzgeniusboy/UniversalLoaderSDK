@@ -37,6 +37,10 @@ public class NativeHookManager {
             new File(root, "external").mkdirs();
 
             initHooks(virtualRoot, packageName);
+            
+            // Initialize level-2 Binder Hooks
+            new NativeHook().installBinderHook();
+            
             hooksInstalled = true;
             Logger.i(TAG, "Virtual Syscall Layer: OPERATIONAL");
         } catch (Exception e) {

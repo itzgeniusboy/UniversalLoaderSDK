@@ -8,6 +8,18 @@
 #include <dlfcn.h>
 #include <sys/mman.h>
 #include "dobby.h"
+#include "BinderHook.h"
+#include "Hook/UnixFileSystemHook.h"
+#include "Hook/RuntimeHook.h"
+#include "JniHook/JniHook.h"
+#include "Utils/Stealth.h"
+#include "Utils/EnvironmentProtector.h"
+#include "Utils/KernelShield.h"
+#include "Utils/HiddenApiBypass.h"
+#include "Utils/ModuleScanner.h"
+#include "Hook/DexFileHook.h"
+#include "Hook/SocketHook.h"
+#include "KittyMemory/KittyMemory.h"
 
 #define TAG "OneCore-Native"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -285,6 +297,19 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
 
     LOGI("Initializing Sandbox IO Layer for: %s", p_name);
 
+    // Apply Stealth first
+    OneCore::enableStealthMode();
+    OneCore::bypassHiddenApi(env);
+
+    // Call modular hooks
+    OneCore::installFileSystemHooks();
+    OneCore::installRuntimeHooks();
+    OneCore::installJniHooks(env);
+    OneCore::installEnvironmentProtector();
+    OneCore::installDexHooks();
+    OneCore::installKernelShield();
+    OneCore::installSocketHooks();
+
     void* libc = dlopen("libc.so", RTLD_NOW);
     if (libc) {
         LOGI("Found libc.so, hooking symbols...");
@@ -417,4 +442,25 @@ Java_com_onecore_sdk_core_UidSpoofing_applyNative(JNIEnv* env, jclass clazz, jin
         LOGI("Native UID Spoof applied: %d", fakeUid);
         dlclose(libc);
     }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_onecore_sdk_NativeHook_installBinderHook(JNIEnv* env, jobject thiz) {
+    OneCore::installBinderHooks();
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_onecore_sdk_MemoryReader_findModuleBase(JNIEnv* env, jobject thiz, jstring module_name) {
+    const char* name = env->GetStringUTFChars(module_name, nullptr);
+    auto info = OneCore::findModule(name);
+    env->ReleaseStringUTFChars(module_name, name);
+    return (jlong)info.base;
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_onecore_sdk_MemoryReader_scanSignature(JNIEnv* env, jobject thiz, jlong start, jlong end, jstring signature) {
+    const char* sig = env->GetStringUTFChars(signature, nullptr);
+    uintptr_t result = KittyMemory::findSignature((uintptr_t)start, (uintptr_t)end, sig);
+    env->ReleaseStringUTFChars(signature, sig);
+    return (jlong)result;
 }

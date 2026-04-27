@@ -8,10 +8,30 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(onecore_native SHARED
         native_hook.cpp
         memory.cpp
+        BinderHook.cpp
+        Hook/UnixFileSystemHook.cpp
+        Hook/RuntimeHook.cpp
+        JniHook/JniHook.cpp
+        Utils/fake_dlfcn.cpp
+        Utils/Stealth.cpp
+        Utils/EnvironmentProtector.cpp
+        Utils/KernelShield.cpp
+        Utils/HiddenApiBypass.cpp
+        Utils/ModuleScanner.cpp
+        Hook/SocketHook.cpp
+        KittyMemory/KittyMemory.cpp
+        KittyMemory/MemoryPatch.cpp
+        Hook/DexFileHook.cpp
         dobby.c
 )
 
-target_include_directories(onecore_native PRIVATE .)
+target_include_directories(onecore_native PRIVATE 
+    .
+    Hook
+    Utils
+    JniHook
+    KittyMemory
+)
 
 find_library(log-lib log)
 find_library(android-lib android)

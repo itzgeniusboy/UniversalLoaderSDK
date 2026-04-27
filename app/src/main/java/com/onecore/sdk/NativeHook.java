@@ -50,4 +50,9 @@ public class NativeHook {
      * Advanced: Writes memory to another process.
      */
     public native boolean writeProcessMemory(int pid, long addr, byte[] buffer);
+
+    /**
+     * Installs low-level Binder transaction hooks.
+     */
+    public native void installBinderHook();
 }

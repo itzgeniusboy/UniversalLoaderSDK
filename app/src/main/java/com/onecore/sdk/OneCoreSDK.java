@@ -55,6 +55,16 @@ public class OneCoreSDK {
             SecurityManager.init(appContext);
             CrashHandler.getInstance().init(appContext);
             
+            // Setup Virtual Identity (Like BlackBox)
+            setupVirtualPackage(appContext);
+            
+            // Register Lifecycle Observer
+            if (appContext instanceof Application) {
+                ((Application) appContext).registerActivityLifecycleCallbacks(new com.onecore.sdk.core.VirtualAppLifecycle());
+            } else if (appContext.getApplicationContext() instanceof Application) {
+                ((Application) appContext.getApplicationContext()).registerActivityLifecycleCallbacks(new com.onecore.sdk.core.VirtualAppLifecycle());
+            }
+            
             try {
                 SDKLicense.getInstance().init(appContext, customerKey);
                 if (!SDKLicense.getInstance().isLicensed()) {
@@ -258,6 +268,23 @@ public class OneCoreSDK {
     public static void enableSignatureBypass(boolean enable) {
         if (!SDKLicense.getInstance().isLicensed()) return;
         SignatureBypass.apply(enable);
+    }
+
+    private static void setupVirtualPackage(Context context) {
+        try {
+            android.content.pm.PackageInfo info = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+            com.onecore.sdk.core.VirtualPackageManager.get().addVirtualPackage(info);
+            Logger.i(TAG, "Virtual Identity Registered: " + context.getPackageName());
+        } catch (Exception e) {
+            Logger.e(TAG, "Identity Registration Failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Core API to get Virtual Services (BlackBox style)
+     */
+    public static Object getVirtualService(String name) {
+        return com.onecore.sdk.core.VirtualServiceManager.getService(name);
     }
 
     private static void loadSandboxConfig() {
