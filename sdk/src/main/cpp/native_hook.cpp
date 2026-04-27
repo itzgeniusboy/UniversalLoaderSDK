@@ -7,6 +7,8 @@
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <sys/mman.h>
+#include <EGL/egl.h>
+#include <GLES2/gl2.h>
 #include "dobby.h"
 #include "BinderHook.h"
 #include "Hook/UnixFileSystemHook.h"
@@ -101,10 +103,10 @@ static uid_t (*orig_getgid)() = nullptr;
 static void* (*orig_ANativeWindow_fromSurface)(void* env, jobject surface) = nullptr;
 static void (*orig_ANativeWindow_acquire)(void* window) = nullptr;
 static void (*orig_ANativeWindow_release)(void* window) = nullptr;
-static void* (*orig_eglCreateWindowSurface)(void* dpy, void* config, void* win, const int *attrib_list) = nullptr;
-static int (*orig_eglMakeCurrent)(void* dpy, void* draw, void* read, void* ctx) = nullptr;
+static EGLSurface (*orig_eglCreateWindowSurface)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list) = nullptr;
+static EGLBoolean (*orig_eglMakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx) = nullptr;
 
-static EGLBoolean (*orig_eglSwapBuffers)(void* dpy, void* surface) = nullptr;
+static EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface) = nullptr;
 
 void* my_ANativeWindow_fromSurface(void* env, jobject surface) {
     if (g_in_hook) return orig_ANativeWindow_fromSurface(env, surface);
@@ -131,30 +133,30 @@ void my_ANativeWindow_release(void* window) {
     g_in_hook = false;
 }
 
-void* my_eglCreateWindowSurface(void* dpy, void* config, void* win, const int *attrib_list) {
+EGLSurface my_eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list) {
     if (g_in_hook) return orig_eglCreateWindowSurface(dpy, config, win, attrib_list);
     g_in_hook = true;
     log_step(5, "eglCreateWindowSurface START");
     LOGI("HOOK: eglCreateWindowSurface(win=%p)", win);
-    void* surface = orig_eglCreateWindowSurface(dpy, config, win, attrib_list);
-    if (!surface) LOGE("eglCreateWindowSurface FAILED");
+    EGLSurface surface = orig_eglCreateWindowSurface(dpy, config, win, attrib_list);
+    if (surface == EGL_NO_SURFACE) LOGE("eglCreateWindowSurface FAILED");
     else LOGI("eglCreateWindowSurface SUCCESS: %p", surface);
     g_in_hook = false;
     return surface;
 }
 
-int my_eglMakeCurrent(void* dpy, void* draw, void* read, void* ctx) {
+EGLBoolean my_eglMakeCurrent(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx) {
     if (g_in_hook) return orig_eglMakeCurrent(dpy, draw, read, ctx);
     g_in_hook = true;
     log_step(6, "eglMakeCurrent START");
-    int res = orig_eglMakeCurrent(dpy, draw, read, ctx);
+    EGLBoolean res = orig_eglMakeCurrent(dpy, draw, read, ctx);
     if (!res) LOGE("eglMakeCurrent FAILED");
     else LOGI("eglMakeCurrent SUCCESS");
     g_in_hook = false;
     return res;
 }
 
-EGLBoolean my_eglSwapBuffers(void* dpy, void* surface) {
+EGLBoolean my_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     if (g_in_hook) return orig_eglSwapBuffers(dpy, surface);
     g_in_hook = true;
     static int frame_count = 0;
@@ -733,7 +735,7 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
     }
 
     OneCore::installJniHooks(env);
-    OneCore::setupBinderHook();
+    OneCore::installBinderHooks();
 
     log_step(4, "Standard Library Hooks (LibC)");
     void* libc = dlopen("libc.so", RTLD_NOW);
@@ -773,13 +775,6 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
         dlclose(libdl);
     }
     
-    LOGI("Phase 5: Rendering Hooks (GLES)");
-    void* libgles = dlopen("libGLESv2.so", RTLD_NOW);
-    if (libgles) {
-        safe_hook(dlsym(libgles, "glGetString"), (void*)my_glGetString, (void**)&orig_glGetString, "glGetString");
-        dlclose(libgles);
-    }
-
     LOGI(">>> Native Engine Initialization COMPLETE for: %s <<<", p_name);
 
     env->ReleaseStringUTFChars(virtual_root, v_root);
