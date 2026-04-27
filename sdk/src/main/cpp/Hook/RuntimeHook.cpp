@@ -103,8 +103,6 @@ const char* suspicious[] = {
     "/system/xbin/su",
     "/sbin/su",
     "/system/bin/su",
-    "/proc/self/maps",
-    "/proc/self/status",
     "magisk",
     "xposed"
 };
@@ -153,10 +151,7 @@ FILE* rt_my_fopen(const char* path, const char* mode) {
     g_in_hook = true;
 
     if (path && (strstr(path, "/proc/") || strstr(path, "maps") || strstr(path, "status"))) {
-        LOGW("[RuntimeHook] Block fopen: %s", path);
-        g_in_hook = false;
-        errno = ENOENT;
-        return NULL;
+        LOGW("[RuntimeHook] fopen accessed internal path: %s - ALLOWING", path);
     }
 
     FILE* result = orig_fopen(path, mode);
@@ -168,8 +163,8 @@ int rt_my_access(const char* path, int mode) {
     if (g_in_hook) return orig_access(path, mode);
     g_in_hook = true;
 
-    if (path && (strstr(path, "su") || strstr(path, "magisk") || strstr(path, "xposed"))) {
-        LOGW("[RuntimeHook] Block access: %s", path);
+    if (path && (strstr(path, "/su") || strstr(path, "/bin/su") || strstr(path, "magisk") || strstr(path, "xposed"))) {
+        LOGW("[RuntimeHook] Block access to sensitive path: %s", path);
         g_in_hook = false;
         errno = ENOENT;
         return -1;
@@ -185,10 +180,7 @@ int rt_my_stat(const char* path, struct stat* buf) {
     g_in_hook = true;
 
     if (path && (strstr(path, "su") || strstr(path, "magisk"))) {
-        LOGW("[RuntimeHook] Block stat: %s", path);
-        g_in_hook = false;
-        errno = ENOENT;
-        return -1;
+        LOGW("[RuntimeHook] stat accessed suspicious path: %s - ALLOWING", path);
     }
 
     int result = orig_stat(path, buf);
@@ -197,8 +189,8 @@ int rt_my_stat(const char* path, struct stat* buf) {
 }
 
 long rt_my_ptrace(int request, pid_t pid, void* addr, void* data) {
-    LOGW("[RuntimeHook] ptrace blocked (request=%d, pid=%d)", request, pid);
-    return -1;
+    LOGW("[RuntimeHook] ptrace called (request=%d, pid=%d) - ALLOWING", request, pid);
+    return orig_ptrace(request, pid, addr, data);
 }
 
 void crash_handler(int sig, siginfo_t* info, void* context) {
