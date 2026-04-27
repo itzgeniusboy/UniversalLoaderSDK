@@ -48,7 +48,7 @@ static stat_t orig_stat = nullptr;
 typedef long (*ptrace_t)(int request, pid_t pid, void* addr, void* data);
 static ptrace_t orig_ptrace = nullptr;
 
-pid_t my_fork() {
+pid_t rt_my_fork() {
     if (g_in_hook) return orig_fork();
     g_in_hook = true;
     LOGI("Process tried to fork! Blocking for security.");
@@ -56,7 +56,7 @@ pid_t my_fork() {
     return -1; 
 }
 
-void* my_dlopen(const char* filename, int flag) {
+void* rt_my_dlopen(const char* filename, int flag) {
     if (g_in_hook) return orig_dlopen(filename, flag);
     g_in_hook = true;
     
@@ -79,7 +79,7 @@ void* my_dlopen(const char* filename, int flag) {
     return handle;
 }
 
-int my_system_property_get(const char* name, char* value) {
+int rt_my_system_property_get(const char* name, char* value) {
     if (g_in_hook) return orig_system_property_get(name, value);
     g_in_hook = true;
     
@@ -109,7 +109,7 @@ const char* suspicious[] = {
     "xposed"
 };
 
-int my_open(const char* pathname, int flags, ...) {
+int rt_my_open(const char* pathname, int flags, ...) {
     if (g_in_hook) {
         va_list args;
         va_start(args, flags);
@@ -140,15 +140,15 @@ int my_open(const char* pathname, int flags, ...) {
     return result;
 }
 
-uid_t my_getuid() {
+uid_t rt_my_getuid() {
     return 10000; // normal app UID
 }
 
-uid_t my_geteuid() {
+uid_t rt_my_geteuid() {
     return 10000;
 }
 
-FILE* my_fopen(const char* path, const char* mode) {
+FILE* rt_my_fopen(const char* path, const char* mode) {
     if (g_in_hook) return orig_fopen(path, mode);
     g_in_hook = true;
 
@@ -164,7 +164,7 @@ FILE* my_fopen(const char* path, const char* mode) {
     return result;
 }
 
-int my_access(const char* path, int mode) {
+int rt_my_access(const char* path, int mode) {
     if (g_in_hook) return orig_access(path, mode);
     g_in_hook = true;
 
@@ -180,7 +180,7 @@ int my_access(const char* path, int mode) {
     return result;
 }
 
-int my_stat(const char* path, struct stat* buf) {
+int rt_my_stat(const char* path, struct stat* buf) {
     if (g_in_hook) return orig_stat(path, buf);
     g_in_hook = true;
 
@@ -196,7 +196,7 @@ int my_stat(const char* path, struct stat* buf) {
     return result;
 }
 
-long my_ptrace(int request, pid_t pid, void* addr, void* data) {
+long rt_my_ptrace(int request, pid_t pid, void* addr, void* data) {
     LOGW("[RuntimeHook] ptrace blocked (request=%d, pid=%d)", request, pid);
     return -1;
 }
@@ -226,31 +226,31 @@ namespace OneCore {
         void* libc = dlopen("libc.so", RTLD_NOW);
         if (libc) {
             void* fork_ptr = dlsym(libc, "fork");
-            if (fork_ptr) DobbyHook(fork_ptr, (void*)my_fork, (void**)&orig_fork);
+            if (fork_ptr) DobbyHook(fork_ptr, (void*)rt_my_fork, (void**)&orig_fork);
             
             void* sys_prop_ptr = dlsym(libc, "__system_property_get");
-            if (sys_prop_ptr) DobbyHook(sys_prop_ptr, (void*)my_system_property_get, (void**)&orig_system_property_get);
+            if (sys_prop_ptr) DobbyHook(sys_prop_ptr, (void*)rt_my_system_property_get, (void**)&orig_system_property_get);
 
             void* getuid_ptr = dlsym(libc, "getuid");
-            if (getuid_ptr) DobbyHook(getuid_ptr, (void*)my_getuid, (void**)&orig_getuid);
+            if (getuid_ptr) DobbyHook(getuid_ptr, (void*)rt_my_getuid, (void**)&orig_getuid);
 
             void* geteuid_ptr = dlsym(libc, "geteuid");
-            if (geteuid_ptr) DobbyHook(geteuid_ptr, (void*)my_geteuid, (void**)&orig_geteuid);
+            if (geteuid_ptr) DobbyHook(geteuid_ptr, (void*)rt_my_geteuid, (void**)&orig_geteuid);
 
             void* open_ptr = dlsym(libc, "open");
-            if (open_ptr) DobbyHook(open_ptr, (void*)my_open, (void**)&orig_open);
+            if (open_ptr) DobbyHook(open_ptr, (void*)rt_my_open, (void**)&orig_open);
 
             void* fopen_ptr = dlsym(libc, "fopen");
-            if (fopen_ptr) DobbyHook(fopen_ptr, (void*)my_fopen, (void**)&orig_fopen);
+            if (fopen_ptr) DobbyHook(fopen_ptr, (void*)rt_my_fopen, (void**)&orig_fopen);
 
             void* access_ptr = dlsym(libc, "access");
-            if (access_ptr) DobbyHook(access_ptr, (void*)my_access, (void**)&orig_access);
+            if (access_ptr) DobbyHook(access_ptr, (void*)rt_my_access, (void**)&orig_access);
 
             void* stat_ptr = dlsym(libc, "stat");
-            if (stat_ptr) DobbyHook(stat_ptr, (void*)my_stat, (void**)&orig_stat);
+            if (stat_ptr) DobbyHook(stat_ptr, (void*)rt_my_stat, (void**)&orig_stat);
 
             void* ptrace_ptr = dlsym(libc, "ptrace");
-            if (ptrace_ptr) DobbyHook(ptrace_ptr, (void*)my_ptrace, (void**)&orig_ptrace);
+            if (ptrace_ptr) DobbyHook(ptrace_ptr, (void*)rt_my_ptrace, (void**)&orig_ptrace);
 
             LOGI("Libc Hooks Installed.");
             dlclose(libc);
@@ -265,7 +265,7 @@ namespace OneCore {
                 dlclose(libc_for_dl);
             }
 
-            if (dlopen_ptr) DobbyHook(dlopen_ptr, (void*)my_dlopen, (void**)&orig_dlopen);
+            if (dlopen_ptr) DobbyHook(dlopen_ptr, (void*)rt_my_dlopen, (void**)&orig_dlopen);
             
             LOGI("Libdl Hooks Installed.");
             dlclose(libdl);
