@@ -31,7 +31,7 @@ public class OneCoreActivityThreadHook {
 
             // 1. Hook Instrumentation
             final Object at = activityThread;
-            SafeExecutionManager.run("Instrumentation Hook", () -> {
+            OneCoreHookManager.applyResilientHook("Instrumentation Hook", () -> {
                 android.app.Instrumentation baseInstrumentation = (android.app.Instrumentation) ReflectionHelper.getFieldValue(at, "mInstrumentation");
                 if (baseInstrumentation instanceof com.onecore.sdk.core.OneCoreInstrumentation) {
                     Log.i(TAG, "OneCore-DEBUG: Instrumentation already hooked.");
@@ -39,15 +39,29 @@ public class OneCoreActivityThreadHook {
                 }
                 OneCoreInstrumentation customInstrumentation = new OneCoreInstrumentation(baseInstrumentation);
                 ReflectionHelper.setFieldValue(at, customInstrumentation, "mInstrumentation");
+            }, () -> {
+                // Fallback: Try setting via direct reflection if ReflectionHelper fails
+                java.lang.reflect.Field f = at.getClass().getDeclaredField("mInstrumentation");
+                f.setAccessible(true);
+                android.app.Instrumentation base = (android.app.Instrumentation) f.get(at);
+                f.set(at, new OneCoreInstrumentation(base));
             });
 
             // 1.1 Hook H Handler (The core of ActivityThread lifecycle)
-            SafeExecutionManager.run("H Handler Hook", () -> {
+            OneCoreHookManager.applyResilientHook("H Handler Hook", () -> {
                 android.os.Handler h = (android.os.Handler) ReflectionHelper.getFieldValue(at, "mH");
                 if (h != null) {
                     ReflectionHelper.setFieldValue(h, new OneCoreHCallback(h), "mCallback");
                     Log.i(TAG, "OneCore-DEBUG: ActivityThread H Handler hooked.");
                 }
+            }, () -> {
+                // Alternative strategy for Handler hook
+                java.lang.reflect.Field f = at.getClass().getDeclaredField("mH");
+                f.setAccessible(true);
+                android.os.Handler h = (android.os.Handler) f.get(at);
+                java.lang.reflect.Field cbField = android.os.Handler.class.getDeclaredField("mCallback");
+                cbField.setAccessible(true);
+                cbField.set(h, new OneCoreHCallback(h));
             });
             
             // 2. Hook Service Proxies with safe execution
