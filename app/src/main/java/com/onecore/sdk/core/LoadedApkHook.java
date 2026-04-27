@@ -70,7 +70,13 @@ public class LoadedApkHook {
                             } else if (field.equals("mDataDir")) {
                                 f.set(loadedApk, guestAi.dataDir);
                             } else if (field.equals("mPrimaryCpuAbi")) {
-                                f.set(loadedApk, guestAi.primaryCpuAbi);
+                                try {
+                                    Field primaryCpuAbiField = ApplicationInfo.class.getDeclaredField("primaryCpuAbi");
+                                    primaryCpuAbiField.setAccessible(true);
+                                    f.set(loadedApk, primaryCpuAbiField.get(guestAi));
+                                } catch (Exception e) {
+                                    // Fallback if field totally missing
+                                }
                             } else if (field.equals("mAppDir") || field.equals("mResDir")) {
                                 f.set(loadedApk, guestAi.sourceDir);
                             }

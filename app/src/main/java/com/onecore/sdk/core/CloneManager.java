@@ -75,7 +75,11 @@ public class CloneManager {
             // Task 5: Native Library Fix - Extract all .so files
             String libDirStr = virtualRoot + "/lib";
             info.applicationInfo.nativeLibraryDir = libDirStr;
-            info.applicationInfo.primaryCpuAbi = appInfo.primaryCpuAbi;
+            try {
+                Field f = ApplicationInfo.class.getDeclaredField("primaryCpuAbi");
+                f.setAccessible(true);
+                f.set(info.applicationInfo, f.get(appInfo));
+            } catch (Throwable ignored) {}
             info.applicationInfo.targetSdkVersion = appInfo.targetSdkVersion;
             
             cache.put(packageName, info);

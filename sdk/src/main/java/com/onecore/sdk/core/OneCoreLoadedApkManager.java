@@ -39,14 +39,14 @@ public class OneCoreLoadedApkManager {
             ai.publicSourceDir = apkPath;
             ai.dataDir = context.getDir("v_data_" + packageName, Context.MODE_PRIVATE).getAbsolutePath();
             ai.deviceProtectedDataDir = ai.dataDir;
-            ai.credentialProtectedDataDir = ai.dataDir;
+            ReflectionHelper.setFieldValue(ai, ai.dataDir, "credentialProtectedDataDir");
             ai.uid = context.getApplicationInfo().uid;
             ai.flags = context.getApplicationInfo().flags; // Inherit flags for compatibility
             
             File libDir = context.getDir("v_lib_" + packageName, Context.MODE_PRIVATE);
             ai.nativeLibraryDir = libDir.getAbsolutePath();
             // Modern Android requires primaryCpuAbi to be set for native libs to work properly in some cases
-            ai.primaryCpuAbi = android.os.Build.SUPPORTED_ABIS[0];
+            ReflectionHelper.setFieldValue(ai, android.os.Build.SUPPORTED_ABIS[0], "primaryCpuAbi");
             
             Log.d(TAG, "OneCore-Apk: Creating LoadedApk for " + packageName);
             Log.d(TAG, "OneCore-Apk: DataDir: " + ai.dataDir);
