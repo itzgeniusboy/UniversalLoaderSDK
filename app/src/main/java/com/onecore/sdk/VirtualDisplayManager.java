@@ -48,7 +48,8 @@ public class VirtualDisplayManager {
 
         int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC | 
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION |
-                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR; // Added for better compatibility
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR |
+                    0x00000004; // DisplayManager.VIRTUAL_DISPLAY_FLAG_SECURE
         
         // Android 14-16 (API 34-36) Standard Isolation
         if (Build.VERSION.SDK_INT >= 26) {
@@ -141,6 +142,37 @@ public class VirtualDisplayManager {
         } catch (Exception e) {
             Log.e(TAG, "RECOVERY FAILED: All virtualization paths blocked.", e);
             return null;
+        }
+    }
+
+    /**
+     * Mirror the physical display (Display 0) into the provided surface.
+     * This is a "Last Resort" fallback to solve the black screen.
+     */
+    public void mirrorPhysicalDisplay(Surface surface) {
+        if (surface == null || !surface.isValid()) return;
+        Logger.w(TAG, "LAST RESORT: Activating Physical Display Mirroring...");
+        
+        try {
+            // Using SurfaceControl to mirror Display 0 (Physical) to our VirtualDisplay surface
+            Class<?> scClass = Class.forName("android.view.SurfaceControl");
+            Method getInternalDisplayToken = scClass.getMethod("getInternalDisplayToken");
+            Object displayToken = getInternalDisplayToken.invoke(null);
+            
+            if (displayToken == null) {
+                Logger.e(TAG, "Mirroring FAILED: Could not get internal display token.");
+                return;
+            }
+            
+            // In Android 14+, we might need Transaction-based mirroring
+            // For older versions, we use SurfaceControl.setDisplaySurface
+            Method setDisplaySurface = scClass.getMethod("setDisplaySurface", android.os.IBinder.class, Surface.class);
+            setDisplaySurface.invoke(null, displayToken, surface);
+            
+            Logger.i(TAG, "Mirroring SUCCESS: Physical display 0 is now being piped to our surface.");
+        } catch (Exception e) {
+            Logger.e(TAG, "Mirroring CRITICAL FAILURE: " + e.getMessage());
+            // This happens if system permissions prevent display cross-binding
         }
     }
 

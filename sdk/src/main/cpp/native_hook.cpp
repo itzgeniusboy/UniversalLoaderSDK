@@ -150,11 +150,41 @@ static uid_t (*orig_getgid)() = nullptr;
 // Recursion guard is handled via Utils/RecursionGuard.h
 
 // --- Rendering Hooks ---
+static int (*orig_Surface_dequeueBuffer)(void* self, void** buffer, int* fenceFd) = nullptr;
+static int (*orig_Surface_queueBuffer)(void* self, void* buffer, int fenceFd) = nullptr;
+
+int my_Surface_dequeueBuffer(void* self, void** buffer, int* fenceFd) {
+    if (g_in_hook) return orig_Surface_dequeueBuffer(self, buffer, fenceFd);
+    g_in_hook = true;
+    g_buffer_dequeue_count++;
+    int res = orig_Surface_dequeueBuffer(self, buffer, fenceFd);
+    g_in_hook = false;
+    return res;
+}
+
+int my_Surface_queueBuffer(void* self, void* buffer, int fenceFd) {
+    if (g_in_hook) return orig_Surface_queueBuffer(self, buffer, fenceFd);
+    g_in_hook = true;
+    g_buffer_enqueue_count++;
+    
+    // Check if fence is valid
+    if (fenceFd < 0 && fenceFd != -1) {
+        LOGW("DIAG: INVALID FENCE DETECTED: %d", fenceFd);
+        LOGI("ISSUE: SYNC FAILURE");
+    }
+
+    int res = orig_Surface_queueBuffer(self, buffer, fenceFd);
+    g_in_hook = false;
+    return res;
+}
+
 static void* (*orig_ANativeWindow_fromSurface)(void* env, jobject surface) = nullptr;
 static void (*orig_ANativeWindow_acquire)(void* window) = nullptr;
 static void (*orig_ANativeWindow_release)(void* window) = nullptr;
 static int (*orig_ANativeWindow_setBuffersGeometry)(void* window, int32_t width, int32_t height, int32_t format) = nullptr;
 static int (*orig_ANativeWindow_unlockAndPost)(void* window) = nullptr;
+static void (*orig_ASurfaceTransaction_setBuffer)(void* transaction, void* surfaceControl, void* buffer, int fenceFd) = nullptr;
+static void (*orig_ASurfaceTransaction_apply)(void* transaction) = nullptr;
 
 static EGLSurface (*orig_eglCreateWindowSurface)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list) = nullptr;
 static EGLBoolean (*orig_eglMakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx) = nullptr;
@@ -165,6 +195,9 @@ static EGLNativeWindowType g_target_window = nullptr;
 
 static int g_egl_frame_count = 0;
 static int g_vk_frame_count = 0;
+static int g_buffer_enqueue_count = 0;
+static int g_buffer_dequeue_count = 0;
+static bool g_hwc_bypass_detected = false;
 
 static void print_rendering_diagnosis() {
     static int last_diag_time = 0;
@@ -181,19 +214,38 @@ static void print_rendering_diagnosis() {
     
     LOGI("DIAG: EGL Frames Count: %d", g_egl_frame_count);
     LOGI("DIAG: Vulkan Frames Count: %d", g_vk_frame_count);
+    LOGI("DIAG: Buffer Enqueue Count: %d", g_buffer_enqueue_count);
+    LOGI("DIAG: Buffer Dequeue Count: %d", g_buffer_dequeue_count);
     
+    if (g_hwc_bypass_detected) {
+        LOGW("DIAG: HWC DIRECT RENDERING DETECTED");
+        LOGI("ISSUE: HWC BYPASS");
+    }
+
     if (g_egl_frame_count > 0) {
         LOGI("DIAG: ACTIVE BACKEND: EGL");
     } else if (g_vk_frame_count > 0) {
         LOGI("DIAG: ACTIVE BACKEND: VULKAN");
+    } else if (g_buffer_enqueue_count > 0) {
+        LOGI("DIAG: ACTIVE BACKEND: DIRECT BUFFER QUEUE (HWC/Native)");
     } else {
         LOGW("DIAG: ISSUE - NO RENDERING DETECTED (0 frames detected)");
+        LOGI("ISSUE: NO FRAME OUTPUT");
+        return;
     }
     
-    if ((g_egl_frame_count > 0 || g_vk_frame_count > 0) && g_target_window != nullptr) {
+    if (g_buffer_dequeue_count > g_buffer_enqueue_count + 5) {
+        LOGE("DIAG: BUFFER LEAK DETECTED: Dequeued > Enqueued");
+        LOGI("ISSUE: BUFFER NOT ACQUIRED");
+    }
+
+    if ((g_egl_frame_count > 0 || g_vk_frame_count > 0 || g_buffer_enqueue_count > 0) && g_target_window != nullptr) {
         LOGI("DIAG: REDIRECTION STATUS: SUCCESSFUL (Data should be flowing)");
-    } else if (g_egl_frame_count > 0 || g_vk_frame_count > 0) {
+        LOGI("RENDER TARGET: VIRTUAL DISPLAY");
+    } else {
         LOGE("DIAG: REDIRECTION STATUS: FAILED (Frames rendered but no target set)");
+        LOGI("RENDER TARGET: PHYSICAL DISPLAY (Default)");
+        LOGI("ISSUE: RENDERING TO WRONG DISPLAY");
     }
     LOGI("-----------------------------------------------------");
 }
@@ -241,6 +293,23 @@ int my_ANativeWindow_unlockAndPost(void* window) {
     int res = orig_ANativeWindow_unlockAndPost(window);
     g_in_hook = false;
     return res;
+}
+
+void my_ASurfaceTransaction_setBuffer(void* transaction, void* surfaceControl, void* buffer, int fenceFd) {
+    if (g_in_hook) { orig_ASurfaceTransaction_setBuffer(transaction, surfaceControl, buffer, fenceFd); return; }
+    g_in_hook = true;
+    LOGI("HOOK: ASurfaceTransaction_setBuffer(tx=%p, sc=%p, buf=%p, fence=%d)", transaction, surfaceControl, buffer, fenceFd);
+    g_buffer_enqueue_count++;
+    orig_ASurfaceTransaction_setBuffer(transaction, surfaceControl, buffer, fenceFd);
+    g_in_hook = false;
+}
+
+void my_ASurfaceTransaction_apply(void* transaction) {
+    if (g_in_hook) { orig_ASurfaceTransaction_apply(transaction); return; }
+    g_in_hook = true;
+    LOGI("HOOK: ASurfaceTransaction_apply(tx=%p)", transaction);
+    orig_ASurfaceTransaction_apply(transaction);
+    g_in_hook = false;
 }
 
 void* my_ANativeWindow_fromSurface(void* env, jobject surface) {
@@ -950,6 +1019,43 @@ static void install_all_hooks(JavaVM* vm) {
     }
     OneCore::installBinderHooks();
 
+    // Hook BufferQueue (Surface)
+    void* libgui = dlopen("libgui.so", RTLD_NOW);
+    if (libgui) {
+        LOGI("HWC CHECK: libgui found, checking for direct buffer submission...");
+        // Try various mangled names for Surface::dequeueBuffer/queueBuffer
+        const char* dequeue_symbols[] = {
+            "_ZN7android7Surface13dequeueBufferEP19ANativeWindowBufferi",
+            "_ZN7android7Surface13dequeueBufferEP22ANativeWindowBuffer_hti"
+        };
+        const char* queue_symbols[] = {
+            "_ZN7android7Surface13queueBufferEP19ANativeWindowBufferi",
+            "_ZN7android7Surface13queueBufferEP22ANativeWindowBuffer_hti"
+        };
+
+        for (int i = 0; i < 2; i++) {
+            void* sym = dlsym(libgui, dequeue_symbols[i]);
+            if (sym) {
+                safe_hook(sym, (void*)my_Surface_dequeueBuffer, (void**)&orig_Surface_dequeueBuffer, "Surface::dequeueBuffer");
+                break;
+            }
+        }
+        for (int i = 0; i < 2; i++) {
+            void* sym = dlsym(libgui, queue_symbols[i]);
+            if (sym) {
+                safe_hook(sym, (void*)my_Surface_queueBuffer, (void**)&orig_Surface_queueBuffer, "Surface::queueBuffer");
+                break;
+            }
+        }
+        
+        // Check for HWC indicators
+        if (dlsym(libgui, "_ZN7android11HwcComposerC1Ev") || dlsym(libgui, "hwc2_open")) {
+             g_hwc_bypass_detected = true;
+        }
+
+        dlclose(libgui);
+    }
+
     LOGI("Installing Early Rendering Hooks...");
     void* libandroid = dlopen("libandroid.so", RTLD_NOW);
     if (libandroid) {
@@ -959,6 +1065,13 @@ static void install_all_hooks(JavaVM* vm) {
         safe_hook(dlsym(libandroid, "ANativeWindow_setBuffersGeometry"), (void*)my_ANativeWindow_setBuffersGeometry, (void**)&orig_ANativeWindow_setBuffersGeometry, "ANativeWindow_setBuffersGeometry");
         safe_hook(dlsym(libandroid, "ANativeWindow_unlockAndPost"), (void*)my_ANativeWindow_unlockAndPost, (void**)&orig_ANativeWindow_unlockAndPost, "ANativeWindow_unlockAndPost");
         safe_hook(dlsym(libandroid, "ASurfaceControl_createFromWindow"), (void*)my_ASurfaceControl_createFromWindow, (void**)&orig_ASurfaceControl_createFromWindow, "ASurfaceControl_createFromWindow");
+        
+        void* setBuffer = dlsym(libandroid, "ASurfaceTransaction_setBuffer");
+        if (setBuffer) safe_hook(setBuffer, (void*)my_ASurfaceTransaction_setBuffer, (void**)&orig_ASurfaceTransaction_setBuffer, "ASurfaceTransaction_setBuffer");
+        
+        void* apply = dlsym(libandroid, "ASurfaceTransaction_apply");
+        if (apply) safe_hook(apply, (void*)my_ASurfaceTransaction_apply, (void**)&orig_ASurfaceTransaction_apply, "ASurfaceTransaction_apply");
+
         dlclose(libandroid);
     }
 

@@ -130,7 +130,29 @@ public class StubActivity extends Activity implements SurfaceHolder.Callback {
         // Task 2: Hook and redirect rendering surface (Native)
         com.onecore.sdk.NativeHookManager.setTargetSurface(surface);
         
-        VirtualDisplayManager.getInstance(this).syncSurface(surface);
+        // Ensure VirtualDisplay is CREATED and ACTIVE for this surface
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        
+        VirtualDisplayManager vdm = VirtualDisplayManager.getInstance(this);
+        int currentId = vdm.getDisplayId();
+        
+        if (currentId == android.view.Display.DEFAULT_DISPLAY) {
+            Logger.i(TAG, "Creating primary VirtualDisplay for guest rendering...");
+            vdm.createSecureDisplay(this, "OneCore-Virtual", metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, surface);
+            currentId = vdm.getDisplayId();
+        } else {
+            Logger.i(TAG, "Reusing existing VirtualDisplay (ID: " + currentId + ")");
+            vdm.syncSurface(surface);
+        }
+
+        if (currentId != android.view.Display.DEFAULT_DISPLAY) {
+            Logger.i(TAG, "FINAL OUTPUT DISPLAY: VIRTUAL (ID: " + currentId + ")");
+        } else {
+            Logger.e(TAG, "FINAL OUTPUT DISPLAY: PHYSICAL (VirtualDisplay failed to activate)");
+            // Mirroring disabled temporarily for diagnostics
+            // vdm.mirrorPhysicalDisplay(surface);
+        }
 
         // Launch deferred app
         if (pendingPkg != null) {
