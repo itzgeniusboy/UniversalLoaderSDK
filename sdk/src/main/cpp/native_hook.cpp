@@ -8,6 +8,13 @@
 #include <dlfcn.h>
 #include <sys/mman.h>
 #include <EGL/egl.h>
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_android.h>
+#include <time.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <GLES2/gl2.h>
 #include "dobby.h"
 #include "BinderHook.h"
@@ -64,6 +71,20 @@ static void check_egl_error(const char* op) {
         LOGE("EGL ERROR after %s: %s (0x%X)", op, get_egl_error_name(err), err);
     }
 }
+
+static void safe_hook(void* target, void* replace, void** origin, const char* name);
+
+// --- Vulkan Hook Forward Declarations ---
+static VkResult my_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface);
+static VkResult my_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo);
+static PFN_vkVoidFunction my_vkGetInstanceProcAddr(VkInstance instance, const char* pName);
+static PFN_vkVoidFunction my_vkGetDeviceProcAddr(VkDevice device, const char* pName);
+
+// --- Vulkan Original Function Pointers ---
+static PFN_vkCreateAndroidSurfaceKHR orig_vkCreateAndroidSurfaceKHR = nullptr;
+static PFN_vkQueuePresentKHR orig_vkQueuePresentKHR = nullptr;
+static PFN_vkGetInstanceProcAddr orig_vkGetInstanceProcAddr = nullptr;
+static PFN_vkGetDeviceProcAddr orig_vkGetDeviceProcAddr = nullptr;
 
 static int g_last_step = 0;
 void log_step(int step, const char* msg) {
@@ -260,7 +281,7 @@ EGLBoolean my_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     if (++frame_count % 60 == 0) {
         LOGI("eglSwapBuffers: 60 frames rendered on thread %d", (int)gettid());
     }
-static EGLBoolean res = orig_eglSwapBuffers(dpy, surface);
+    EGLBoolean res = orig_eglSwapBuffers(dpy, surface);
     if (res) {
         static bool backend_logged = false;
         if (!backend_logged) {
@@ -277,38 +298,8 @@ static EGLBoolean res = orig_eglSwapBuffers(dpy, surface);
 }
 
 // --- Vulkan Hooks ---
-typedef void* VkInstance;
-typedef void* VkSurfaceKHR;
-typedef void* VkPhysicalDevice;
-typedef void* VkDevice;
-typedef uint32_t VkFlags;
-typedef enum VkStructureType {
-    VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR = 1000008000,
-} VkStructureType;
 
-typedef struct VkAndroidSurfaceCreateInfoKHR {
-    VkStructureType sType;
-    const void* pNext;
-    VkFlags flags;
-    void* window; // ANativeWindow*
-} VkAndroidSurfaceCreateInfoKHR;
-
-typedef struct VkPresentInfoKHR {
-    VkStructureType          sType;
-    const void*              pNext;
-    uint32_t                 waitSemaphoreCount;
-    const void*              pWaitSemaphores;
-    uint32_t                 swapchainCount;
-    const void*              pSwapchains;
-    const uint32_t*          pImageIndices;
-    const int*               pResults; // VkResult*
-} VkPresentInfoKHR;
-
-typedef void* (*PFN_vkVoidFunction)(void);
-static PFN_vkVoidFunction (*orig_vkGetInstanceProcAddr)(VkInstance instance, const char* pName) = nullptr;
-static PFN_vkVoidFunction (*orig_vkGetDeviceProcAddr)(VkDevice device, const char* pName) = nullptr;
-
-PFN_vkVoidFunction my_vkGetInstanceProcAddr(VkInstance instance, const char* pName) {
+static PFN_vkVoidFunction my_vkGetInstanceProcAddr(VkInstance instance, const char* pName) {
     if (g_in_hook) return orig_vkGetInstanceProcAddr(instance, pName);
     if (pName && strcmp(pName, "vkCreateAndroidSurfaceKHR") == 0) {
         return (PFN_vkVoidFunction)my_vkCreateAndroidSurfaceKHR;
@@ -319,7 +310,7 @@ PFN_vkVoidFunction my_vkGetInstanceProcAddr(VkInstance instance, const char* pNa
     return orig_vkGetInstanceProcAddr(instance, pName);
 }
 
-PFN_vkVoidFunction my_vkGetDeviceProcAddr(VkDevice device, const char* pName) {
+static PFN_vkVoidFunction my_vkGetDeviceProcAddr(VkDevice device, const char* pName) {
     if (g_in_hook) return orig_vkGetDeviceProcAddr(device, pName);
     if (pName && strcmp(pName, "vkQueuePresentKHR") == 0) {
         return (PFN_vkVoidFunction)my_vkQueuePresentKHR;
@@ -327,9 +318,7 @@ PFN_vkVoidFunction my_vkGetDeviceProcAddr(VkDevice device, const char* pName) {
     return orig_vkGetDeviceProcAddr(device, pName);
 }
 
-static int (*orig_vkQueuePresentKHR)(void* queue, const VkPresentInfoKHR* pPresentInfo) = nullptr;
-
-int my_vkQueuePresentKHR(void* queue, const VkPresentInfoKHR* pPresentInfo) {
+static VkResult my_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo) {
     if (g_in_hook) return orig_vkQueuePresentKHR(queue, pPresentInfo);
     g_in_hook = true;
     
@@ -338,8 +327,8 @@ int my_vkQueuePresentKHR(void* queue, const VkPresentInfoKHR* pPresentInfo) {
         LOGI("vkQueuePresentKHR: 60 Vulkan frames rendered on thread %d", (int)gettid());
     }
     
-    int res = orig_vkQueuePresentKHR(queue, pPresentInfo);
-    if (res == 0) {
+    VkResult res = orig_vkQueuePresentKHR(queue, pPresentInfo);
+    if (res == VK_SUCCESS) {
         static bool vk_backend_logged = false;
         if (!vk_backend_logged) {
             LOGI(">>> ACTIVE BACKEND: VULKAN <<<");
@@ -350,9 +339,7 @@ int my_vkQueuePresentKHR(void* queue, const VkPresentInfoKHR* pPresentInfo) {
     return res;
 }
 
-static int (*orig_vkCreateAndroidSurfaceKHR)(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR* pCreateInfo, void* pAllocator, VkSurfaceKHR* pSurface) = nullptr;
-
-int my_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR* pCreateInfo, void* pAllocator, VkSurfaceKHR* pSurface) {
+static VkResult my_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface) {
     if (g_in_hook) return orig_vkCreateAndroidSurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
     g_in_hook = true;
     
@@ -360,11 +347,11 @@ int my_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCrea
     VkAndroidSurfaceCreateInfoKHR createInfo = *pCreateInfo;
     if (g_target_window != nullptr) {
         LOGI("VULKAN SPOOF: Redirecting window %p -> %p", createInfo.window, g_target_window);
-        createInfo.window = g_target_window;
+        createInfo.window = (ANativeWindow*)g_target_window;
     }
     
-    int res = orig_vkCreateAndroidSurfaceKHR(instance, &createInfo, pAllocator, pSurface);
-    if (res != 0) {
+    VkResult res = orig_vkCreateAndroidSurfaceKHR(instance, &createInfo, pAllocator, pSurface);
+    if (res != VK_SUCCESS) {
         LOGE("vkCreateAndroidSurfaceKHR FAILED: %d", res);
     } else {
         LOGI("vkCreateAndroidSurfaceKHR SUCCESS: surface=%p", *pSurface);
