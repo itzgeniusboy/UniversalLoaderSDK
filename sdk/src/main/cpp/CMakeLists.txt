@@ -37,9 +37,11 @@ target_include_directories(onecore_native PRIVATE
 
 find_library(log-lib log)
 find_library(android-lib android)
+find_library(egl-lib EGL)
 
 target_link_libraries(onecore_native
         ${log-lib}
         ${android-lib}
+        ${egl-lib}
         dl
 )
