@@ -1,4 +1,5 @@
 #include "UnixFileSystemHook.h"
+#include <string.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/stat.h>
