@@ -3,6 +3,7 @@
 #include <sys/socket.h>
 #include <android/log.h>
 #include "../dobby.h"
+#include "../Utils/RecursionGuard.h"
 
 #define TAG "OneCore-NetHook"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -14,16 +15,18 @@ typedef ssize_t (*recvfrom_t)(int sockfd, void *buf, size_t len, int flags, stru
 static recvfrom_t orig_recvfrom = nullptr;
 
 ssize_t my_sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen) {
-    // Powerful: Log or modify dynamic game packets here
-    // Example: Block specific telemetry packets
-    return orig_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+    if (g_in_hook) return orig_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+    g_in_hook = true;
+    ssize_t res = orig_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+    g_in_hook = false;
+    return res;
 }
 
 ssize_t my_recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen) {
+    if (g_in_hook) return orig_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+    g_in_hook = true;
     ssize_t result = orig_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
-    if (result > 0) {
-       // Inspect received packets for cheat detection or data syncing
-    }
+    g_in_hook = false;
     return result;
 }
 

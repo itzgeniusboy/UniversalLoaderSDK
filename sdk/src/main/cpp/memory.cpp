@@ -62,8 +62,16 @@ static ssize_t process_vm_writev_fallback(pid_t pid, const struct iovec *local_i
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_onecore_sdk_NativeHook_readProcessMemory(JNIEnv* env, jobject thiz, jint pid, jlong addr, jbyteArray buffer) {
+    if (buffer == nullptr) {
+        LOGE("readProcessMemory: buffer is null");
+        return JNI_FALSE;
+    }
     jsize size = env->GetArrayLength(buffer);
     jbyte* local_buf = env->GetByteArrayElements(buffer, nullptr);
+    if (local_buf == nullptr) {
+        LOGE("readProcessMemory: failed to get byte array elements");
+        return JNI_FALSE;
+    }
 
     struct iovec local[1];
     struct iovec remote[1];
@@ -80,15 +88,27 @@ Java_com_onecore_sdk_NativeHook_readProcessMemory(JNIEnv* env, jobject thiz, jin
     nread = process_vm_readv_fallback(pid, local, 1, remote, 1, 0);
 #endif
     
-    env->ReleaseByteArrayElements(buffer, local_buf, 0);
+    if (nread != size) {
+        LOGE("readProcessMemory failed: pid=%d, addr=%p, requested=%d, read=%zd, errno=%d (%s)", 
+             pid, (void*)addr, size, nread, errno, strerror(errno));
+    }
 
+    env->ReleaseByteArrayElements(buffer, local_buf, 0);
     return (nread == size) ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_onecore_sdk_NativeHook_writeProcessMemory(JNIEnv* env, jobject thiz, jint pid, jlong addr, jbyteArray buffer) {
+    if (buffer == nullptr) {
+        LOGE("writeProcessMemory: buffer is null");
+        return JNI_FALSE;
+    }
     jsize size = env->GetArrayLength(buffer);
     jbyte* local_buf = env->GetByteArrayElements(buffer, nullptr);
+    if (local_buf == nullptr) {
+        LOGE("writeProcessMemory: failed to get byte array elements");
+        return JNI_FALSE;
+    }
 
     struct iovec local[1];
     struct iovec remote[1];
@@ -105,7 +125,11 @@ Java_com_onecore_sdk_NativeHook_writeProcessMemory(JNIEnv* env, jobject thiz, ji
     nwritten = process_vm_writev_fallback(pid, local, 1, remote, 1, 0);
 #endif
 
-    env->ReleaseByteArrayElements(buffer, local_buf, JNI_ABORT);
+    if (nwritten != size) {
+        LOGE("writeProcessMemory failed: pid=%d, addr=%p, requested=%d, written=%zd, errno=%d (%s)", 
+             pid, (void*)addr, size, nwritten, errno, strerror(errno));
+    }
 
+    env->ReleaseByteArrayElements(buffer, local_buf, JNI_ABORT);
     return (nwritten == size) ? JNI_TRUE : JNI_FALSE;
 }

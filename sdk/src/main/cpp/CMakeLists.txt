@@ -18,6 +18,7 @@ add_library(onecore_native SHARED
         Utils/KernelShield.cpp
         Utils/HiddenApiBypass.cpp
         Utils/ModuleScanner.cpp
+        Utils/RecursionGuard.cpp
         Hook/SocketHook.cpp
         KittyMemory/KittyMemory.cpp
         KittyMemory/MemoryPatch.cpp

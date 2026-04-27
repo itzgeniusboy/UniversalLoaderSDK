@@ -2,6 +2,7 @@
 #include <dlfcn.h>
 #include <android/log.h>
 #include "dobby.h"
+#include "Utils/RecursionGuard.h"
 
 #define TAG "OneCore-BinderHook"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -11,10 +12,14 @@ static transact_t orig_transact = nullptr;
 
 // This intercepts Binder transactions between the game and the system
 int my_transact(void* p1, uint32_t code, void* data, void* reply, uint32_t flags) {
-    // In a full implementation, we would inspect 'data' and 'code' 
-    // to redirect system service calls (like ActivityManager) to our virtual services.
-    // For now, we pass it through but we have the "Master Gate" ready.
-    return orig_transact(p1, code, data, reply, flags);
+    if (g_in_hook) return orig_transact(p1, code, data, reply, flags);
+    g_in_hook = true;
+    
+    // Pass it through
+    int res = orig_transact(p1, code, data, reply, flags);
+    
+    g_in_hook = false;
+    return res;
 }
 
 namespace OneCore {

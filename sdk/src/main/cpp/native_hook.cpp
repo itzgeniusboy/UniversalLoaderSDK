@@ -20,6 +20,7 @@
 #include "Hook/DexFileHook.h"
 #include "Hook/SocketHook.h"
 #include "KittyMemory/KittyMemory.h"
+#include "Utils/RecursionGuard.h"
 
 #define TAG "OneCore-Native"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -44,6 +45,9 @@ static void* (*orig_dlopen)(const char* filename, int flags) = nullptr;
 static void* (*orig_dlopen_ext)(const char* filename, int flags, const void* extinfo) = nullptr;
 static FILE* (*orig_fopen)(const char* filename, const char* mode) = nullptr;
 static pid_t (*orig_getppid)() = nullptr;
+
+// Recursion guard
+static thread_local bool in_hook = false;
 
 // --- EGL Hooks ---
 static const char* (*orig_glGetString)(int name) = nullptr;
@@ -86,7 +90,8 @@ static std::string redirect_path(const char* path) {
 
     if (s_path == "/proc/self/cmdline" || s_path == "/proc/cmdline") {
         std::string fake_cmd = g_virtual_root + "/proc_cmdline";
-        FILE* f = fopen(fake_cmd.c_str(), "w");
+        // We use orig_fopen to avoid recursion
+        FILE* f = orig_fopen ? orig_fopen(fake_cmd.c_str(), "w") : fopen(fake_cmd.c_str(), "w");
         if (f) {
             fprintf(f, "%s", g_package_name.c_str());
             fclose(f);
@@ -95,10 +100,9 @@ static std::string redirect_path(const char* path) {
     }
 
     if (s_path == "/proc/self/maps" || s_path == "/proc/maps") {
-        // We redirect maps to a filtered version that hides 'onecore' and 'v_lib'
         std::string fake_maps = g_virtual_root + "/proc_maps";
-        FILE* original = fopen("/proc/self/maps", "r");
-        FILE* filtered = fopen(fake_maps.c_str(), "w");
+        FILE* original = orig_fopen ? orig_fopen("/proc/self/maps", "r") : fopen("/proc/self/maps", "r");
+        FILE* filtered = orig_fopen ? orig_fopen(fake_maps.c_str(), "w") : fopen(fake_maps.c_str(), "w");
         if (original && filtered) {
             char line[1024];
             while (fgets(line, sizeof(line), original)) {
@@ -114,8 +118,8 @@ static std::string redirect_path(const char* path) {
 
     if (s_path == "/proc/self/status") {
         std::string fake_status = g_virtual_root + "/proc_status";
-        FILE* original = fopen("/proc/self/status", "r");
-        FILE* filtered = fopen(fake_status.c_str(), "w");
+        FILE* original = orig_fopen ? orig_fopen("/proc/self/status", "r") : fopen("/proc/self/status", "r");
+        FILE* filtered = orig_fopen ? orig_fopen(fake_status.c_str(), "w") : fopen(fake_status.c_str(), "w");
         if (original && filtered) {
             char line[1024];
             while (fgets(line, sizeof(line), original)) {
@@ -153,25 +157,19 @@ static std::string redirect_path(const char* path) {
         std::string target = std::string(root) + g_package_name;
         if (s_path.compare(0, target.length(), target) == 0) {
             std::string redirected = g_virtual_root + "/obb" + s_path.substr(target.length());
-            // Check if redirected OBB exists, if not, maybe try to access original but hide path
             struct stat st;
             if (orig_stat && orig_stat(redirected.c_str(), &st) == 0) {
-                LOGI("REDIRECTING OBB -> %s", redirected.c_str());
                 return redirected;
             }
-            // Fallback for some systems where OBB is actually in the data dir
             std::string fallback = g_virtual_root + "/data/files/obb" + s_path.substr(target.length());
             if (orig_stat && orig_stat(fallback.c_str(), &st) == 0) {
-                LOGI("REDIRECTING OBB (FALLBACK) -> %s", fallback.c_str());
                 return fallback;
             }
-            
-            LOGE("OBB MISSING IN SANDBOX: %s", redirected.c_str());
-            return s_path; // Fallback to original if sandbox version missing
+            return s_path; 
         }
     }
 
-    // 3. External Data Redirection (/storage/emulated/0/Android/data/...)
+    // 3. External Data Redirection
     const char* ext_data_roots[] = {
         "/storage/emulated/0/Android/data/",
         "/sdcard/Android/data/",
@@ -185,7 +183,7 @@ static std::string redirect_path(const char* path) {
         }
     }
 
-    // 4. Root Hiding (Busybox, su, Magisk)
+    // 4. Root Hiding 
     if (s_path.find("/su") != std::string::npos || 
         s_path.find("/magisk") != std::string::npos ||
         s_path.find("busybox") != std::string::npos) {
@@ -195,91 +193,178 @@ static std::string redirect_path(const char* path) {
     return s_path;
 }
 
+#define HOOK_GUARD() \
+    if (in_hook) return false; \
+    in_hook = true; \
+    // ... logic ...
+    in_hook = false;
+
+// We'll use a more robust guard in the Actual Hook functions
+#define ENTER_HOOK() \
+    if (in_hook) return; \
+    in_hook = true;
+
+#define EXIT_HOOK() \
+    in_hook = false;
+
+// Updated Hook functions with guard
 static int my_open(const char *pathname, int flags, mode_t mode) {
+    if (g_in_hook) return orig_open(pathname, flags, mode);
+    g_in_hook = true;
     std::string r_path = redirect_path(pathname);
     // Log OBB access for debugging
     if (r_path.find("/obb") != std::string::npos) {
         LOGI("HOOK: OBB Open Access -> %s", r_path.c_str());
     }
-    return orig_open(r_path.c_str(), flags, mode);
+    int res = orig_open(r_path.c_str(), flags, mode);
+    g_in_hook = false;
+    return res;
 }
 
 int my_openat(int dirfd, const char *pathname, int flags, mode_t mode) {
+    if (g_in_hook) return orig_openat(dirfd, pathname, flags, mode);
+    g_in_hook = true;
+    int res;
     if (pathname && pathname[0] == '/') {
-        return orig_openat(dirfd, redirect_path(pathname).c_str(), flags, mode);
+        res = orig_openat(dirfd, redirect_path(pathname).c_str(), flags, mode);
+    } else {
+        res = orig_openat(dirfd, pathname, flags, mode);
     }
-    return orig_openat(dirfd, pathname, flags, mode);
+    g_in_hook = false;
+    return res;
 }
 
 static int my_access(const char *pathname, int mode) {
-    return orig_access(redirect_path(pathname).c_str(), mode);
+    if (g_in_hook) return orig_access(pathname, mode);
+    g_in_hook = true;
+    int res = orig_access(redirect_path(pathname).c_str(), mode);
+    g_in_hook = false;
+    return res;
 }
 
 int my_faccessat(int dirfd, const char *pathname, int mode, int flags) {
+    if (g_in_hook) return orig_faccessat(dirfd, pathname, mode, flags);
+    g_in_hook = true;
+    int res;
     if (pathname && pathname[0] == '/') {
-        return orig_faccessat(dirfd, redirect_path(pathname).c_str(), mode, flags);
+        res = orig_faccessat(dirfd, redirect_path(pathname).c_str(), mode, flags);
+    } else {
+        res = orig_faccessat(dirfd, pathname, mode, flags);
     }
-    return orig_faccessat(dirfd, pathname, mode, flags);
+    g_in_hook = false;
+    return res;
 }
 
 int my_stat(const char *pathname, struct stat *buf) {
-    return orig_stat(redirect_path(pathname).c_str(), buf);
+    if (g_in_hook) return orig_stat(pathname, buf);
+    g_in_hook = true;
+    int res = orig_stat(redirect_path(pathname).c_str(), buf);
+    g_in_hook = false;
+    return res;
 }
 
 int my_lstat(const char *pathname, struct stat *buf) {
-    return orig_lstat(redirect_path(pathname).c_str(), buf);
+    if (g_in_hook) return orig_lstat(pathname, buf);
+    g_in_hook = true;
+    int res = orig_lstat(redirect_path(pathname).c_str(), buf);
+    g_in_hook = false;
+    return res;
 }
 
 int my_fstatat(int dirfd, const char *pathname, struct stat *buf, int flags) {
+    if (g_in_hook) return orig_fstatat(dirfd, pathname, buf, flags);
+    g_in_hook = true;
+    int res;
     if (pathname && pathname[0] == '/') {
-        return orig_fstatat(dirfd, redirect_path(pathname).c_str(), buf, flags);
+        res = orig_fstatat(dirfd, redirect_path(pathname).c_str(), buf, flags);
+    } else {
+        res = orig_fstatat(dirfd, pathname, buf, flags);
     }
-    return orig_fstatat(dirfd, pathname, buf, flags);
+    g_in_hook = false;
+    return res;
 }
 
 ssize_t my_readlink(const char *pathname, char *buf, size_t bufsiz) {
-    return orig_readlink(redirect_path(pathname).c_str(), buf, bufsiz);
+    if (g_in_hook) return orig_readlink(pathname, buf, bufsiz);
+    g_in_hook = true;
+    ssize_t res = orig_readlink(redirect_path(pathname).c_str(), buf, bufsiz);
+    g_in_hook = false;
+    return res;
 }
 
 void* my_opendir(const char *name) {
-    return orig_opendir(redirect_path(name).c_str());
+    if (g_in_hook) return orig_opendir(name);
+    g_in_hook = true;
+    void* res = orig_opendir(redirect_path(name).c_str());
+    g_in_hook = false;
+    return res;
 }
 
 void* my_opendir2(const char *name, int flags) {
-    return orig_opendir2(redirect_path(name).c_str(), flags);
+    if (g_in_hook) return orig_opendir2(name, flags);
+    g_in_hook = true;
+    void* res = orig_opendir2(redirect_path(name).c_str(), flags);
+    g_in_hook = false;
+    return res;
 }
 
 int my_execve(const char *filename, char *const argv[], char *const envp[]) {
+    if (g_in_hook) return orig_execve(filename, argv, envp);
+    g_in_hook = true;
+    int res;
     // Block the game from launching child processes that might detect us
-    if (filename && strstr(filename, "su")) return -1;
-    return orig_execve(filename, argv, envp);
+    if (filename && strstr(filename, "su")) {
+        res = -1;
+    } else {
+        res = orig_execve(filename, argv, envp);
+    }
+    g_in_hook = false;
+    return res;
 }
 
 void* my_dlopen_ext(const char* filename, int flags, const void* extinfo) {
+    if (g_in_hook) return orig_dlopen_ext(filename, flags, extinfo);
+    g_in_hook = true;
+    void* res;
     if (filename) {
         std::string path = redirect_path(filename);
-        return orig_dlopen_ext(path.c_str(), flags, extinfo);
+        res = orig_dlopen_ext(path.c_str(), flags, extinfo);
+    } else {
+        res = orig_dlopen_ext(filename, flags, extinfo);
     }
-    return orig_dlopen_ext(filename, flags, extinfo);
+    g_in_hook = false;
+    return res;
 }
 
 void* my_dlopen(const char* filename, int flags) {
+    if (g_in_hook) return orig_dlopen(filename, flags);
+    g_in_hook = true;
+    void* res;
     if (filename) {
         std::string path = redirect_path(filename);
         if (path != filename) {
             LOGI("HOOK: dlopen redirected %s -> %s", filename, path.c_str());
         }
-        return orig_dlopen(path.c_str(), flags);
+        res = orig_dlopen(path.c_str(), flags);
+    } else {
+        res = orig_dlopen(filename, flags);
     }
-    return orig_dlopen(filename, flags);
+    g_in_hook = false;
+    return res;
 }
 
 FILE* my_fopen(const char* filename, const char* mode) {
+    if (g_in_hook) return orig_fopen(filename, mode);
+    g_in_hook = true;
+    FILE* res;
     if (filename) {
         std::string path = redirect_path(filename);
-        return orig_fopen(path.c_str(), mode);
+        res = orig_fopen(path.c_str(), mode);
+    } else {
+        res = orig_fopen(filename, mode);
     }
-    return orig_fopen(filename, mode);
+    g_in_hook = false;
+    return res;
 }
 
 pid_t my_getppid() {
@@ -288,20 +373,48 @@ pid_t my_getppid() {
 
 // --- JNI Implementation for NativeHookManager ---
 
+static void safe_hook(void* target, void* replace, void** origin, const char* name) {
+    if (!target) {
+        LOGE("Failed to hook %s: target is null", name);
+        return;
+    }
+    if (DobbyHook(target, replace, origin) == 0) {
+        LOGI("Successfully hooked: %s at %p", name, target);
+    } else {
+        LOGE("FAILED to hook: %s at %p", name, target);
+    }
+}
+
+static bool g_init_done = false;
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstring virtual_root, jstring package_name) {
+    if (g_init_done) {
+        LOGI("initHooks: Already initialized, skipping.");
+        return;
+    }
+    g_init_done = true;
+
+    if (!virtual_root || !package_name) {
+        LOGE("initHooks: null arguments provided");
+        return;
+    }
     const char* v_root = env->GetStringUTFChars(virtual_root, nullptr);
     const char* p_name = env->GetStringUTFChars(package_name, nullptr);
+    if (!v_root || !p_name) {
+        LOGE("initHooks: failed to get UTF chars");
+        return;
+    }
     g_virtual_root = v_root;
     g_package_name = p_name;
 
-    LOGI("Initializing Sandbox IO Layer for: %s", p_name);
+    LOGI(">>> Initializing OneCore Native Engine for: %s <<<", p_name);
 
-    // Apply Stealth first
+    LOGI("Phase 1: Security Bypass");
     OneCore::enableStealthMode();
     OneCore::bypassHiddenApi(env);
 
-    // Call modular hooks
+    LOGI("Phase 2: Modular Internal Hooks");
     OneCore::installFileSystemHooks();
     OneCore::installRuntimeHooks();
     OneCore::installJniHooks(env);
@@ -310,67 +423,43 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
     OneCore::installKernelShield();
     OneCore::installSocketHooks();
 
+    LOGI("Phase 3: Standard Library Hooks (LibC)");
     void* libc = dlopen("libc.so", RTLD_NOW);
     if (libc) {
-        LOGI("Found libc.so, hooking symbols...");
-        void* fopen_ptr = dlsym(libc, "fopen");
-        if (fopen_ptr) DobbyHook(fopen_ptr, (void*)my_fopen, (void**)&orig_fopen);
-        
-        void* open_ptr = dlsym(libc, "open");
-        if (open_ptr) DobbyHook(open_ptr, (void*)my_open, (void**)&orig_open);
-        
-        void* openat_ptr = dlsym(libc, "openat");
-        if (openat_ptr) DobbyHook(openat_ptr, (void*)my_openat, (void**)&orig_openat);
-        
-        void* access_ptr = dlsym(libc, "access");
-        if (access_ptr) DobbyHook(access_ptr, (void*)my_access, (void**)&orig_access);
-        
-        void* faccessat_ptr = dlsym(libc, "faccessat");
-        if (faccessat_ptr) DobbyHook(faccessat_ptr, (void*)my_faccessat, (void**)&orig_faccessat);
-        
-        void* stat_ptr = dlsym(libc, "stat");
-        if (stat_ptr) DobbyHook(stat_ptr, (void*)my_stat, (void**)&orig_stat);
-        
-        void* lstat_ptr = dlsym(libc, "lstat");
-        if (lstat_ptr) DobbyHook(lstat_ptr, (void*)my_lstat, (void**)&orig_lstat);
-        
-        void* fstatat_ptr = dlsym(libc, "fstatat");
-        if (fstatat_ptr) DobbyHook(fstatat_ptr, (void*)my_fstatat, (void**)&orig_fstatat);
-        
-        void* readlink_ptr = dlsym(libc, "readlink");
-        if (readlink_ptr) DobbyHook(readlink_ptr, (void*)my_readlink, (void**)&orig_readlink);
-        
-        void* opendir_ptr = dlsym(libc, "opendir");
-        if (opendir_ptr) DobbyHook(opendir_ptr, (void*)my_opendir, (void**)&orig_opendir);
-        
-        void* execve_ptr = dlsym(libc, "execve");
-        if (execve_ptr) DobbyHook(execve_ptr, (void*)my_execve, (void**)&orig_execve);
-        
-        void* getppid_ptr = dlsym(libc, "getppid");
-        if (getppid_ptr) DobbyHook(getppid_ptr, (void*)my_getppid, (void**)&orig_getppid);
-        
-        void* opendir2_ptr = dlsym(libc, "__opendir2");
-        if (opendir2_ptr) DobbyHook(opendir2_ptr, (void*)my_opendir2, (void**)&orig_opendir2);
-        
-        LOGI("Extended Native Hooks (IO + PROC + EXEC) INSTALLED.");
+        safe_hook(dlsym(libc, "fopen"), (void*)my_fopen, (void**)&orig_fopen, "fopen");
+        safe_hook(dlsym(libc, "open"), (void*)my_open, (void**)&orig_open, "open");
+        safe_hook(dlsym(libc, "openat"), (void*)my_openat, (void**)&orig_openat, "openat");
+        safe_hook(dlsym(libc, "access"), (void*)my_access, (void**)&orig_access, "access");
+        safe_hook(dlsym(libc, "faccessat"), (void*)my_faccessat, (void**)&orig_faccessat, "faccessat");
+        safe_hook(dlsym(libc, "stat"), (void*)my_stat, (void**)&orig_stat, "stat");
+        safe_hook(dlsym(libc, "lstat"), (void*)my_lstat, (void**)&orig_lstat, "lstat");
+        safe_hook(dlsym(libc, "fstatat"), (void*)my_fstatat, (void**)&orig_fstatat, "fstatat");
+        safe_hook(dlsym(libc, "readlink"), (void*)my_readlink, (void**)&orig_readlink, "readlink");
+        safe_hook(dlsym(libc, "opendir"), (void*)my_opendir, (void**)&orig_opendir, "opendir");
+        safe_hook(dlsym(libc, "execve"), (void*)my_execve, (void**)&orig_execve, "execve");
+        safe_hook(dlsym(libc, "getppid"), (void*)my_getppid, (void**)&orig_getppid, "getppid");
+        safe_hook(dlsym(libc, "__opendir2"), (void*)my_opendir2, (void**)&orig_opendir2, "__opendir2");
         dlclose(libc);
+    } else {
+        LOGE("CRITICAL: Could not open libc.so!");
     }
 
+    LOGI("Phase 4: Dynamic Linker Hooks (LibDL)");
     void* libdl = dlopen("libdl.so", RTLD_NOW);
     if (libdl) {
-        void* dlopen_ptr = dlsym(libdl, "dlopen");
-        if (dlopen_ptr) DobbyHook(dlopen_ptr, (void*)my_dlopen, (void**)&orig_dlopen);
-        
-        void* dlopen_ext_ptr = dlsym(libdl, "android_dlopen_ext");
-        if (dlopen_ext_ptr) DobbyHook(dlopen_ext_ptr, (void*)my_dlopen_ext, (void**)&orig_dlopen_ext);
+        safe_hook(dlsym(libdl, "dlopen"), (void*)my_dlopen, (void**)&orig_dlopen, "dlopen");
+        safe_hook(dlsym(libdl, "android_dlopen_ext"), (void*)my_dlopen_ext, (void**)&orig_dlopen_ext, "android_dlopen_ext");
         dlclose(libdl);
     }
     
+    LOGI("Phase 5: Rendering Hooks (GLES)");
     void* libgles = dlopen("libGLESv2.so", RTLD_NOW);
     if (libgles) {
-        DobbyHook(dlsym(libgles, "glGetString"), (void*)my_glGetString, (void**)&orig_glGetString);
+        safe_hook(dlsym(libgles, "glGetString"), (void*)my_glGetString, (void**)&orig_glGetString, "glGetString");
         dlclose(libgles);
     }
+
+    LOGI(">>> Native Engine Initialization COMPLETE for: %s <<<", p_name);
 
     env->ReleaseStringUTFChars(virtual_root, v_root);
     env->ReleaseStringUTFChars(package_name, p_name);
@@ -406,15 +495,20 @@ Java_com_onecore_sdk_NativeHook_writeMemoryNative(JNIEnv* env, jobject obj, jlon
     if (addr == 0 || data == nullptr) return JNI_FALSE;
     jsize size = env->GetArrayLength(data);
     jbyte* buffer = env->GetByteArrayElements(data, nullptr);
+    if (buffer == nullptr) return JNI_FALSE;
     
     // Use mprotect to ensure memory is writable (typical in Unreal Engine hacks)
     long pagesize = sysconf(_SC_PAGESIZE);
     void* page = (void*)(addr & ~(pagesize - 1));
-    mprotect(page, pagesize * 2, PROT_READ | PROT_WRITE | PROT_EXEC);
-    
-    memcpy((void*)addr, buffer, size);
-    env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
-    return JNI_TRUE;
+    if (mprotect(page, pagesize * 2, PROT_READ | PROT_WRITE | PROT_EXEC) == 0) {
+        memcpy((void*)addr, buffer, size);
+        env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
+        return JNI_TRUE;
+    } else {
+        LOGE("writeMemoryNative: mprotect failed: %s", strerror(errno));
+        env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
+        return JNI_FALSE;
+    }
 }
 
 // --- UID Spoofing Hook ---
