@@ -150,6 +150,13 @@ static uid_t (*orig_getgid)() = nullptr;
 // Recursion guard is handled via Utils/RecursionGuard.h
 
 // --- Rendering Hooks ---
+static int g_egl_frame_count = 0;
+static int g_vk_frame_count = 0;
+static int g_buffer_enqueue_count = 0;
+static int g_buffer_dequeue_count = 0;
+static bool g_hwc_bypass_detected = false;
+thread_local bool g_in_hook = false;
+
 static int (*orig_Surface_dequeueBuffer)(void* self, void** buffer, int* fenceFd) = nullptr;
 static int (*orig_Surface_queueBuffer)(void* self, void* buffer, int fenceFd) = nullptr;
 
@@ -192,12 +199,6 @@ static EGLBoolean (*orig_eglMakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSur
 static EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface) = nullptr;
 
 static EGLNativeWindowType g_target_window = nullptr;
-
-static int g_egl_frame_count = 0;
-static int g_vk_frame_count = 0;
-static int g_buffer_enqueue_count = 0;
-static int g_buffer_dequeue_count = 0;
-static bool g_hwc_bypass_detected = false;
 
 static void print_rendering_diagnosis() {
     static int last_diag_time = 0;
