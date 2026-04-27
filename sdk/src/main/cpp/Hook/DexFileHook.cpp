@@ -1,4 +1,5 @@
 #include "DexFileHook.h"
+#include <string>
 #include <dlfcn.h>
 #include <android/log.h>
 #include "../dobby.h"
