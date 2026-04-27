@@ -29,9 +29,6 @@ static eglCreateWindowSurface_t orig_eglCreateWindowSurface = nullptr;
 static eglMakeCurrent_t orig_eglMakeCurrent = nullptr;
 static eglSwapBuffers_t orig_eglSwapBuffers = nullptr;
 
-// Global pointer for debugging / tracking last created window
-static ANativeWindow* g_lastValidWindow = nullptr;
-
 // Hook implementations
 ANativeWindow* my_ANativeWindow_fromSurface(JNIEnv* env, jobject surface) {
     if (g_in_hook) return orig_ANativeWindow_fromSurface(env, surface);
@@ -42,17 +39,12 @@ ANativeWindow* my_ANativeWindow_fromSurface(JNIEnv* env, jobject surface) {
     ANativeWindow* window = orig_ANativeWindow_fromSurface(env, surface);
 
     if (window == nullptr) {
-        LOGE("[RenderingHook] Window is NULL, attempting fallback");
-
-        if (g_lastValidWindow != nullptr) {
-            LOGD("[RenderingHook] Using last valid window: %p", g_lastValidWindow);
-            g_in_hook = false;
-            return g_lastValidWindow;
-        }
-    } else {
-        LOGD("[RenderingHook] Valid window acquired: %p", window);
-        g_lastValidWindow = window;
+        LOGE("[RenderingHook] Window is NULL — no fallback used");
+        g_in_hook = false;
+        return nullptr;
     }
+
+    LOGD("[RenderingHook] Valid window acquired: %p", window);
 
     g_in_hook = false;
     return window;
@@ -79,7 +71,6 @@ void my_ANativeWindow_release(ANativeWindow* window) {
     g_in_hook = true;
 
     LOGI("HOOK: ANativeWindow_release(window=%p)", window);
-    // Do NOT null g_lastValidWindow here to keep as fallback
     orig_ANativeWindow_release(window);
 
     g_in_hook = false;
@@ -92,32 +83,12 @@ EGLSurface my_eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config, EGLNative
 
     LOGI("HOOK: eglCreateWindowSurface(dpy=%p, config=%p, win=%p, attrib_list=%p)", dpy, config, (void*)win, attrib_list);
     
-    EGLNativeWindowType target_win = win;
-    bool using_fallback = false;
-
-    if (target_win == nullptr && g_lastValidWindow != nullptr) {
-        LOGI("eglCreateWindowSurface: Received NULL window, falling back to last valid window: %p", g_lastValidWindow);
-        target_win = (EGLNativeWindowType)g_lastValidWindow;
-        using_fallback = true;
-    }
-
-    EGLSurface surface = orig_eglCreateWindowSurface(dpy, config, target_win, attrib_list);
+    EGLSurface surface = orig_eglCreateWindowSurface(dpy, config, win, attrib_list);
     
     if (surface == EGL_NO_SURFACE) {
-        LOGE("FAILURE: eglCreateWindowSurface returned EGL_NO_SURFACE. Window=%p, Error=0x%x", (void*)target_win, eglGetError());
-        
-        // If it failed and we haven't tried the fallback yet, try it now
-        if (!using_fallback && g_lastValidWindow != nullptr && target_win != (EGLNativeWindowType)g_lastValidWindow) {
-            LOGI("RETRYING eglCreateWindowSurface with fallback window: %p", g_lastValidWindow);
-            surface = orig_eglCreateWindowSurface(dpy, config, (EGLNativeWindowType)g_lastValidWindow, attrib_list);
-            if (surface != EGL_NO_SURFACE) {
-                LOGI("SUCCESS: Fallback window recovered the EGLSurface: %p", surface);
-            } else {
-                LOGE("CRITICAL: Fallback window also FAILED. Error=0x%x", eglGetError());
-            }
-        }
+        LOGE("FAILURE: eglCreateWindowSurface returned EGL_NO_SURFACE. Window=%p, Error=0x%x", (void*)win, eglGetError());
     } else {
-        LOGI("SUCCESS: Created EGLSurface %p for window %p", surface, (void*)target_win);
+        LOGI("SUCCESS: Created EGLSurface %p for window %p", surface, (void*)win);
     }
 
     g_in_hook = false;

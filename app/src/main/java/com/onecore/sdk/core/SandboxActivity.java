@@ -102,10 +102,10 @@ public class SandboxActivity extends Activity {
             
             startActivity(intent);
             
-            Logger.i(TAG, "Virtual startup sequence initiated.");
+            Logger.i(TAG, "Virtual startup sequence initiated. StubActivity hosting rendering.");
             
-            // Self-destruct this activity after handover (Extended delay for stability)
-            new Handler(Looper.getMainLooper()).postDelayed(this::finish, 5000);
+            // Finish loader activity immediately after handoff to StubActivity
+            finish();
 
         } catch (Exception e) {
             Logger.e(TAG, "Sandbox Execution Failure: " + e.getMessage());

@@ -45,44 +45,68 @@ public class StubActivity extends Activity implements SurfaceHolder.Callback {
         String targetActivity = getIntent().getStringExtra("target_activity");
         
         if (targetPkg != null && targetActivity != null) {
-            setupVirtualDisplay(targetPkg, targetActivity);
+            launchTargetApp(targetPkg, targetActivity);
         } else {
             Logger.w(TAG, "Redirection failed: StubActivity.onCreate reached with no targets!");
         }
     }
 
-    private void setupVirtualDisplay(String pkg, String activity) {
-        DisplayMetrics metrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        
-        // Initialize Virtual Display (Surface will be synced in surfaceCreated)
-        VirtualDisplayManager.getInstance(this).createSecureDisplay(
-            this, "OneCore-Virtual", metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, null
-        );
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Logger.i(TAG, "StubActivity: onResume");
+    }
 
-        Logger.i(TAG, "Stub handoff: " + pkg + "/" + activity);
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Logger.i(TAG, "StubActivity: onPause");
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Logger.i(TAG, "StubActivity: onStart");
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        Logger.i(TAG, "StubActivity: onStop");
+    }
+
+    private void launchTargetApp(String pkg, String activity) {
+        Logger.i(TAG, "Stub handoff: Preparing to launch " + pkg + " on default display.");
         
         try {
-            Intent intent = new Intent();
-            intent.setClassName(pkg, activity);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            // Resolve main launcher activity using PackageManager (Do NOT hardcode)
+            Intent launchIntent = getPackageManager().getLaunchIntentForPackage(pkg);
+            
+            if (launchIntent == null) {
+                Logger.e(TAG, "Launch intent is null for " + pkg + ". Attemping manual resolve.");
+                if (activity != null) {
+                    launchIntent = new Intent();
+                    launchIntent.setClassName(pkg, activity);
+                } else {
+                    return;
+                }
+            }
+
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             
             // Forward extras
             Bundle extras = getIntent().getExtras();
             if (extras != null) {
-                intent.putExtras(extras);
+                launchIntent.putExtras(extras);
             }
             
-            // Critical: Launch target in the Virtual Display
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ActivityOptions options = ActivityOptions.makeBasic();
-                options.setLaunchDisplayId(VirtualDisplayManager.getInstance(this).getDisplayId());
-                startActivity(intent, options.toBundle());
-            } else {
-                startActivity(intent);
-            }
+            Logger.i(TAG, "Launching target activity normally...");
+            startActivity(launchIntent);
+            Logger.i(TAG, "startActivity called successfully.");
         } catch (Exception e) {
-            Logger.e(TAG, "Failed to launch target activity from Stub", e);
+            Logger.e(TAG, "Launch failed", e);
         }
     }
 

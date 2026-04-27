@@ -384,6 +384,17 @@ static void safe_hook(void* target, void* replace, void** origin, const char* na
 
 static bool g_init_done = false;
 
+extern "C" JNIEXPORT jint JNICALL
+JNI_OnLoad(JavaVM* vm, void* reserved) {
+    LOGI(">>> OneCore Native Library LOADED by process: %d <<<", getpid());
+    return JNI_VERSION_1_6;
+}
+
+extern "C" JNIEXPORT void JNICALL
+JNI_OnUnload(JavaVM* vm, void* reserved) {
+    LOGI(">>> OneCore Native Library UNLOADED from process: %d <<<", getpid());
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstring virtual_root, jstring package_name) {
     if (g_init_done) {
