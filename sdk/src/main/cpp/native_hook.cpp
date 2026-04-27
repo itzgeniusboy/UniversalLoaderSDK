@@ -19,7 +19,6 @@
 #include "Utils/ModuleScanner.h"
 #include "Hook/DexFileHook.h"
 #include "Hook/SocketHook.h"
-#include "Hook/RenderingHook.h"
 #include "KittyMemory/KittyMemory.h"
 #include "Utils/RecursionGuard.h"
 #include <stdarg.h>
