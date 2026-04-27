@@ -34,6 +34,7 @@ static open_t orig_open = nullptr;
 
 typedef uid_t (*getuid_t)();
 static getuid_t orig_getuid = nullptr;
+static getuid_t orig_geteuid = nullptr;
 
 typedef FILE* (*fopen_t)(const char* filename, const char* mode);
 static fopen_t orig_fopen = nullptr;
