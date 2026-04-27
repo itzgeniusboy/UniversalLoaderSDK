@@ -15,7 +15,11 @@ static syscall_t orig_syscall = nullptr;
 
 long my_syscall(long number, long arg1, long arg2, long arg3, long arg4, long arg5, long arg6) {
     // If the process is checking critical anti-debug files
-    if (number == __NR_openat || number == __NR_open) {
+    if (number == __NR_openat
+#ifdef __NR_open
+        || number == __NR_open
+#endif
+    ) {
         // Advanced Filtering logic here
     }
     return orig_syscall(number, arg1, arg2, arg3, arg4, arg5, arg6);
