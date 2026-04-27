@@ -19,6 +19,7 @@
 #include "Utils/ModuleScanner.h"
 #include "Hook/DexFileHook.h"
 #include "Hook/SocketHook.h"
+#include "Hook/RenderingHook.h"
 #include "KittyMemory/KittyMemory.h"
 #include "Utils/RecursionGuard.h"
 
@@ -418,6 +419,7 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
     OneCore::installDexHooks();
     OneCore::installKernelShield();
     OneCore::installSocketHooks();
+    OneCore::installRenderingHooks();
 
     LOGI("Phase 3: Standard Library Hooks (LibC)");
     void* libc = dlopen("libc.so", RTLD_NOW);

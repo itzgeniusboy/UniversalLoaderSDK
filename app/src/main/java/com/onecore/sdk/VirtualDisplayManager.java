@@ -17,6 +17,7 @@ public class VirtualDisplayManager {
     private static final String TAG = "OneCore-VDM";
     private static VirtualDisplayManager instance;
     private VirtualDisplay virtualDisplay;
+    private Surface currentSurface;
 
     private VirtualDisplayManager(Context context) {}
 
@@ -27,15 +28,20 @@ public class VirtualDisplayManager {
 
     /**
      * Creates a virtual display with appropriate security flags based on API level.
+     * Attaches the provided surface as the primary rendering target.
      */
     public VirtualDisplay createSecureDisplay(Context context, String name, int w, int h, int dpi, Surface surface) {
+        this.currentSurface = surface;
+        
         DisplayManager dm = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
         if (dm == null) {
             Log.e(TAG, "FALLBACK: DisplayManager not found. Using system default display.");
             return null;
         }
 
-        int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC | DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION;
+        int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC | 
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION |
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR; // Added for better compatibility
         
         // Android 14-16 (API 34-36) Standard Isolation
         if (Build.VERSION.SDK_INT >= 26) {
@@ -54,10 +60,16 @@ public class VirtualDisplayManager {
         }
 
         try {
+            if (surface != null) {
+                Log.i(TAG, "ATTACHING REAL SURFACE to VirtualDisplay: " + surface.toString());
+            } else {
+                Log.w(TAG, "CREATING DISPLAY WITHOUT SURFACE (Rendering will be deferred)");
+            }
+
             // Attempt standard creation
             virtualDisplay = dm.createVirtualDisplay(name, w, h, dpi, surface, flags);
             if (virtualDisplay != null) {
-                Log.i(TAG, "SUCCESS: Virtual Display created (API " + Build.VERSION.SDK_INT + ")");
+                Log.i(TAG, "SUCCESS: Virtual Display created (Display ID: " + virtualDisplay.getDisplay().getDisplayId() + ")");
                 return virtualDisplay;
             }
         } catch (SecurityException e) {
@@ -68,6 +80,30 @@ public class VirtualDisplayManager {
         }
 
         return applyFutureFallback(name, w, h);
+    }
+
+    /**
+     * Sycnronizes the Activity window with the Virtual Display surface.
+     * This fixes the "Black Screen" issue by ensuring the rendering pipeline is connected.
+     */
+    public void syncSurface(Surface surface) {
+        if (surface == null) return;
+        
+        this.currentSurface = surface;
+        if (virtualDisplay != null) {
+            Log.i(TAG, "SYNCING Surface to Active Display: " + surface);
+            virtualDisplay.setSurface(surface);
+        } else {
+            Log.w(TAG, "SYNC FAILED: VirtualDisplay not initialized yet.");
+        }
+    }
+
+    public Surface getCurrentSurface() {
+        return currentSurface;
+    }
+
+    public int getDisplayId() {
+        return (virtualDisplay != null) ? virtualDisplay.getDisplay().getDisplayId() : Display.DEFAULT_DISPLAY;
     }
 
     /**
