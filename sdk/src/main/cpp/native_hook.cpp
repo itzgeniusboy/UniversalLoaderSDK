@@ -51,18 +51,26 @@ static pid_t (*orig_getppid)() = nullptr;
 // --- EGL Hooks ---
 static const char* (*orig_glGetString)(int name) = nullptr;
 const char* my_glGetString(int name) {
-    if (name == 0x1F00) return "Qualcomm"; // GL_VENDOR
-    if (name == 0x1F01) return "Adreno (TM) 650"; // GL_RENDERER
-    return orig_glGetString(name);
+    if (g_in_hook) return orig_glGetString(name);
+    g_in_hook = true;
+    const char* res;
+    if (name == 0x1F00) res = "Qualcomm"; // GL_VENDOR
+    else if (name == 0x1F01) res = "Adreno (TM) 650"; // GL_RENDERER
+    else res = orig_glGetString(name);
+    g_in_hook = false;
+    return res;
 }
 
 /**
  * Path Redirection Engine for BGMI Sandbox.
  */
 static std::string redirect_path(const char* path) {
-    if (!path || g_virtual_root.empty()) return path ? path : "";
+    if (g_in_hook || !path || g_virtual_root.empty()) return path ? path : "";
     
     std::string s_path(path);
+    
+    // Safety check: is it a system critical path we shouldn't touch?
+    if (s_path.size() < 2 || s_path[0] != '/') return s_path;
     
     // Auto-rewrite lib paths if they point to system or host but should be in sandbox
     if (s_path.find("/data/app/") != std::string::npos && s_path.find("/lib/") != std::string::npos) {
@@ -84,12 +92,12 @@ static std::string redirect_path(const char* path) {
     
     // Anti-Detection: Proc Spoofing
     if (s_path == "/proc/self/exe") {
-        return "/system/bin/app_process"; // Simulated for anti-detection or return target APK
+        return "/system/bin/app_process"; 
     }
 
     if (s_path == "/proc/self/cmdline" || s_path == "/proc/cmdline") {
         std::string fake_cmd = g_virtual_root + "/proc_cmdline";
-        // We use orig_fopen to avoid recursion
+        // Use original fopen to prevent recursion
         FILE* f = orig_fopen ? orig_fopen(fake_cmd.c_str(), "w") : fopen(fake_cmd.c_str(), "w");
         if (f) {
             fprintf(f, "%s", g_package_name.c_str());
@@ -105,12 +113,13 @@ static std::string redirect_path(const char* path) {
         if (original && filtered) {
             char line[1024];
             while (fgets(line, sizeof(line), original)) {
-                if (strstr(line, "onecore") == nullptr && strstr(line, "v_lib") == nullptr) {
+                // Hide OneCore and Virtual spaces from memory maps
+                if (strstr(line, "onecore") == nullptr && strstr(line, "v_lib") == nullptr && strstr(line, "libdobby") == nullptr) {
                     fputs(line, filtered);
                 }
             }
-            fclose(original);
-            fclose(filtered);
+            if (original) fclose(original);
+            if (filtered) fclose(filtered);
         }
         return fake_maps;
     }
@@ -124,12 +133,14 @@ static std::string redirect_path(const char* path) {
             while (fgets(line, sizeof(line), original)) {
                 if (strstr(line, "TracerPid:") != nullptr) {
                     fputs("TracerPid:\t0\n", filtered);
+                } else if (strstr(line, "Uid:") != nullptr) {
+                    fputs("Uid:\t1000\t1000\t1000\t1000\n", filtered); // Fake system UID
                 } else {
                     fputs(line, filtered);
                 }
             }
-            fclose(original);
-            fclose(filtered);
+            if (original) fclose(original);
+            if (filtered) fclose(filtered);
         }
         return fake_status;
     }
@@ -500,13 +511,21 @@ Java_com_onecore_sdk_NativeHook_writeMemoryNative(JNIEnv* env, jobject obj, jlon
 static uid_t g_fake_uid = 10100;
 static uid_t (*orig_getuid)() = nullptr;
 static uid_t (*orig_geteuid)() = nullptr;
+static uid_t (*orig_getgid)() = nullptr;
 
 uid_t my_getuid() {
+    if (g_in_hook) return orig_getuid();
     return g_fake_uid;
 }
 
 uid_t my_geteuid() {
+    if (g_in_hook) return orig_geteuid();
     return g_fake_uid;
+}
+
+uid_t my_getgid() {
+    if (g_in_hook) return orig_getgid();
+    return 2000; // Fake shell/system group
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -516,8 +535,7 @@ Java_com_onecore_sdk_core_UidSpoofing_applyNative(JNIEnv* env, jclass clazz, jin
     if (libc) {
         DobbyHook(dlsym(libc, "getuid"), (void*)my_getuid, (void**)&orig_getuid);
         DobbyHook(dlsym(libc, "geteuid"), (void*)my_geteuid, (void**)&orig_geteuid);
-        // Some games use getcallinguid from binder, but that's usually at service level.
-        // We'll hook getuid and geteuid which are common in native layer.
+        DobbyHook(dlsym(libc, "getgid"), (void*)my_getgid, (void**)&orig_getgid);
         LOGI("Native UID Spoof applied: %d", fakeUid);
         dlclose(libc);
     }

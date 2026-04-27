@@ -59,7 +59,7 @@ public class SandboxActivity extends Activity {
         try {
             VirtualContainer container = VirtualContainer.getInstance();
             
-            // 0. Ensure Virtual Environment is ready in this process
+            // 0. Ensure Virtual Environment is ready in this process (Only call once!)
             boolean synced = container.installApk(this, container.getApkPath(), targetPackage);
             if (!synced) {
                 Logger.e(TAG, "Process Environment Sync Failed!");
@@ -74,12 +74,10 @@ public class SandboxActivity extends Activity {
             }
 
             // 1. Basic hooks (UID, Filesystem redirection)
-            String virtualRoot = "/data/data/" + getPackageName() + "/files/virtual/" + targetPackage;
             com.onecore.sdk.IORedirector.ensureVirtualEnv(this, targetPackage);
             
             // 1.5 Apply Deep System Hooks
             Logger.i(TAG, "Applying Anti-Root & Virtualization Hooks...");
-            container.installApk(this, container.getApkPath(), targetPackage);
             com.onecore.sdk.core.UidSpoofing.apply(10000 + (int)(Math.random() * 5000));
             
             // 2. Resolve target activity
@@ -106,8 +104,8 @@ public class SandboxActivity extends Activity {
             
             Logger.i(TAG, "Virtual startup sequence initiated.");
             
-            // Self-destruct this activity after handover
-            new Handler(Looper.getMainLooper()).postDelayed(this::finish, 2000);
+            // Self-destruct this activity after handover (Extended delay for stability)
+            new Handler(Looper.getMainLooper()).postDelayed(this::finish, 5000);
 
         } catch (Exception e) {
             Logger.e(TAG, "Sandbox Execution Failure: " + e.getMessage());
