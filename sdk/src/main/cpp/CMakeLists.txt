@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(onecore_native SHARED
         native_hook.cpp
         memory.cpp
+        dobby.c
 )
 
 target_include_directories(onecore_native PRIVATE .)
