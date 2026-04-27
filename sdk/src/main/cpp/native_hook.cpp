@@ -155,7 +155,7 @@ static int g_vk_frame_count = 0;
 static int g_buffer_enqueue_count = 0;
 static int g_buffer_dequeue_count = 0;
 static bool g_hwc_bypass_detected = false;
-thread_local bool g_in_hook = false;
+extern thread_local bool g_in_hook;
 
 static int (*orig_Surface_dequeueBuffer)(void* self, void** buffer, int* fenceFd) = nullptr;
 static int (*orig_Surface_queueBuffer)(void* self, void* buffer, int fenceFd) = nullptr;
