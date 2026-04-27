@@ -46,8 +46,7 @@ static void* (*orig_dlopen_ext)(const char* filename, int flags, const void* ext
 static FILE* (*orig_fopen)(const char* filename, const char* mode) = nullptr;
 static pid_t (*orig_getppid)() = nullptr;
 
-// Recursion guard
-static thread_local bool in_hook = false;
+// Recursion guard is handled via Utils/RecursionGuard.h
 
 // --- EGL Hooks ---
 static const char* (*orig_glGetString)(int name) = nullptr;
@@ -192,20 +191,6 @@ static std::string redirect_path(const char* path) {
 
     return s_path;
 }
-
-#define HOOK_GUARD() \
-    if (in_hook) return false; \
-    in_hook = true; \
-    // ... logic ...
-    in_hook = false;
-
-// We'll use a more robust guard in the Actual Hook functions
-#define ENTER_HOOK() \
-    if (in_hook) return; \
-    in_hook = true;
-
-#define EXIT_HOOK() \
-    in_hook = false;
 
 // Updated Hook functions with guard
 static int my_open(const char *pathname, int flags, mode_t mode) {
