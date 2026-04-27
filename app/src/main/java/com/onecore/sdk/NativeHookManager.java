@@ -49,4 +49,5 @@ public class NativeHookManager {
     }
 
     private static native void initHooks(String virtualRoot, String packageName);
+    public static native void setTargetSurface(android.view.Surface surface);
 }

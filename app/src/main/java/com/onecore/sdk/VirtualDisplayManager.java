@@ -7,7 +7,9 @@ import android.os.Build;
 import android.util.Log;
 import android.view.Display;
 import android.view.Surface;
+import android.util.DisplayMetrics;
 import java.lang.reflect.Method;
+import com.onecore.sdk.NativeHookManager;
 
 /**
  * Android 14-18 Compatible Virtual Display Manager.
@@ -32,6 +34,9 @@ public class VirtualDisplayManager {
      */
     public VirtualDisplay createSecureDisplay(Context context, String name, int w, int h, int dpi, Surface surface) {
         this.currentSurface = surface;
+        
+        // Sync native layer immediately
+        NativeHookManager.setTargetSurface(surface);
         
         DisplayManager dm = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
         if (dm == null) {
@@ -95,9 +100,14 @@ public class VirtualDisplayManager {
      * This fixes the "Black Screen" issue by ensuring the rendering pipeline is connected.
      */
     public void syncSurface(Surface surface) {
-        if (surface == null) return;
+        if (surface == null) {
+            NativeHookManager.setTargetSurface(null);
+            return;
+        }
         
         this.currentSurface = surface;
+        NativeHookManager.setTargetSurface(surface);
+        
         if (virtualDisplay != null) {
             Log.i(TAG, "SYNCING Surface to Active Display: " + surface);
             virtualDisplay.setSurface(surface);

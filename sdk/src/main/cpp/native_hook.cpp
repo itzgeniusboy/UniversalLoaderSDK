@@ -136,11 +136,39 @@ static EGLBoolean (*orig_eglMakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSur
 
 static EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface) = nullptr;
 
+static EGLNativeWindowType g_target_window = nullptr;
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_onecore_sdk_NativeHookManager_setTargetSurface(JNIEnv* env, jclass clazz, jobject surface) {
+    if (surface == nullptr) {
+        g_target_window = nullptr;
+        return;
+    }
+    
+    if (orig_ANativeWindow_fromSurface != nullptr) {
+        g_target_window = (EGLNativeWindowType)orig_ANativeWindow_fromSurface(env, surface);
+    } else {
+        // Early call before hooks are installed - use dlopen/dlsym to be safe
+        void* libandroid = dlopen("libandroid.so", RTLD_NOW);
+        if (libandroid) {
+            auto func = (void* (*)(void*, jobject))dlsym(libandroid, "ANativeWindow_fromSurface");
+            if (func) g_target_window = (EGLNativeWindowType)func(env, surface);
+            dlclose(libandroid);
+        }
+    }
+    LOGI("Native target window set: %p", g_target_window);
+}
+
 void* my_ANativeWindow_fromSurface(void* env, jobject surface) {
     if (g_in_hook) return orig_ANativeWindow_fromSurface(env, surface);
     g_in_hook = true;
-    LOGI("HOOK: ANativeWindow_fromSurface called");
+    
     void* win = orig_ANativeWindow_fromSurface(env, surface);
+    if (g_target_window != nullptr) {
+        LOGI("SPOOFING ANativeWindow_fromSurface: Redirecting %p -> %p", win, g_target_window);
+        win = g_target_window;
+    }
+    
     g_in_hook = false;
     return win;
 }
@@ -164,9 +192,17 @@ void my_ANativeWindow_release(void* window) {
 EGLSurface my_eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list) {
     if (g_in_hook) return orig_eglCreateWindowSurface(dpy, config, win, attrib_list);
     g_in_hook = true;
+    
+    EGLNativeWindowType target_win = win;
+    if (g_target_window != nullptr) {
+        LOGI("SPOOFING eglCreateWindowSurface: Redirecting %p -> %p", win, g_target_window);
+        target_win = g_target_window;
+    }
+
     log_step(5, "eglCreateWindowSurface START");
-    LOGI("HOOK: eglCreateWindowSurface(dpy=%p, config=%p, win=%p)", dpy, config, win);
-    EGLSurface surface = orig_eglCreateWindowSurface(dpy, config, win, attrib_list);
+    LOGI("HOOK: eglCreateWindowSurface(dpy=%p, config=%p, win=%p)", dpy, config, target_win);
+    EGLSurface surface = orig_eglCreateWindowSurface(dpy, config, target_win, attrib_list);
+    
     if (surface == EGL_NO_SURFACE) {
         LOGE("eglCreateWindowSurface FAILED");
         check_egl_error("eglCreateWindowSurface");

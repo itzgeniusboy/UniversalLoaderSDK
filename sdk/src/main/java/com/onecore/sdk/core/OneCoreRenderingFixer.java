@@ -31,6 +31,9 @@ public class OneCoreRenderingFixer {
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
             
+            // Task 7: Handle protected/secure surfaces - Prevent FLAG_SECURE from blocking capture/rendering
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            
             // 3. Force OPAQUE window for EGL performance and visibility
             window.setFormat(android.graphics.PixelFormat.OPAQUE);
             
@@ -122,11 +125,11 @@ public class OneCoreRenderingFixer {
 
     private static void fixSingleSurfaceView(SurfaceView sv) {
         // UE4/BGMI Fix: The game needs to be on top to be visible through the decor
-        sv.setZOrderOnTop(true); 
-        sv.setZOrderMediaOverlay(false);
+        // sv.setZOrderOnTop(true); 
+        // sv.setZOrderMediaOverlay(false);
         
         // UE4 Fix: Set Opaque format on Holder
-        sv.getHolder().setFormat(android.graphics.PixelFormat.OPAQUE);
+        // sv.getHolder().setFormat(android.graphics.PixelFormat.OPAQUE);
         
         // Fix Surface Control for EGL
         try {

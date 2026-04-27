@@ -25,6 +25,9 @@ public class StubActivity extends Activity implements SurfaceHolder.Callback {
     private static final String TAG = "OneCore-Stub";
     private SurfaceView surfaceView;
 
+    private String pendingPkg;
+    private String pendingActivity;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -40,14 +43,14 @@ public class StubActivity extends Activity implements SurfaceHolder.Callback {
         surfaceView.getHolder().addCallback(this);
         setContentView(surfaceView);
 
-        // 3. Resolve target
-        String targetPkg = getIntent().getStringExtra("target_package");
-        String targetActivity = getIntent().getStringExtra("target_activity");
+        // 3. Resolve target - DEFER launch until surfaceCreated
+        pendingPkg = getIntent().getStringExtra("target_package");
+        pendingActivity = getIntent().getStringExtra("target_activity");
         
-        if (targetPkg != null && targetActivity != null) {
-            launchTargetApp(targetPkg, targetActivity);
-        } else {
+        if (pendingPkg == null) {
             Logger.w(TAG, "Redirection failed: StubActivity.onCreate reached with no targets!");
+        } else {
+            Logger.i(TAG, "StubActivity created. Waiting for Surface to launch " + pendingPkg);
         }
     }
 
@@ -96,15 +99,24 @@ public class StubActivity extends Activity implements SurfaceHolder.Callback {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             
+            // Task 1: Force app rendering to VirtualDisplay
+            int displayId = VirtualDisplayManager.getInstance(this).getDisplayId();
+            Logger.i(TAG, "Redirecting launch to Display ID: " + displayId);
+            
+            ActivityOptions options = ActivityOptions.makeBasic();
+            if (Build.VERSION.SDK_INT >= 26) {
+                options.setLaunchDisplayId(displayId);
+            }
+
             // Forward extras
             Bundle extras = getIntent().getExtras();
             if (extras != null) {
                 launchIntent.putExtras(extras);
             }
             
-            Logger.i(TAG, "Launching target activity normally...");
-            startActivity(launchIntent);
-            Logger.i(TAG, "startActivity called successfully.");
+            Logger.i(TAG, "Launching target activity on VirtualDisplay...");
+            startActivity(launchIntent, options.toBundle());
+            Logger.i(TAG, "startActivity with options called successfully.");
         } catch (Exception e) {
             Logger.e(TAG, "Launch failed", e);
         }
@@ -114,7 +126,20 @@ public class StubActivity extends Activity implements SurfaceHolder.Callback {
     public void surfaceCreated(SurfaceHolder holder) {
         Surface surface = holder.getSurface();
         Logger.i(TAG, "Host Surface CREATED: " + surface + " | valid=" + (surface != null && surface.isValid()));
+        
+        // Task 2: Hook and redirect rendering surface (Native)
+        com.onecore.sdk.NativeHookManager.setTargetSurface(surface);
+        
         VirtualDisplayManager.getInstance(this).syncSurface(surface);
+
+        // Launch deferred app
+        if (pendingPkg != null) {
+            String pkg = pendingPkg;
+            String act = pendingActivity;
+            pendingPkg = null; // Ensure only launched once
+            pendingActivity = null;
+            launchTargetApp(pkg, act);
+        }
     }
 
     @Override
@@ -127,6 +152,7 @@ public class StubActivity extends Activity implements SurfaceHolder.Callback {
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
         Logger.w(TAG, "Host Surface DESTROYED. Rendering will stop.");
+        com.onecore.sdk.NativeHookManager.setTargetSurface(null);
         VirtualDisplayManager.getInstance(this).syncSurface(null);
     }
 
