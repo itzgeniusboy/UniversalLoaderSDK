@@ -29,6 +29,7 @@
 
 #include <signal.h>
 #include <sys/syscall.h>
+#include <time.h>
 
 #define TAG "OneCore-Native"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -189,6 +190,20 @@ void my_ANativeWindow_release(void* window) {
     g_in_hook = false;
 }
 
+static void* (*orig_ASurfaceControl_createFromWindow)(void* parent, void* window, const char* debug_name) = nullptr;
+void* my_ASurfaceControl_createFromWindow(void* parent, void* window, const char* debug_name) {
+    if (g_in_hook) return orig_ASurfaceControl_createFromWindow(parent, window, debug_name);
+    g_in_hook = true;
+    void* win_target = window;
+    if (g_target_window != nullptr) {
+        LOGI("SurfaceControl Redirect: %p -> %p", window, g_target_window);
+        win_target = g_target_window;
+    }
+    void* res = orig_ASurfaceControl_createFromWindow(parent, win_target, debug_name);
+    g_in_hook = false;
+    return res;
+}
+
 EGLSurface my_eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list) {
     if (g_in_hook) return orig_eglCreateWindowSurface(dpy, config, win, attrib_list);
     g_in_hook = true;
@@ -229,6 +244,15 @@ EGLBoolean my_eglMakeCurrent(EGLDisplay dpy, EGLSurface draw, EGLSurface read, E
     return res;
 }
 
+static void* (*orig_eglGetProcAddress)(const char* procname) = nullptr;
+void* my_eglGetProcAddress(const char* procname) {
+    if (g_in_hook) return orig_eglGetProcAddress(procname);
+    if (procname && strcmp(procname, "eglCreateWindowSurface") == 0) {
+        return (void*)my_eglCreateWindowSurface;
+    }
+    return orig_eglGetProcAddress(procname);
+}
+
 EGLBoolean my_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     if (g_in_hook) return orig_eglSwapBuffers(dpy, surface);
     g_in_hook = true;
@@ -236,11 +260,116 @@ EGLBoolean my_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     if (++frame_count % 60 == 0) {
         LOGI("eglSwapBuffers: 60 frames rendered on thread %d", (int)gettid());
     }
-    EGLBoolean res = orig_eglSwapBuffers(dpy, surface);
+static EGLBoolean res = orig_eglSwapBuffers(dpy, surface);
+    if (res) {
+        static bool backend_logged = false;
+        if (!backend_logged) {
+            LOGI(">>> ACTIVE BACKEND: EGL <<<");
+            backend_logged = true;
+        }
+    }
     if (!res) {
         LOGE("eglSwapBuffers FAILED for surface %p", surface);
         check_egl_error("eglSwapBuffers");
     }
+    g_in_hook = false;
+    return res;
+}
+
+// --- Vulkan Hooks ---
+typedef void* VkInstance;
+typedef void* VkSurfaceKHR;
+typedef void* VkPhysicalDevice;
+typedef void* VkDevice;
+typedef uint32_t VkFlags;
+typedef enum VkStructureType {
+    VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR = 1000008000,
+} VkStructureType;
+
+typedef struct VkAndroidSurfaceCreateInfoKHR {
+    VkStructureType sType;
+    const void* pNext;
+    VkFlags flags;
+    void* window; // ANativeWindow*
+} VkAndroidSurfaceCreateInfoKHR;
+
+typedef struct VkPresentInfoKHR {
+    VkStructureType          sType;
+    const void*              pNext;
+    uint32_t                 waitSemaphoreCount;
+    const void*              pWaitSemaphores;
+    uint32_t                 swapchainCount;
+    const void*              pSwapchains;
+    const uint32_t*          pImageIndices;
+    const int*               pResults; // VkResult*
+} VkPresentInfoKHR;
+
+typedef void* (*PFN_vkVoidFunction)(void);
+static PFN_vkVoidFunction (*orig_vkGetInstanceProcAddr)(VkInstance instance, const char* pName) = nullptr;
+static PFN_vkVoidFunction (*orig_vkGetDeviceProcAddr)(VkDevice device, const char* pName) = nullptr;
+
+PFN_vkVoidFunction my_vkGetInstanceProcAddr(VkInstance instance, const char* pName) {
+    if (g_in_hook) return orig_vkGetInstanceProcAddr(instance, pName);
+    if (pName && strcmp(pName, "vkCreateAndroidSurfaceKHR") == 0) {
+        return (PFN_vkVoidFunction)my_vkCreateAndroidSurfaceKHR;
+    }
+    if (pName && strcmp(pName, "vkQueuePresentKHR") == 0) {
+        return (PFN_vkVoidFunction)my_vkQueuePresentKHR;
+    }
+    return orig_vkGetInstanceProcAddr(instance, pName);
+}
+
+PFN_vkVoidFunction my_vkGetDeviceProcAddr(VkDevice device, const char* pName) {
+    if (g_in_hook) return orig_vkGetDeviceProcAddr(device, pName);
+    if (pName && strcmp(pName, "vkQueuePresentKHR") == 0) {
+        return (PFN_vkVoidFunction)my_vkQueuePresentKHR;
+    }
+    return orig_vkGetDeviceProcAddr(device, pName);
+}
+
+static int (*orig_vkQueuePresentKHR)(void* queue, const VkPresentInfoKHR* pPresentInfo) = nullptr;
+
+int my_vkQueuePresentKHR(void* queue, const VkPresentInfoKHR* pPresentInfo) {
+    if (g_in_hook) return orig_vkQueuePresentKHR(queue, pPresentInfo);
+    g_in_hook = true;
+    
+    static int vk_frame_count = 0;
+    if (++vk_frame_count % 60 == 0) {
+        LOGI("vkQueuePresentKHR: 60 Vulkan frames rendered on thread %d", (int)gettid());
+    }
+    
+    int res = orig_vkQueuePresentKHR(queue, pPresentInfo);
+    if (res == 0) {
+        static bool vk_backend_logged = false;
+        if (!vk_backend_logged) {
+            LOGI(">>> ACTIVE BACKEND: VULKAN <<<");
+            vk_backend_logged = true;
+        }
+    }
+    g_in_hook = false;
+    return res;
+}
+
+static int (*orig_vkCreateAndroidSurfaceKHR)(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR* pCreateInfo, void* pAllocator, VkSurfaceKHR* pSurface) = nullptr;
+
+int my_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR* pCreateInfo, void* pAllocator, VkSurfaceKHR* pSurface) {
+    if (g_in_hook) return orig_vkCreateAndroidSurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
+    g_in_hook = true;
+    
+    LOGI("HOOK: vkCreateAndroidSurfaceKHR called");
+    VkAndroidSurfaceCreateInfoKHR createInfo = *pCreateInfo;
+    if (g_target_window != nullptr) {
+        LOGI("VULKAN SPOOF: Redirecting window %p -> %p", createInfo.window, g_target_window);
+        createInfo.window = g_target_window;
+    }
+    
+    int res = orig_vkCreateAndroidSurfaceKHR(instance, &createInfo, pAllocator, pSurface);
+    if (res != 0) {
+        LOGE("vkCreateAndroidSurfaceKHR FAILED: %d", res);
+    } else {
+        LOGI("vkCreateAndroidSurfaceKHR SUCCESS: surface=%p", *pSurface);
+    }
+    
     g_in_hook = false;
     return res;
 }
@@ -656,6 +785,14 @@ void* my_dlopen_ext(const char* filename, int flags, const void* extinfo) {
 
     res = orig_dlopen_ext(target_path, flags, extinfo);
     
+    if (res && filename && strstr(filename, "libvulkan.so")) {
+        LOGI("Vulkan Library (ext) Detected! Installing Vulkan hooks...");
+        safe_hook(dlsym(res, "vkCreateAndroidSurfaceKHR"), (void*)my_vkCreateAndroidSurfaceKHR, (void**)&orig_vkCreateAndroidSurfaceKHR, "vkCreateAndroidSurfaceKHR");
+        safe_hook(dlsym(res, "vkQueuePresentKHR"), (void*)my_vkQueuePresentKHR, (void**)&orig_vkQueuePresentKHR, "vkQueuePresentKHR");
+        safe_hook(dlsym(res, "vkGetInstanceProcAddr"), (void*)my_vkGetInstanceProcAddr, (void**)&orig_vkGetInstanceProcAddr, "vkGetInstanceProcAddr");
+        safe_hook(dlsym(res, "vkGetDeviceProcAddr"), (void*)my_vkGetDeviceProcAddr, (void**)&orig_vkGetDeviceProcAddr, "vkGetDeviceProcAddr");
+    }
+
     if (!res && filename) {
         LOGE("dlopen_ext FAIL: %s (asked as %s) | error=%s", target_path, filename, dlerror());
     } else if (res && filename) {
@@ -688,6 +825,14 @@ void* my_dlopen(const char* filename, int flags) {
     }
 
     res = orig_dlopen(target_path, flags);
+
+    if (res && filename && strstr(filename, "libvulkan.so")) {
+        LOGI("Vulkan Library Detected! Installing Vulkan hooks...");
+        safe_hook(dlsym(res, "vkCreateAndroidSurfaceKHR"), (void*)my_vkCreateAndroidSurfaceKHR, (void**)&orig_vkCreateAndroidSurfaceKHR, "vkCreateAndroidSurfaceKHR");
+        safe_hook(dlsym(res, "vkQueuePresentKHR"), (void*)my_vkQueuePresentKHR, (void**)&orig_vkQueuePresentKHR, "vkQueuePresentKHR");
+        safe_hook(dlsym(res, "vkGetInstanceProcAddr"), (void*)my_vkGetInstanceProcAddr, (void**)&orig_vkGetInstanceProcAddr, "vkGetInstanceProcAddr");
+        safe_hook(dlsym(res, "vkGetDeviceProcAddr"), (void*)my_vkGetDeviceProcAddr, (void**)&orig_vkGetDeviceProcAddr, "vkGetDeviceProcAddr");
+    }
 
     if (!res && filename) {
         LOGE("dlopen FAIL: %s (asked as %s) | error=%s", target_path, filename, dlerror());
@@ -735,15 +880,100 @@ static void safe_hook(void* target, void* replace, void** origin, const char* na
     if (DobbyHook(target, replace, origin) == 0) {
         LOGI("Successfully hooked: %s at %p", name, target);
     } else {
-        LOGE("FAILED to hook: %s at %p", name, target);
+        LOGE("FAILED to hook: %s at %p. Reason: Dobby failure", name, target);
     }
 }
 
 static bool g_init_done = false;
 
+static void install_all_hooks(JavaVM* vm) {
+    static bool hooks_installed = false;
+    if (hooks_installed) return;
+    hooks_installed = true;
+
+    LOGI("Installing All Core Hooks...");
+    
+    OneCore::enableStealthMode();
+    JNIEnv* env = nullptr;
+    if (vm && vm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_OK) {
+         OneCore::bypassHiddenApi(env);
+         OneCore::installJniHooks(env);
+    }
+    OneCore::installBinderHooks();
+
+    LOGI("Installing Early Rendering Hooks...");
+    void* libandroid = dlopen("libandroid.so", RTLD_NOW);
+    if (libandroid) {
+        safe_hook(dlsym(libandroid, "ANativeWindow_fromSurface"), (void*)my_ANativeWindow_fromSurface, (void**)&orig_ANativeWindow_fromSurface, "ANativeWindow_fromSurface");
+        safe_hook(dlsym(libandroid, "ANativeWindow_acquire"), (void*)my_ANativeWindow_acquire, (void**)&orig_ANativeWindow_acquire, "ANativeWindow_acquire");
+        safe_hook(dlsym(libandroid, "ANativeWindow_release"), (void*)my_ANativeWindow_release, (void**)&orig_ANativeWindow_release, "ANativeWindow_release");
+        safe_hook(dlsym(libandroid, "ASurfaceControl_createFromWindow"), (void*)my_ASurfaceControl_createFromWindow, (void**)&orig_ASurfaceControl_createFromWindow, "ASurfaceControl_createFromWindow");
+        dlclose(libandroid);
+    }
+
+    void* libegl = dlopen("libEGL.so", RTLD_NOW);
+    if (libegl) {
+        safe_hook(dlsym(libegl, "eglCreateWindowSurface"), (void*)my_eglCreateWindowSurface, (void**)&orig_eglCreateWindowSurface, "eglCreateWindowSurface");
+        safe_hook(dlsym(libegl, "eglMakeCurrent"), (void*)my_eglMakeCurrent, (void**)&orig_eglMakeCurrent, "eglMakeCurrent");
+        safe_hook(dlsym(libegl, "eglSwapBuffers"), (void*)my_eglSwapBuffers, (void**)&orig_eglSwapBuffers, "eglSwapBuffers");
+        safe_hook(dlsym(libegl, "eglGetProcAddress"), (void*)my_eglGetProcAddress, (void**)&orig_eglGetProcAddress, "eglGetProcAddress");
+        dlclose(libegl);
+    }
+    
+    // Proactively check for Vulkan if already loaded
+    void* libvulkan = dlopen("libvulkan.so", RTLD_NOLOAD);
+    if (libvulkan) {
+        LOGI("Vulkan already loaded, installing hooks...");
+        safe_hook(dlsym(libvulkan, "vkCreateAndroidSurfaceKHR"), (void*)my_vkCreateAndroidSurfaceKHR, (void**)&orig_vkCreateAndroidSurfaceKHR, "vkCreateAndroidSurfaceKHR");
+        safe_hook(dlsym(libvulkan, "vkQueuePresentKHR"), (void*)my_vkQueuePresentKHR, (void**)&orig_vkQueuePresentKHR, "vkQueuePresentKHR");
+        safe_hook(dlsym(libvulkan, "vkGetInstanceProcAddr"), (void*)my_vkGetInstanceProcAddr, (void**)&orig_vkGetInstanceProcAddr, "vkGetInstanceProcAddr");
+        safe_hook(dlsym(libvulkan, "vkGetDeviceProcAddr"), (void*)my_vkGetDeviceProcAddr, (void**)&orig_vkGetDeviceProcAddr, "vkGetDeviceProcAddr");
+        dlclose(libvulkan);
+    }
+
+    LOGI("Installing Path Redirection Hooks (LibC)");
+    void* libc = dlopen("libc.so", RTLD_NOW);
+    if (libc) {
+        safe_hook(dlsym(libc, "open"), (void*)my_open, (void**)&orig_open, "open");
+        safe_hook(dlsym(libc, "openat"), (void*)my_openat, (void**)&orig_openat, "openat");
+        safe_hook(dlsym(libc, "access"), (void*)my_access, (void**)&orig_access, "access");
+        safe_hook(dlsym(libc, "faccessat"), (void*)my_faccessat, (void**)&orig_faccessat, "faccessat");
+        safe_hook(dlsym(libc, "stat"), (void*)my_stat, (void**)&orig_stat, "stat");
+        safe_hook(dlsym(libc, "lstat"), (void*)my_lstat, (void**)&orig_lstat, "lstat");
+        safe_hook(dlsym(libc, "fstatat"), (void*)my_fstatat, (void**)&orig_fstatat, "fstatat");
+        safe_hook(dlsym(libc, "readlink"), (void*)my_readlink, (void**)&orig_readlink, "readlink");
+        safe_hook(dlsym(libc, "opendir"), (void*)my_opendir, (void**)&orig_opendir, "opendir");
+        safe_hook(dlsym(libc, "execve"), (void*)my_execve, (void**)&orig_execve, "execve");
+        safe_hook(dlsym(libc, "fopen"), (void*)my_fopen, (void**)&orig_fopen, "fopen");
+        safe_hook(dlsym(libc, "getppid"), (void*)my_getppid, (void**)&orig_getppid, "getppid");
+        safe_hook(dlsym(libc, "fork"), (void*)my_fork, (void**)&orig_fork, "fork");
+        safe_hook(dlsym(libc, "getuid"), (void*)my_getuid, (void**)&orig_getuid, "getuid");
+        safe_hook(dlsym(libc, "geteuid"), (void*)my_geteuid, (void**)&orig_geteuid, "geteuid");
+        safe_hook(dlsym(libc, "getgid"), (void*)my_getgid, (void**)&orig_getgid, "getgid");
+        dlclose(libc);
+    }
+
+    LOGI("Installing Runtime Protection Hooks");
+    OneCore::installEnvironmentProtector();
+    OneCore::installDexHooks();
+    OneCore::installKernelShield();
+    OneCore::installSocketHooks();
+
+    void* libdl = dlopen("libdl.so", RTLD_NOW);
+    if (libdl) {
+        safe_hook(dlsym(libdl, "dlopen"), (void*)my_dlopen, (void**)&orig_dlopen, "dlopen");
+        void* dlopen_ext = dlsym(libdl, "android_dlopen_ext");
+        if (dlopen_ext) {
+            safe_hook(dlopen_ext, (void*)my_dlopen_ext, (void**)&orig_dlopen_ext, "android_dlopen_ext");
+        }
+        dlclose(libdl);
+    }
+}
+
 extern "C" JNIEXPORT jint JNICALL
 JNI_OnLoad(JavaVM* vm, void* reserved) {
-    LOGI(">>> OneCore Native Library LOADED by process: %d <<<", getpid());
+    LOGI(">>> OneCore Native Library LOADED by process: %d at timestamp %ld <<<", getpid(), (long)time(NULL));
+    install_all_hooks(vm);
     return JNI_VERSION_1_6;
 }
 
@@ -775,84 +1005,10 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
     g_virtual_root = v_root;
     g_package_name = p_name;
 
-    LOGI(">>> Initializing OneCore Native Engine for: %s <<<", p_name);
-
-    LOGI("Phase 1: Security Bypass");
-    OneCore::enableStealthMode();
-    OneCore::bypassHiddenApi(env);
-
-    log_step(2, "Modular Internal Hooks");
-    // OneCore::installFileSystemHooks(); // Disabled: replaced by unified hooks in this file
-    OneCore::installEnvironmentProtector();
-    OneCore::installDexHooks();
-    OneCore::installKernelShield();
-    OneCore::installSocketHooks();
-
-    log_step(3, "Rendering Hooks");
-    void* libandroid = dlopen("libandroid.so", RTLD_NOW);
-    if (libandroid) {
-        safe_hook(dlsym(libandroid, "ANativeWindow_fromSurface"), (void*)my_ANativeWindow_fromSurface, (void**)&orig_ANativeWindow_fromSurface, "ANativeWindow_fromSurface");
-        safe_hook(dlsym(libandroid, "ANativeWindow_acquire"), (void*)my_ANativeWindow_acquire, (void**)&orig_ANativeWindow_acquire, "ANativeWindow_acquire");
-        safe_hook(dlsym(libandroid, "ANativeWindow_release"), (void*)my_ANativeWindow_release, (void**)&orig_ANativeWindow_release, "ANativeWindow_release");
-        dlclose(libandroid);
-    }
-
-    void* libegl = dlopen("libEGL.so", RTLD_NOW);
-    if (libegl) {
-        safe_hook(dlsym(libegl, "eglCreateWindowSurface"), (void*)my_eglCreateWindowSurface, (void**)&orig_eglCreateWindowSurface, "eglCreateWindowSurface");
-        safe_hook(dlsym(libegl, "eglMakeCurrent"), (void*)my_eglMakeCurrent, (void**)&orig_eglMakeCurrent, "eglMakeCurrent");
-        safe_hook(dlsym(libegl, "eglSwapBuffers"), (void*)my_eglSwapBuffers, (void**)&orig_eglSwapBuffers, "eglSwapBuffers");
-        dlclose(libegl);
-    }
-
-    void* libgles = dlopen("libGLESv2.so", RTLD_NOW);
-    if (libgles) {
-        safe_hook(dlsym(libgles, "glGetString"), (void*)my_glGetString, (void**)&orig_glGetString, "glGetString");
-        dlclose(libgles);
-    }
-
-    OneCore::installJniHooks(env);
-    OneCore::installBinderHooks();
-
-    log_step(4, "Standard Library Hooks (LibC)");
-    void* libc = dlopen("libc.so", RTLD_NOW);
-    if (libc) {
-        safe_hook(dlsym(libc, "fopen"), (void*)my_fopen, (void**)&orig_fopen, "fopen");
-        safe_hook(dlsym(libc, "open"), (void*)my_open, (void**)&orig_open, "open");
-        safe_hook(dlsym(libc, "openat"), (void*)my_openat, (void**)&orig_openat, "openat");
-        safe_hook(dlsym(libc, "access"), (void*)my_access, (void**)&orig_access, "access");
-        safe_hook(dlsym(libc, "faccessat"), (void*)my_faccessat, (void**)&orig_faccessat, "faccessat");
-        safe_hook(dlsym(libc, "stat"), (void*)my_stat, (void**)&orig_stat, "stat");
-        safe_hook(dlsym(libc, "lstat"), (void*)my_lstat, (void**)&orig_lstat, "lstat");
-        safe_hook(dlsym(libc, "fstatat"), (void*)my_fstatat, (void**)&orig_fstatat, "fstatat");
-        safe_hook(dlsym(libc, "readlink"), (void*)my_readlink, (void**)&orig_readlink, "readlink");
-        safe_hook(dlsym(libc, "opendir"), (void*)my_opendir, (void**)&orig_opendir, "opendir");
-        safe_hook(dlsym(libc, "execve"), (void*)my_execve, (void**)&orig_execve, "execve");
-        safe_hook(dlsym(libc, "getppid"), (void*)my_getppid, (void**)&orig_getppid, "getppid");
-        safe_hook(dlsym(libc, "__opendir2"), (void*)my_opendir2, (void**)&orig_opendir2, "__opendir2");
-        
-        // Runtime Logic Hooks
-        safe_hook(dlsym(libc, "fork"), (void*)my_fork, (void**)&orig_fork, "fork");
-        safe_hook(dlsym(libc, "ptrace"), (void*)my_ptrace, (void**)&orig_ptrace, "ptrace");
-        safe_hook(dlsym(libc, "__system_property_get"), (void*)my_system_property_get, (void**)&orig_system_property_get, "__system_property_get");
-        safe_hook(dlsym(libc, "getuid"), (void*)my_getuid, (void**)&orig_getuid, "getuid");
-        safe_hook(dlsym(libc, "geteuid"), (void*)my_geteuid, (void**)&orig_geteuid, "geteuid");
-        safe_hook(dlsym(libc, "getgid"), (void*)my_getgid, (void**)&orig_getgid, "getgid");
-
-        dlclose(libc);
-    } else {
-        LOGE("CRITICAL: Could not open libc.so!");
-    }
-
-    LOGI("Phase 4: Dynamic Linker Hooks (LibDL)");
-    void* libdl = dlopen("libdl.so", RTLD_NOW);
-    if (libdl) {
-        safe_hook(dlsym(libdl, "dlopen"), (void*)my_dlopen, (void**)&orig_dlopen, "dlopen");
-        safe_hook(dlsym(libdl, "android_dlopen_ext"), (void*)my_dlopen_ext, (void**)&orig_dlopen_ext, "android_dlopen_ext");
-        dlclose(libdl);
-    }
+    LOGI(">>> Initializing OneCore Native Engine Redirection Patterns for: %s <<<", p_name);
     
-    LOGI(">>> Native Engine Initialization COMPLETE for: %s <<<", p_name);
+    // Ensure all hooks are installed (if JNI_OnLoad failed or we are re-initializing)
+    install_all_hooks(nullptr); 
 
     env->ReleaseStringUTFChars(virtual_root, v_root);
     env->ReleaseStringUTFChars(package_name, p_name);
