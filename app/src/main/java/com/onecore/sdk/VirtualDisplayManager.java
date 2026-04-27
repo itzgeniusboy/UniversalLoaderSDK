@@ -39,6 +39,8 @@ public class VirtualDisplayManager {
             return null;
         }
 
+        Log.i(TAG, "Requesting Virtual Display: " + name + " [" + w + "x" + h + " @ " + dpi + "dpi]");
+
         int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC | 
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION |
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR; // Added for better compatibility
@@ -60,8 +62,10 @@ public class VirtualDisplayManager {
         }
 
         try {
-            if (surface != null) {
+            if (surface != null && surface.isValid()) {
                 Log.i(TAG, "ATTACHING REAL SURFACE to VirtualDisplay: " + surface.toString());
+            } else if (surface != null) {
+                Log.e(TAG, "ATTACHING INVALID SURFACE to VirtualDisplay!");
             } else {
                 Log.w(TAG, "CREATING DISPLAY WITHOUT SURFACE (Rendering will be deferred)");
             }
@@ -69,7 +73,11 @@ public class VirtualDisplayManager {
             // Attempt standard creation
             virtualDisplay = dm.createVirtualDisplay(name, w, h, dpi, surface, flags);
             if (virtualDisplay != null) {
-                Log.i(TAG, "SUCCESS: Virtual Display created (Display ID: " + virtualDisplay.getDisplay().getDisplayId() + ")");
+                Display d = virtualDisplay.getDisplay();
+                Log.i(TAG, "SUCCESS: Virtual Display created (ID: " + d.getDisplayId() + ", Name: " + d.getName() + ")");
+                DisplayMetrics metrics = new DisplayMetrics();
+                d.getRealMetrics(metrics);
+                Log.d(TAG, "Display Real Metrics: " + metrics.widthPixels + "x" + metrics.heightPixels + " @ " + metrics.densityDpi + "dpi");
                 return virtualDisplay;
             }
         } catch (SecurityException e) {

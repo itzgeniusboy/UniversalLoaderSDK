@@ -112,14 +112,16 @@ public class StubActivity extends Activity implements SurfaceHolder.Callback {
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        Logger.i(TAG, "Host Surface CREATED. Syncing with Virtual Display...");
-        VirtualDisplayManager.getInstance(this).syncSurface(holder.getSurface());
+        Surface surface = holder.getSurface();
+        Logger.i(TAG, "Host Surface CREATED: " + surface + " | valid=" + (surface != null && surface.isValid()));
+        VirtualDisplayManager.getInstance(this).syncSurface(surface);
     }
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        Logger.d(TAG, "Host Surface CHANGED: " + width + "x" + height);
-        VirtualDisplayManager.getInstance(this).syncSurface(holder.getSurface());
+        Surface surface = holder.getSurface();
+        Logger.i(TAG, "Host Surface CHANGED: " + width + "x" + height + " | format=" + format + " | valid=" + (surface != null && surface.isValid()));
+        VirtualDisplayManager.getInstance(this).syncSurface(surface);
     }
 
     @Override

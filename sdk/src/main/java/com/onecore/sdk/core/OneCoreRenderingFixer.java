@@ -64,12 +64,16 @@ public class OneCoreRenderingFixer {
             View decor = window.getDecorView();
             if (decor instanceof ViewGroup) {
                 fixSurfaceViews((ViewGroup) decor);
+            } else if (decor instanceof SurfaceView) {
+                fixSingleSurfaceView((SurfaceView) decor);
             }
             
             // UE4/BGMI Fix: Re-run after a small delay to catch lazy surface initialization
             decor.postDelayed(() -> {
                 if (decor instanceof ViewGroup) {
                     fixSurfaceViews((ViewGroup) decor);
+                } else if (decor instanceof SurfaceView) {
+                    fixSingleSurfaceView((SurfaceView) decor);
                 }
                 
                 // Black Screen Recovery: 
@@ -109,49 +113,57 @@ public class OneCoreRenderingFixer {
         for (int i = 0; i < group.getChildCount(); i++) {
             View child = group.getChildAt(i);
             if (child instanceof SurfaceView) {
-                SurfaceView sv = (SurfaceView) child;
-                
-                // UE4/BGMI Fix: The game needs to be on top to be visible through the decor
-                sv.setZOrderOnTop(true); 
-                sv.setZOrderMediaOverlay(false);
-                
-                // UE4 Fix: Set Opaque format on Holder
-                sv.getHolder().setFormat(android.graphics.PixelFormat.OPAQUE);
-                
-                // Fix Surface Control for EGL
-                try {
-                    android.view.SurfaceHolder holder = sv.getHolder();
-                    if (holder != null && holder.getSurface() != null && !holder.getSurface().isValid()) {
-                         Log.w(TAG, "Surface is invalid, attempting forced refresh.");
-                    }
-                } catch (Exception ignored) {}
-                
-                // Disable Secure flag as it can cause black screen in some virtual environments
-                try {
-                    sv.setSecure(false);
-                } catch (Exception ignored) {}
-                
-                // Aggressive fix: Some devices need a brief toggle to wake up the buffer
-                if (sv.getVisibility() == View.VISIBLE) {
-                    sv.setWillNotDraw(false);
-                    sv.postInvalidate();
-                }
-                
-                // UE4 specific: Set fixed size if it's too small
-                if (sv.getWidth() > 0 && sv.getWidth() < 10) {
-                     Log.w(TAG, "Detected suspiciously small SurfaceView, might be hidden UE4 layer.");
-                }
-                
-                // Force buffer update
-                sv.getHolder().setFixedSize(sv.getWidth(), sv.getHeight());
-                
-                // Wake up the surface if it's stalled
-                sv.postInvalidate();
-                
-                Log.d(TAG, "UE4-Surface-Wakeup: SurfaceView stabilized: " + sv.toString());
+                fixSingleSurfaceView((SurfaceView) child);
             } else if (child instanceof ViewGroup) {
                 fixSurfaceViews((ViewGroup) child);
             }
         }
+    }
+
+    private static void fixSingleSurfaceView(SurfaceView sv) {
+        // UE4/BGMI Fix: The game needs to be on top to be visible through the decor
+        sv.setZOrderOnTop(true); 
+        sv.setZOrderMediaOverlay(false);
+        
+        // UE4 Fix: Set Opaque format on Holder
+        sv.getHolder().setFormat(android.graphics.PixelFormat.OPAQUE);
+        
+        // Fix Surface Control for EGL
+        try {
+            android.view.SurfaceHolder holder = sv.getHolder();
+            if (holder != null && holder.getSurface() != null) {
+                 if (!holder.getSurface().isValid()) {
+                    Log.w(TAG, "Surface is invalid: " + sv);
+                 } else {
+                    Log.i(TAG, "Surface is VALID and READY: " + holder.getSurface());
+                 }
+            }
+        } catch (Exception ignored) {}
+        
+        // Disable Secure flag as it can cause black screen in some virtual environments
+        try {
+            sv.setSecure(false);
+        } catch (Exception ignored) {}
+        
+        // Aggressive fix: Some devices need a brief toggle to wake up the buffer
+        if (sv.getVisibility() == View.VISIBLE) {
+            sv.setWillNotDraw(false);
+            sv.postInvalidate();
+        }
+        
+        // UE4 specific: Set fixed size if it's too small
+        if (sv.getWidth() > 0 && sv.getWidth() < 10) {
+             Log.w(TAG, "Detected suspiciously small SurfaceView (" + sv.getWidth() + "x" + sv.getHeight() + "), might be hidden UE4 layer.");
+        }
+        
+        // Force buffer update
+        if (sv.getWidth() > 0 && sv.getHeight() > 0) {
+            sv.getHolder().setFixedSize(sv.getWidth(), sv.getHeight());
+        }
+        
+        // Wake up the surface if it's stalled
+        sv.postInvalidate();
+        
+        Log.d(TAG, "UE4-Surface-Wakeup: SurfaceView stabilized: " + sv.toString());
     }
 }

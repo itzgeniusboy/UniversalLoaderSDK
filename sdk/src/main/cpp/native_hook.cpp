@@ -36,6 +36,34 @@
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
+static const char* get_egl_error_name(EGLint err) {
+    switch (err) {
+        case EGL_SUCCESS: return "EGL_SUCCESS";
+        case EGL_NOT_INITIALIZED: return "EGL_NOT_INITIALIZED";
+        case EGL_BAD_ACCESS: return "EGL_BAD_ACCESS";
+        case EGL_BAD_ALLOC: return "EGL_BAD_ALLOC";
+        case EGL_BAD_ATTRIBUTE: return "EGL_BAD_ATTRIBUTE";
+        case EGL_BAD_CONFIG: return "EGL_BAD_CONFIG";
+        case EGL_BAD_CONTEXT: return "EGL_BAD_CONTEXT";
+        case EGL_BAD_CURRENT_SURFACE: return "EGL_BAD_CURRENT_SURFACE";
+        case EGL_BAD_DISPLAY: return "EGL_BAD_DISPLAY";
+        case EGL_BAD_MATCH: return "EGL_BAD_MATCH";
+        case EGL_BAD_NATIVE_PIXMAP: return "EGL_BAD_NATIVE_PIXMAP";
+        case EGL_BAD_NATIVE_WINDOW: return "EGL_BAD_NATIVE_WINDOW";
+        case EGL_BAD_PARAMETER: return "EGL_BAD_PARAMETER";
+        case EGL_BAD_SURFACE: return "EGL_BAD_SURFACE";
+        case EGL_CONTEXT_LOST: return "EGL_CONTEXT_LOST";
+        default: return "UNKNOWN";
+    }
+}
+
+static void check_egl_error(const char* op) {
+    EGLint err = eglGetError();
+    if (err != EGL_SUCCESS) {
+        LOGE("EGL ERROR after %s: %s (0x%X)", op, get_egl_error_name(err), err);
+    }
+}
+
 static int g_last_step = 0;
 void log_step(int step, const char* msg) {
     g_last_step = step;
@@ -137,10 +165,14 @@ EGLSurface my_eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config, EGLNative
     if (g_in_hook) return orig_eglCreateWindowSurface(dpy, config, win, attrib_list);
     g_in_hook = true;
     log_step(5, "eglCreateWindowSurface START");
-    LOGI("HOOK: eglCreateWindowSurface(win=%p)", win);
+    LOGI("HOOK: eglCreateWindowSurface(dpy=%p, config=%p, win=%p)", dpy, config, win);
     EGLSurface surface = orig_eglCreateWindowSurface(dpy, config, win, attrib_list);
-    if (surface == EGL_NO_SURFACE) LOGE("eglCreateWindowSurface FAILED");
-    else LOGI("eglCreateWindowSurface SUCCESS: %p", surface);
+    if (surface == EGL_NO_SURFACE) {
+        LOGE("eglCreateWindowSurface FAILED");
+        check_egl_error("eglCreateWindowSurface");
+    } else {
+        LOGI("eglCreateWindowSurface SUCCESS: surface=%p", surface);
+    }
     g_in_hook = false;
     return surface;
 }
@@ -149,9 +181,14 @@ EGLBoolean my_eglMakeCurrent(EGLDisplay dpy, EGLSurface draw, EGLSurface read, E
     if (g_in_hook) return orig_eglMakeCurrent(dpy, draw, read, ctx);
     g_in_hook = true;
     log_step(6, "eglMakeCurrent START");
+    LOGI("HOOK: eglMakeCurrent(dpy=%p, draw=%p, read=%p, ctx=%p)", dpy, draw, read, ctx);
     EGLBoolean res = orig_eglMakeCurrent(dpy, draw, read, ctx);
-    if (!res) LOGE("eglMakeCurrent FAILED");
-    else LOGI("eglMakeCurrent SUCCESS");
+    if (!res) {
+        LOGE("eglMakeCurrent FAILED");
+        check_egl_error("eglMakeCurrent");
+    } else {
+        LOGI("eglMakeCurrent SUCCESS: thread_id=%d", (int)gettid());
+    }
     g_in_hook = false;
     return res;
 }
@@ -161,9 +198,13 @@ EGLBoolean my_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     g_in_hook = true;
     static int frame_count = 0;
     if (++frame_count % 60 == 0) {
-        LOGI("eglSwapBuffers: 60 frames rendered");
+        LOGI("eglSwapBuffers: 60 frames rendered on thread %d", (int)gettid());
     }
     EGLBoolean res = orig_eglSwapBuffers(dpy, surface);
+    if (!res) {
+        LOGE("eglSwapBuffers FAILED for surface %p", surface);
+        check_egl_error("eglSwapBuffers");
+    }
     g_in_hook = false;
     return res;
 }
