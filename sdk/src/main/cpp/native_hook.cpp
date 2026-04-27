@@ -26,10 +26,48 @@
 #include <sys/ptrace.h>
 #include <sys/system_properties.h>
 
+#include <signal.h>
+#include <sys/syscall.h>
+
 #define TAG "OneCore-Native"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+
+static int g_last_step = 0;
+void log_step(int step, const char* msg) {
+    g_last_step = step;
+    LOGI(">>> STEP %d: %s <<<", step, msg);
+}
+
+// Signal handler for crash tracing
+void signal_handler(int sig, siginfo_t* info, void* context) {
+    LOGE("!!! CRITICAL NATIVE CRASH !!!");
+    LOGE("Signal: %d, Fault Address: %p", sig, info->si_addr);
+    LOGE("Last successful STEP marker: %d", g_last_step);
+    LOGE("Thread ID: %d", (int)gettid());
+    
+    // Default action to allow system to handle it (generate tombstone)
+    struct sigaction sa;
+    sa.sa_handler = SIG_DFL;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(sig, &sa, NULL);
+    raise(sig);
+}
+
+void install_signal_handlers() {
+    struct sigaction sa;
+    sa.sa_sigaction = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO;
+
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGABRT, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
+    LOGI("Crash tracing signal handlers installed.");
+}
 
 static std::string g_virtual_root;
 static std::string g_package_name;
@@ -59,6 +97,75 @@ static uid_t (*orig_geteuid)() = nullptr;
 static uid_t (*orig_getgid)() = nullptr;
 
 // Recursion guard is handled via Utils/RecursionGuard.h
+
+// --- Rendering Hooks ---
+static void* (*orig_ANativeWindow_fromSurface)(void* env, jobject surface) = nullptr;
+static void (*orig_ANativeWindow_acquire)(void* window) = nullptr;
+static void (*orig_ANativeWindow_release)(void* window) = nullptr;
+static void* (*orig_eglCreateWindowSurface)(void* dpy, void* config, void* win, const int *attrib_list) = nullptr;
+static int (*orig_eglMakeCurrent)(void* dpy, void* draw, void* read, void* ctx) = nullptr;
+
+static EGLBoolean (*orig_eglSwapBuffers)(void* dpy, void* surface) = nullptr;
+
+void* my_ANativeWindow_fromSurface(void* env, jobject surface) {
+    if (g_in_hook) return orig_ANativeWindow_fromSurface(env, surface);
+    g_in_hook = true;
+    LOGI("HOOK: ANativeWindow_fromSurface called");
+    void* win = orig_ANativeWindow_fromSurface(env, surface);
+    g_in_hook = false;
+    return win;
+}
+
+void my_ANativeWindow_acquire(void* window) {
+    if (g_in_hook) { orig_ANativeWindow_acquire(window); return; }
+    g_in_hook = true;
+    LOGI("HOOK: ANativeWindow_acquire(%p)", window);
+    orig_ANativeWindow_acquire(window);
+    g_in_hook = false;
+}
+
+void my_ANativeWindow_release(void* window) {
+    if (g_in_hook) { orig_ANativeWindow_release(window); return; }
+    g_in_hook = true;
+    LOGI("HOOK: ANativeWindow_release(%p)", window);
+    orig_ANativeWindow_release(window);
+    g_in_hook = false;
+}
+
+void* my_eglCreateWindowSurface(void* dpy, void* config, void* win, const int *attrib_list) {
+    if (g_in_hook) return orig_eglCreateWindowSurface(dpy, config, win, attrib_list);
+    g_in_hook = true;
+    log_step(5, "eglCreateWindowSurface START");
+    LOGI("HOOK: eglCreateWindowSurface(win=%p)", win);
+    void* surface = orig_eglCreateWindowSurface(dpy, config, win, attrib_list);
+    if (!surface) LOGE("eglCreateWindowSurface FAILED");
+    else LOGI("eglCreateWindowSurface SUCCESS: %p", surface);
+    g_in_hook = false;
+    return surface;
+}
+
+int my_eglMakeCurrent(void* dpy, void* draw, void* read, void* ctx) {
+    if (g_in_hook) return orig_eglMakeCurrent(dpy, draw, read, ctx);
+    g_in_hook = true;
+    log_step(6, "eglMakeCurrent START");
+    int res = orig_eglMakeCurrent(dpy, draw, read, ctx);
+    if (!res) LOGE("eglMakeCurrent FAILED");
+    else LOGI("eglMakeCurrent SUCCESS");
+    g_in_hook = false;
+    return res;
+}
+
+EGLBoolean my_eglSwapBuffers(void* dpy, void* surface) {
+    if (g_in_hook) return orig_eglSwapBuffers(dpy, surface);
+    g_in_hook = true;
+    static int frame_count = 0;
+    if (++frame_count % 60 == 0) {
+        LOGI("eglSwapBuffers: 60 frames rendered");
+    }
+    EGLBoolean res = orig_eglSwapBuffers(dpy, surface);
+    g_in_hook = false;
+    return res;
+}
 
 // --- EGL Hooks ---
 static const char* (*orig_glGetString)(int name) = nullptr;
@@ -569,6 +676,8 @@ JNI_OnUnload(JavaVM* vm, void* reserved) {
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstring virtual_root, jstring package_name) {
+    install_signal_handlers();
+    log_step(1, "Native Engine Initialization");
     if (g_init_done) {
         LOGI("initHooks: Already initialized, skipping.");
         return;
@@ -594,16 +703,40 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
     OneCore::enableStealthMode();
     OneCore::bypassHiddenApi(env);
 
-    LOGI("Phase 2: Modular Internal Hooks");
+    log_step(2, "Modular Internal Hooks");
     // OneCore::installFileSystemHooks(); // Disabled: replaced by unified hooks in this file
-    OneCore::installJniHooks(env);
     OneCore::installEnvironmentProtector();
     OneCore::installDexHooks();
     OneCore::installKernelShield();
     OneCore::installSocketHooks();
-    OneCore::installRenderingHooks();
 
-    LOGI("Phase 3: Standard Library Hooks (LibC)");
+    log_step(3, "Rendering Hooks");
+    void* libandroid = dlopen("libandroid.so", RTLD_NOW);
+    if (libandroid) {
+        safe_hook(dlsym(libandroid, "ANativeWindow_fromSurface"), (void*)my_ANativeWindow_fromSurface, (void**)&orig_ANativeWindow_fromSurface, "ANativeWindow_fromSurface");
+        safe_hook(dlsym(libandroid, "ANativeWindow_acquire"), (void*)my_ANativeWindow_acquire, (void**)&orig_ANativeWindow_acquire, "ANativeWindow_acquire");
+        safe_hook(dlsym(libandroid, "ANativeWindow_release"), (void*)my_ANativeWindow_release, (void**)&orig_ANativeWindow_release, "ANativeWindow_release");
+        dlclose(libandroid);
+    }
+
+    void* libegl = dlopen("libEGL.so", RTLD_NOW);
+    if (libegl) {
+        safe_hook(dlsym(libegl, "eglCreateWindowSurface"), (void*)my_eglCreateWindowSurface, (void**)&orig_eglCreateWindowSurface, "eglCreateWindowSurface");
+        safe_hook(dlsym(libegl, "eglMakeCurrent"), (void*)my_eglMakeCurrent, (void**)&orig_eglMakeCurrent, "eglMakeCurrent");
+        safe_hook(dlsym(libegl, "eglSwapBuffers"), (void*)my_eglSwapBuffers, (void**)&orig_eglSwapBuffers, "eglSwapBuffers");
+        dlclose(libegl);
+    }
+
+    void* libgles = dlopen("libGLESv2.so", RTLD_NOW);
+    if (libgles) {
+        safe_hook(dlsym(libgles, "glGetString"), (void*)my_glGetString, (void**)&orig_glGetString, "glGetString");
+        dlclose(libgles);
+    }
+
+    OneCore::installJniHooks(env);
+    OneCore::setupBinderHook();
+
+    log_step(4, "Standard Library Hooks (LibC)");
     void* libc = dlopen("libc.so", RTLD_NOW);
     if (libc) {
         safe_hook(dlsym(libc, "fopen"), (void*)my_fopen, (void**)&orig_fopen, "fopen");

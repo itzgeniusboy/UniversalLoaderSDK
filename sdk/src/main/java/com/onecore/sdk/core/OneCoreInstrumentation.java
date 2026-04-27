@@ -111,6 +111,7 @@ public class OneCoreInstrumentation extends Instrumentation {
                         Log.d(TAG, "OneCore-Lifecycle: Instantiating activity from virtual ClassLoader: " + targetActivity);
                         Activity activity = mBase.newActivity(virtualCl, targetActivity, intent);
                         Log.i(TAG, "OneCore-Lifecycle: Activity Instance Created -> " + activity.getClass().getName());
+                        android.util.Log.d(TAG, ">>> STEP 4: Activity Created <<<");
                         return activity;
                     } catch (Exception e) {
                         Log.e(TAG, "!!! OneCore-Lifecycle: Virtual instantiation FAILED for " + targetActivity, e);

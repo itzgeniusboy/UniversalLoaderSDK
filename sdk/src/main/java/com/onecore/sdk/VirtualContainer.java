@@ -93,6 +93,7 @@ public class VirtualContainer {
 
             // 2. Setup ClassLoader
             Log.i(TAG, "OneCore-Init: Creating DexClassLoader for target APK...");
+            android.util.Log.d(TAG, ">>> STEP 1: ClassLoader Ready <<<");
             mClassLoader = new DexClassLoader(
                 apkPath,
                 dexOptDir.getAbsolutePath(),
@@ -210,6 +211,7 @@ public class VirtualContainer {
                     
                     if (mTargetApplication != null) {
                         Log.i(TAG, "OneCore-Bind: Application Instance Created -> " + mTargetApplication.getClass().getName());
+                        android.util.Log.d(TAG, ">>> STEP 2: Application Bound <<<");
                         
                         // Spoof process name for anti-detection and consistency
                         OneCoreProcessManager.spoofProcessName(packageName);

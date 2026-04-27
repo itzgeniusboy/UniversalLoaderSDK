@@ -20,7 +20,6 @@ add_library(onecore_native SHARED
         Utils/ModuleScanner.cpp
         Utils/RecursionGuard.cpp
         Hook/SocketHook.cpp
-        Hook/RenderingHook.cpp
         KittyMemory/KittyMemory.cpp
         KittyMemory/MemoryPatch.cpp
         Hook/DexFileHook.cpp

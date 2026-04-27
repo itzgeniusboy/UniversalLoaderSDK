@@ -90,7 +90,8 @@ public class OneCoreNativeLoader {
             }
             zipFile.close();
             Log.i(TAG, "OneCore-Native: Successfully extracted " + count + " libraries for " + bestAbi);
-            
+            android.util.Log.d(TAG, ">>> STEP 3: Native Libs Extracted <<<");
+
             // Pre-load common dependencies to stabilize the linker
             preloadKnownDependencies(libDir);
 
@@ -108,6 +109,8 @@ public class OneCoreNativeLoader {
             try {
                 Log.i(TAG, "OneCore-Native: Loading onecore_native bridge...");
                 System.loadLibrary("onecore_native");
+                Log.i(TAG, "OneCore-Native: onecore_native bridge LOADED SUCCESS");
+                android.util.Log.d(TAG, ">>> STEP 3.5: Native Bridge Loaded <<<");
                 String vRoot = context.getDir("v_data_" + packageName, Context.MODE_PRIVATE).getAbsolutePath();
                 Log.i(TAG, "OneCore-Native: Virtual Data Root -> " + vRoot);
                 // Call the JNI method directly or via reflection if class is in another module
@@ -143,11 +146,11 @@ public class OneCoreNativeLoader {
             File libFile = new File(libDir, libName);
             if (libFile.exists()) {
                 try {
-                    Log.i(TAG, "OneCore-Native: Pre-loading critical dependency: " + libName);
+                    Log.i(TAG, "OneCore-Native: [Pre-load START] " + libName);
                     System.load(libFile.getAbsolutePath());
-                    Log.i(TAG, "OneCore-Native: Pre-load SUCCESS: " + libName);
+                    Log.i(TAG, "OneCore-Native: [Pre-load SUCCESS] " + libName);
                 } catch (Throwable t) {
-                    Log.w(TAG, "OneCore-Native: Pre-load FAILED (might be normal if dependencies missing): " + libName + " | " + t.getMessage());
+                    Log.w(TAG, "OneCore-Native: [Pre-load FAILED] " + libName + " | error=" + t.getMessage());
                 }
             }
         }
