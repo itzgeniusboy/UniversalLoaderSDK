@@ -150,8 +150,8 @@ export const Dashboard = () => {
                 </CardHeader>
                 <CardContent className="p-6">
                     <div className="grid grid-cols-7 gap-2">
-                        {['S','M','T','W','T','F','S'].map(d => (
-                            <div key={d} className="text-center text-[10px] font-bold text-zinc-400">{d}</div>
+                        {['S','M','T','W','T','F','S'].map((d, i) => (
+                            <div key={`${d}-${i}`} className="text-center text-[10px] font-bold text-zinc-400">{d}</div>
                         ))}
                         {Array.from({ length: 31 }).map((_, i) => (
                             <div 

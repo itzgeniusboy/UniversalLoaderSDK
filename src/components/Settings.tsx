@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Bell, Moon, Sun, Smartphone, User, Save, CheckCircle2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 export const Settings = () => {
   const { user } = useAuth();
