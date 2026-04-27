@@ -3,14 +3,63 @@
 #include <unistd.h>
 #include <sys/uio.h>
 #include <android/log.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
 
 #define TAG "NativeMemory"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
-/**
- * Accesses memory via process_vm_readv/writev (more robust for inter-process)
- * or fallback to direct access for same-process.
- */
+#if __ANDROID_API__ < 23
+static ssize_t process_vm_readv_fallback(pid_t pid, const struct iovec *local_iov, unsigned long liovcnt, const struct iovec *remote_iov, unsigned long riovcnt, unsigned long flags) {
+    char path[64];
+    snprintf(path, sizeof(path), "/proc/%d/mem", pid);
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        LOGE("Failed to open %s: %s", path, strerror(errno));
+        return -1;
+    }
+
+    ssize_t total_read = 0;
+    for (unsigned long i = 0; i < riovcnt; i++) {
+        ssize_t n = pread64(fd, local_iov[i].iov_base, local_iov[i].iov_len, (off64_t)remote_iov[i].iov_base);
+        if (n != (ssize_t)local_iov[i].iov_len) {
+            LOGE("Failed to read at %p: %s", remote_iov[i].iov_base, strerror(errno));
+            close(fd);
+            return -1;
+        }
+        total_read += n;
+    }
+
+    close(fd);
+    return total_read;
+}
+
+static ssize_t process_vm_writev_fallback(pid_t pid, const struct iovec *local_iov, unsigned long liovcnt, const struct iovec *remote_iov, unsigned long riovcnt, unsigned long flags) {
+    char path[64];
+    snprintf(path, sizeof(path), "/proc/%d/mem", pid);
+    int fd = open(path, O_WRONLY);
+    if (fd < 0) {
+        LOGE("Failed to open %s: %s", path, strerror(errno));
+        return -1;
+    }
+
+    ssize_t total_written = 0;
+    for (unsigned long i = 0; i < riovcnt; i++) {
+        ssize_t n = pwrite64(fd, local_iov[i].iov_base, local_iov[i].iov_len, (off64_t)remote_iov[i].iov_base);
+        if (n != (ssize_t)local_iov[i].iov_len) {
+            LOGE("Failed to write at %p: %s", remote_iov[i].iov_base, strerror(errno));
+            close(fd);
+            return -1;
+        }
+        total_written += n;
+    }
+
+    close(fd);
+    return total_written;
+}
+#endif
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_onecore_sdk_NativeHook_readProcessMemory(JNIEnv* env, jobject thiz, jint pid, jlong addr, jbyteArray buffer) {
     jsize size = env->GetArrayLength(buffer);
@@ -24,7 +73,12 @@ Java_com_onecore_sdk_NativeHook_readProcessMemory(JNIEnv* env, jobject thiz, jin
     remote[0].iov_base = (void*)addr;
     remote[0].iov_len = size;
 
-    ssize_t nread = process_vm_readv(pid, local, 1, remote, 1, 0);
+    ssize_t nread;
+#if __ANDROID_API__ >= 23
+    nread = process_vm_readv(pid, local, 1, remote, 1, 0);
+#else
+    nread = process_vm_readv_fallback(pid, local, 1, remote, 1, 0);
+#endif
     
     env->ReleaseByteArrayElements(buffer, local_buf, 0);
 
@@ -44,7 +98,12 @@ Java_com_onecore_sdk_NativeHook_writeProcessMemory(JNIEnv* env, jobject thiz, ji
     remote[0].iov_base = (void*)addr;
     remote[0].iov_len = size;
 
-    ssize_t nwritten = process_vm_writev(pid, local, 1, remote, 1, 0);
+    ssize_t nwritten;
+#if __ANDROID_API__ >= 23
+    nwritten = process_vm_writev(pid, local, 1, remote, 1, 0);
+#else
+    nwritten = process_vm_writev_fallback(pid, local, 1, remote, 1, 0);
+#endif
 
     env->ReleaseByteArrayElements(buffer, local_buf, JNI_ABORT);
 
