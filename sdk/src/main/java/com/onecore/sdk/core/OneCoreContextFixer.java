@@ -19,6 +19,8 @@ public class OneCoreContextFixer {
     public static void fixContext(Context context, String packageName) {
         if (context == null) return;
         
+        Log.i(TAG, "OneCore-Context: FIX INITIATED for " + context.getClass().getName() + " [" + packageName + "]");
+
         SafeExecutionManager.run("Context Fix (" + packageName + ")", () -> {
             // Find the ContextImpl instance
             Context baseContext = context;
@@ -27,6 +29,7 @@ public class OneCoreContextFixer {
             }
 
             final Object contextImpl = baseContext;
+            Log.d(TAG, "OneCore-Context: ContextImpl instance found -> " + contextImpl);
             
             // 1. Fix Package Names and UID dynamically
             String[] fields = {"mPackageName", "mBasePackageName", "mOpPackageName", "mAttributionTag", "mAttributionSource"};
@@ -42,6 +45,7 @@ public class OneCoreContextFixer {
                     Object attributionSource = ReflectionHelper.getFieldValue(contextImpl, "mAttributionSource");
                     if (attributionSource != null) {
                         ReflectionHelper.setFieldValue(attributionSource, packageName, "mPackageName");
+                        Log.d(TAG, "OneCore-Context: AttributionSource patched.");
                     }
                 } catch (Exception ignored) {}
             }
@@ -56,6 +60,7 @@ public class OneCoreContextFixer {
             // Fix Storage Paths
             File dataDir = context.getDir("v_data_" + packageName, Context.MODE_PRIVATE);
             if (!dataDir.exists()) dataDir.mkdirs();
+            Log.d(TAG, "OneCore-Context: Storage root set to -> " + dataDir.getAbsolutePath());
             
             // Initialize VFS for this package
             OneCoreVFS.init(packageName, dataDir.getAbsolutePath());
@@ -76,10 +81,12 @@ public class OneCoreContextFixer {
             
             if (virtualCl != null) {
                 ReflectionHelper.setFieldValue(contextImpl, virtualCl, "mClassLoader");
+                Log.d(TAG, "OneCore-Context: ClassLoader swapped.");
             }
 
             if (virtualRes != null) {
                 ReflectionHelper.setFieldValue(contextImpl, virtualRes, "mResources");
+                Log.d(TAG, "OneCore-Context: Resources swapped.");
                 
                 // Fix AssetManager specifically for Android 10+
                 try {
@@ -87,6 +94,7 @@ public class OneCoreContextFixer {
                     ReflectionHelper.setFieldValue(contextImpl, assetManager, "mAssets");
                     // CRITICAL: Ensure the APK path is in the AssetManager used by this context
                     ReflectionHelper.invokeMethod(assetManager, "addAssetPath", VirtualContainer.getInstance().getApkPath());
+                    Log.d(TAG, "OneCore-Context: AssetManager path verified.");
                 } catch (Exception e) {
                     Log.w(TAG, "Failed to inject or update AssetManager");
                 }
@@ -96,7 +104,7 @@ public class OneCoreContextFixer {
                 if (original != null) {
                     android.view.LayoutInflater virtualInflater = original.cloneInContext(context);
                     ReflectionHelper.setFieldValue(contextImpl, virtualInflater, "mInflater");
-                    Log.d(TAG, "OneCore-DEBUG: LayoutInflater cloned and injected into ContextImpl");
+                    Log.d(TAG, "OneCore-Context: LayoutInflater cloned and injected");
                 }
             }
 
@@ -107,6 +115,7 @@ public class OneCoreContextFixer {
             android.app.Application virtualApp = VirtualContainer.getInstance().getTargetApplication();
             if (virtualApp != null) {
                 ReflectionHelper.setFieldValue(contextImpl, virtualApp, "mInitialApplication", "mApplication");
+                Log.d(TAG, "OneCore-Context: Application object linked.");
             }
 
             // 4. Activity specific fixes
@@ -133,7 +142,7 @@ public class OneCoreContextFixer {
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
                 }
                 
-                Log.d(TAG, "OneCore-DEBUG: Activity UI Pipeline successfully patched for " + packageName);
+                Log.d(TAG, "OneCore-Context: Activity Pipeline Patched.");
             }
 
             // Fix Display (Android 12+ Fix)
@@ -147,6 +156,7 @@ public class OneCoreContextFixer {
                 }
                 if (display != null) {
                     ReflectionHelper.setFieldValue(contextImpl, display, "mDisplay");
+                    Log.d(TAG, "OneCore-Context: mDisplay fixed.");
                 }
             } catch (Exception e) {
                 Log.w(TAG, "Failed to fix mDisplay field");
@@ -155,7 +165,7 @@ public class OneCoreContextFixer {
             // 5. Shared Storage Fixing
             OneCoreStorageFix.fix(context, packageName);
             
-            Log.i(TAG, "OneCore-DEBUG: Virtual Context successfully patched for " + packageName);
+            Log.i(TAG, "OneCore-Context: FIX SUCCESSFUL for " + packageName);
         });
     }
 

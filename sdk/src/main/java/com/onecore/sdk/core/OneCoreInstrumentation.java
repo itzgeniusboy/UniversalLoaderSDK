@@ -102,16 +102,22 @@ public class OneCoreInstrumentation extends Instrumentation {
             String targetPkg = intent.getStringExtra("target_package");
     
             if (targetPkg != null && targetActivity != null) {
+                Log.i(TAG, "OneCore-Lifecycle: newActivity requested for " + targetActivity + " in " + targetPkg);
                 VirtualContainer container = VirtualContainer.getInstance();
                 ClassLoader virtualCl = container.getClassLoader();
                 
                 if (virtualCl != null) {
                     try {
-                        Log.d(TAG, "OneCore-DEBUG: Instantiating activity from virtual ClassLoader: " + targetActivity);
-                        return mBase.newActivity(virtualCl, targetActivity, intent);
+                        Log.d(TAG, "OneCore-Lifecycle: Instantiating activity from virtual ClassLoader: " + targetActivity);
+                        Activity activity = mBase.newActivity(virtualCl, targetActivity, intent);
+                        Log.i(TAG, "OneCore-Lifecycle: Activity Instance Created -> " + activity.getClass().getName());
+                        return activity;
                     } catch (Exception e) {
-                        Log.e(TAG, "Failed virtual instantiation, falling back to provided CL", e);
+                        Log.e(TAG, "!!! OneCore-Lifecycle: Virtual instantiation FAILED for " + targetActivity, e);
+                        // Do not throw yet, let base try if it can find it (unlikely but safer)
                     }
+                } else {
+                    Log.w(TAG, "OneCore-Lifecycle: virtualCl is NULL in newActivity!");
                 }
             }
         }
@@ -124,6 +130,8 @@ public class OneCoreInstrumentation extends Instrumentation {
         String pkg = app.getPackageName();
         VirtualContainer container = VirtualContainer.getInstance();
         
+        Log.i(TAG, "OneCore-Lifecycle: callApplicationOnCreate for " + pkg);
+
         // If this is our virtual application instance
         if (app == container.getTargetApplication()) {
             Log.i(TAG, ">>> callApplicationOnCreate: Initializing Virtual Application for " + pkg);
@@ -132,8 +140,10 @@ public class OneCoreInstrumentation extends Instrumentation {
         
         try {
             mBase.callApplicationOnCreate(app);
+            Log.i(TAG, "OneCore-Lifecycle: callApplicationOnCreate finished for " + pkg);
         } catch (Exception e) {
-            Log.e(TAG, "Application.onCreate crashed", e);
+            Log.e(TAG, "!!! OneCore-Lifecycle: Application.onCreate CRASHED for " + pkg, e);
+            throw e; // Rethrow to see the crash clearly
         }
     }
 
@@ -157,15 +167,17 @@ public class OneCoreInstrumentation extends Instrumentation {
             // Only perform guest-specific fixes if it's a virtual activity
             if (targetActivity != null) {
                 String targetPkg = intent.getStringExtra("target_package");
+                Log.i(TAG, "OneCore-Lifecycle: callActivityOnCreate for " + targetActivity);
                 
                 try {
                     // Boost priority for smoothness in Game Mode
                     android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_DISPLAY);
-                    Log.i(TAG, "OneCore-DEBUG: Render Priority Boosted for " + targetActivity);
+                    Log.i(TAG, "OneCore-Lifecycle: Render Priority Boosted for " + targetActivity);
                 } catch (Exception e) {}
 
                 VirtualContainer container = VirtualContainer.getInstance();
                 if (container.getTargetApplication() == null && targetPkg != null) {
+                    Log.i(TAG, "OneCore-Lifecycle: Application not bound. Binding now for " + targetPkg);
                     String appClass = "android.app.Application";
                     android.content.pm.ApplicationInfo ai = container.getAppInfo();
                     if (ai != null && ai.className != null) {
@@ -180,17 +192,19 @@ public class OneCoreInstrumentation extends Instrumentation {
                             ReflectionHelper.setFieldValue(at, container.getTargetApplication(), "mInitialApplication");
                         }
                     } catch (Exception e) {
-                        Log.e(TAG, "Failed to swap mInitialApplication", e);
+                        Log.e(TAG, "!!! OneCore-Lifecycle: Failed to swap mInitialApplication", e);
                     }
                 }
                 
                 // Immersive and UI fixes for target activity only
                 Integer theme = container.getTheme(targetActivity);
                 if (theme != null && theme != 0) {
+                    Log.d(TAG, "OneCore-Lifecycle: Applying virtual theme " + theme + " to " + targetActivity);
                     activity.setTheme(theme);
                 }
 
                 if (activity.getWindow() != null) {
+                    Log.d(TAG, "OneCore-Lifecycle: Setting up Window flags for " + targetActivity);
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
                     activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -207,9 +221,11 @@ public class OneCoreInstrumentation extends Instrumentation {
                         | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
                 }
 
+                Log.d(TAG, "OneCore-Lifecycle: Fixing context for " + targetActivity);
                 OneCoreContextFixer.fixContext(activity, targetPkg);
             }
             
+            Log.d(TAG, "OneCore-Lifecycle: Calling base.callActivityOnCreate for " + activity.getClass().getName());
             mBase.callActivityOnCreate(activity, icicle);
             
             // Post-creation fixes

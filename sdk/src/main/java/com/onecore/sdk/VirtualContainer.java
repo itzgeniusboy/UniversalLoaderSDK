@@ -60,10 +60,14 @@ public class VirtualContainer {
                 mAppInfo = packageInfo.applicationInfo;
                 mAppInfo.sourceDir = apkPath;
                 mAppInfo.publicSourceDir = apkPath;
+                mAppInfo.packageName = packageName;
                 
                 // Ensure native lib dir is set correctly
                 File libDir = context.getDir("v_lib_" + packageName, Context.MODE_PRIVATE);
                 mAppInfo.nativeLibraryDir = libDir.getAbsolutePath();
+                
+                Log.i(TAG, "OneCore-Init: Package Info Parsed -> " + packageName);
+                Log.i(TAG, "OneCore-Init: Native Library Dir -> " + mAppInfo.nativeLibraryDir);
                 
                 // Register in VPM
                 com.onecore.sdk.core.OneCorePackageManagerProxy.registerPackage(packageInfo);
@@ -82,17 +86,23 @@ public class VirtualContainer {
             com.onecore.sdk.core.OneCoreHiddenApiFixer.bypass();
 
             File dexOptDir = context.getDir("v_opt_" + packageName, Context.MODE_PRIVATE);
+            if (!dexOptDir.exists()) dexOptDir.mkdirs();
 
             // 1. Extract native libs
             String libPath = com.onecore.sdk.core.OneCoreNativeLoader.copyNativeBinaries(context, apkPath, packageName);
 
             // 2. Setup ClassLoader
+            Log.i(TAG, "OneCore-Init: Creating DexClassLoader for target APK...");
             mClassLoader = new DexClassLoader(
                 apkPath,
                 dexOptDir.getAbsolutePath(),
                 libPath,
                 context.getClassLoader()
             );
+            
+            // Set as active context ClassLoader for this thread
+            Thread.currentThread().setContextClassLoader(mClassLoader);
+            Log.i(TAG, "OneCore-Init: ClassLoader created and set as ContextClassLoader.");
             
             // 2.1 Fix OBB for Games
             fixGameObb(packageName);
@@ -101,6 +111,7 @@ public class VirtualContainer {
             setupResources(context, apkPath);
             
             // 3. Inject LoadedApk into ActivityThread
+            Log.i(TAG, "OneCore-Init: Injecting LoadedApk into ActivityThread...");
             com.onecore.sdk.core.OneCoreLoadedApkManager.getLoadedApk(context, apkPath, packageName, mClassLoader, mResources);
             
             // 4. Register Receivers
@@ -173,25 +184,33 @@ public class VirtualContainer {
         if (mClassLoader == null || mTargetApplication != null) return;
         
         Log.i(TAG, ">>> V_CORE: Binding Target Application [" + applicationClassName + "] <<<");
+        Log.d(TAG, "OneCore-Bind: Package Name: " + packageName);
+        Log.d(TAG, "OneCore-Bind: App Class: " + applicationClassName);
+        Log.d(TAG, "OneCore-Bind: ClassLoader: " + mClassLoader);
         
         SafeExecutionManager.run("bindApplication", () -> {
             try {
                 // 1. Get ActivityThread
                 Object activityThread = ReflectionHelper.invokeMethod(null, "currentActivityThread");
+                Log.d(TAG, "OneCore-Bind: Current ActivityThread: " + activityThread);
                 
                 // 2. Install Content Providers BEFORE Application.onCreate
                 android.content.pm.PackageInfo packageInfo = context.getPackageManager().getPackageArchiveInfo(mApkPath, android.content.pm.PackageManager.GET_PROVIDERS);
                 if (packageInfo != null && packageInfo.providers != null) {
+                    Log.d(TAG, "OneCore-Bind: Installing " + packageInfo.providers.length + " ContentProviders...");
                     com.onecore.sdk.core.OneCoreContentProviderManager.installProviders(context, packageInfo.providers);
                 }
                 
                 // 3. Create Application instance via LoadedApk to ensure proper integration
                 Object loadedApk = com.onecore.sdk.core.OneCoreLoadedApkManager.getLoadedApk(context, mApkPath, packageName, mClassLoader, mResources);
                 if (loadedApk != null) {
+                    Log.i(TAG, "OneCore-Bind: LoadedApk retrieved. Calling makeApplication...");
                     // This triggers attachBaseContext and onCreate via ActivityThread logic
                     mTargetApplication = (android.app.Application) ReflectionHelper.invokeMethod(loadedApk, "makeApplication", false, null);
                     
                     if (mTargetApplication != null) {
+                        Log.i(TAG, "OneCore-Bind: Application Instance Created -> " + mTargetApplication.getClass().getName());
+                        
                         // Spoof process name for anti-detection and consistency
                         OneCoreProcessManager.spoofProcessName(packageName);
 
@@ -205,7 +224,11 @@ public class VirtualContainer {
                         }
                         
                         Log.i(TAG, ">>> V_CORE: Application Lifecycle SYNCED correctly. mTargetApplication=" + mTargetApplication);
+                    } else {
+                        Log.e(TAG, "OneCore-Bind: makeApplication returned NULL.");
                     }
+                } else {
+                    Log.e(TAG, "OneCore-Bind: LoadedApk is NULL, cannot bind application.");
                 }
             } catch (Exception e) {
                 Log.e(TAG, "!!! V_CORE: bindApplication FAILED !!!", e);

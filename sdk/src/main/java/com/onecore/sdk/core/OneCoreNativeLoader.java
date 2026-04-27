@@ -50,8 +50,10 @@ public class OneCoreNativeLoader {
             
             if (bestAbi == null) bestAbi = "armeabi-v7a"; // Fallback
             
-            Log.i(TAG, "OneCore-DEBUG: Best APK ABI detected -> " + bestAbi);
+            Log.i(TAG, "OneCore-Native: Best APK ABI detected -> " + bestAbi);
+            Log.i(TAG, "OneCore-Native: Device CPU ABIs -> " + java.util.Arrays.toString(supportedAbis));
 
+            int count = 0;
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
@@ -74,38 +76,80 @@ public class OneCoreNativeLoader {
                         // Critical: Ensure library is executable for the system linker
                         outFile.setExecutable(true, false);
                         outFile.setReadable(true, false);
+                        outFile.setWritable(true, false);
                         
-                        Log.d(TAG, "Extracted: " + fileName);
+                        // Use shell if available for strict 755 (Runtime.exec is limited but can try)
+                        try {
+                            Runtime.getRuntime().exec("chmod 755 " + outFile.getAbsolutePath());
+                        } catch (Exception ignored) {}
+
+                        Log.d(TAG, "Extracted " + bestAbi + " lib: " + fileName);
                     }
+                    count++;
                 }
             }
             zipFile.close();
+            Log.i(TAG, "OneCore-Native: Successfully extracted " + count + " libraries for " + bestAbi);
             
+            // Pre-load common dependencies to stabilize the linker
+            preloadKnownDependencies(libDir);
+
+            // Try to set LD_LIBRARY_PATH for the process 
+            // Note: This might not affect already loaded linker state but helps some apps
+            try {
+                String currentLd = System.getenv("LD_LIBRARY_PATH");
+                String newLd = libDir.getAbsolutePath() + (currentLd != null ? ":" + currentLd : "");
+                // Reflection to set environment variable if possible (unreliable on Android 10+)
+                // Better approach is often handled via redirection in native code
+                Log.d(TAG, "OneCore-Native: Suggested LD_LIBRARY_PATH: " + newLd);
+            } catch (Exception ignored) {}
+
             // Initialize Native Hook Engine for the virtual app
             try {
+                Log.i(TAG, "OneCore-Native: Loading onecore_native bridge...");
                 System.loadLibrary("onecore_native");
                 String vRoot = context.getDir("v_data_" + packageName, Context.MODE_PRIVATE).getAbsolutePath();
+                Log.i(TAG, "OneCore-Native: Virtual Data Root -> " + vRoot);
                 // Call the JNI method directly or via reflection if class is in another module
                 try {
                      Class<?> hookMgr = Class.forName("com.onecore.sdk.NativeHookManager");
                      java.lang.reflect.Method init = hookMgr.getDeclaredMethod("initHooks", String.class, String.class);
                      init.invoke(null, vRoot, packageName);
-                     Log.i(TAG, "Native Hook Engine initialized for " + packageName);
+                     Log.i(TAG, "OneCore-Native: Native Hook Engine initialized via NativeHookManager");
                 } catch (Exception e) {
                      // Fallback to IORedirector if NativeHookManager missing
                      Class<?> ioRedir = Class.forName("com.onecore.sdk.IORedirector");
                      java.lang.reflect.Method init = ioRedir.getDeclaredMethod("initNativeHooks", String.class, String.class);
                      init.invoke(null, vRoot, packageName);
-                     Log.i(TAG, "Native Hook Engine initialized via IORedirector for " + packageName);
+                     Log.i(TAG, "OneCore-Native: Native Hook Engine initialized via IORedirector");
                 }
             } catch (Throwable t) {
-                Log.w(TAG, "Native Hook Engine link failed - non-fatal if running in host only");
+                Log.e(TAG, "OneCore-Native: Native Hook Engine load FAILED", t);
             }
             
             return libDir.getAbsolutePath();
         } catch (Exception e) {
             Log.e(TAG, "Failed to extract native libs", e);
             return null;
+        }
+    }
+
+    private static void preloadKnownDependencies(File libDir) {
+        String[] criticalLibs = {
+            "libmain.so", "libunity.so", "libUE4.so", "libanort.so", "libTDataMaster.so"
+        };
+        
+        for (String libName : criticalLibs) {
+            File libFile = new File(libDir, libName);
+            if (libFile.exists()) {
+                try {
+                    Log.i(TAG, "OneCore-Native: Pre-loading critical dependency: " + libName);
+                    System.load(libFile.getAbsolutePath());
+                    Log.i(TAG, "OneCore-Native: Pre-load SUCCESS: " + libName);
+                } catch (Throwable t) {
+                    Log.w(TAG, "OneCore-Native: Pre-load FAILED (might be normal if dependencies missing): " + libName + " | " + t.getMessage());
+                }
+            }
         }
     }
 }

@@ -22,13 +22,18 @@
 #include "Hook/RenderingHook.h"
 #include "KittyMemory/KittyMemory.h"
 #include "Utils/RecursionGuard.h"
+#include <stdarg.h>
+#include <sys/ptrace.h>
+#include <sys/system_properties.h>
 
 #define TAG "OneCore-Native"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 static std::string g_virtual_root;
 static std::string g_package_name;
+static uid_t g_fake_uid = 10100;
 
 // Syscall pointers for redirection
 static int (*orig_open)(const char *pathname, int flags, mode_t mode) = nullptr;
@@ -46,6 +51,12 @@ static void* (*orig_dlopen)(const char* filename, int flags) = nullptr;
 static void* (*orig_dlopen_ext)(const char* filename, int flags, const void* extinfo) = nullptr;
 static FILE* (*orig_fopen)(const char* filename, const char* mode) = nullptr;
 static pid_t (*orig_getppid)() = nullptr;
+static pid_t (*orig_fork)() = nullptr;
+static long (*orig_ptrace)(int request, pid_t pid, void* addr, void* data) = nullptr;
+static int (*orig_system_property_get)(const char* name, char* value) = nullptr;
+static uid_t (*orig_getuid)() = nullptr;
+static uid_t (*orig_geteuid)() = nullptr;
+static uid_t (*orig_getgid)() = nullptr;
 
 // Recursion guard is handled via Utils/RecursionGuard.h
 
@@ -135,7 +146,7 @@ static std::string redirect_path(const char* path) {
                 if (strstr(line, "TracerPid:") != nullptr) {
                     fputs("TracerPid:\t0\n", filtered);
                 } else if (strstr(line, "Uid:") != nullptr) {
-                    fputs("Uid:\t1000\t1000\t1000\t1000\n", filtered); // Fake system UID
+                    fprintf(filtered, "Uid:\t%d\t%d\t%d\t%d\n", g_fake_uid, g_fake_uid, g_fake_uid, g_fake_uid);
                 } else {
                     fputs(line, filtered);
                 }
@@ -204,24 +215,102 @@ static std::string redirect_path(const char* path) {
     return s_path;
 }
 
-// Updated Hook functions with guard
-static int my_open(const char *pathname, int flags, mode_t mode) {
+// --- Runtime Hooks Logic ---
+pid_t my_fork() {
+    if (g_in_hook) return orig_fork();
+    g_in_hook = true;
+    LOGI("Blocking native fork() for child stability");
+    g_in_hook = false;
+    return -1;
+}
+
+long my_ptrace(int request, pid_t pid, void* addr, void* data) {
+    if (g_in_hook) return orig_ptrace(request, pid, addr, data);
+    g_in_hook = true;
+    long res = 0;
+    if (OneCore::RuntimeHelper::handlePtrace(request, pid, addr, data, &res)) {
+        g_in_hook = false;
+        return res;
+    }
+    res = orig_ptrace(request, pid, addr, data);
+    g_in_hook = false;
+    return res;
+}
+
+int my_system_property_get(const char* name, char* value) {
+    if (g_in_hook) return orig_system_property_get(name, value);
+    g_in_hook = true;
+    int res = orig_system_property_get(name, value);
+    OneCore::RuntimeHelper::spoofSystemProperty(name, value);
+    g_in_hook = false;
+    return res;
+}
+
+uid_t my_getuid() {
+    if (g_in_hook) return orig_getuid();
+    return g_fake_uid;
+}
+
+uid_t my_geteuid() {
+    if (g_in_hook) return orig_geteuid();
+    return g_fake_uid;
+}
+
+uid_t my_getgid() {
+    if (g_in_hook) return orig_getgid();
+    return 2000;
+}
+
+// Updated Hook functions with guard and logic from RuntimeHook
+#ifndef O_TMPFILE
+#define O_TMPFILE 020200000 
+#endif
+
+static int my_open(const char *pathname, int flags, ...) {
+    mode_t mode = 0;
+    if (flags & (O_CREAT | O_TMPFILE)) {
+        va_list args;
+        va_start(args, flags);
+        mode = va_arg(args, mode_t);
+        va_end(args);
+    }
+    
     if (g_in_hook) return orig_open(pathname, flags, mode);
     g_in_hook = true;
-    std::string r_path = redirect_path(pathname);
-    // Log OBB access for debugging
-    if (r_path.find("/obb") != std::string::npos) {
-        LOGI("HOOK: OBB Open Access -> %s", r_path.c_str());
+    
+    if (OneCore::RuntimeHelper::isSuspiciousPath(pathname)) {
+        LOGW("Blocked access to %s (anti-detect)", pathname);
+        g_in_hook = false;
+        errno = ENOENT;
+        return -1;
     }
+
+    std::string r_path = redirect_path(pathname);
     int res = orig_open(r_path.c_str(), flags, mode);
     g_in_hook = false;
     return res;
 }
 
-int my_openat(int dirfd, const char *pathname, int flags, mode_t mode) {
+int my_openat(int dirfd, const char *pathname, int flags, ...) {
+    mode_t mode = 0;
+    if (flags & (O_CREAT | O_TMPFILE)) {
+        va_list args;
+        va_start(args, flags);
+        mode = va_arg(args, mode_t);
+        va_end(args);
+    }
+
     if (g_in_hook) return orig_openat(dirfd, pathname, flags, mode);
     g_in_hook = true;
     int res;
+    
+    if (pathname && OneCore::RuntimeHelper::isSuspiciousPath(pathname)) {
+        LOGW("Blocked access to %s (anti-detect)", pathname);
+        g_in_hook = false;
+        errno = ENOENT;
+        return -1;
+    }
+
     if (pathname && pathname[0] == '/') {
         res = orig_openat(dirfd, redirect_path(pathname).c_str(), flags, mode);
     } else {
@@ -234,6 +323,14 @@ int my_openat(int dirfd, const char *pathname, int flags, mode_t mode) {
 static int my_access(const char *pathname, int mode) {
     if (g_in_hook) return orig_access(pathname, mode);
     g_in_hook = true;
+    
+    if (OneCore::RuntimeHelper::isSuspiciousPath(pathname)) {
+        LOGW("Blocked access(access): %s", pathname);
+        g_in_hook = false;
+        errno = ENOENT;
+        return -1;
+    }
+
     int res = orig_access(redirect_path(pathname).c_str(), mode);
     g_in_hook = false;
     return res;
@@ -242,6 +339,14 @@ static int my_access(const char *pathname, int mode) {
 int my_faccessat(int dirfd, const char *pathname, int mode, int flags) {
     if (g_in_hook) return orig_faccessat(dirfd, pathname, mode, flags);
     g_in_hook = true;
+    
+    if (pathname && OneCore::RuntimeHelper::isSuspiciousPath(pathname)) {
+        LOGW("Blocked access(faccessat): %s", pathname);
+        g_in_hook = false;
+        errno = ENOENT;
+        return -1;
+    }
+
     int res;
     if (pathname && pathname[0] == '/') {
         res = orig_faccessat(dirfd, redirect_path(pathname).c_str(), mode, flags);
@@ -255,6 +360,14 @@ int my_faccessat(int dirfd, const char *pathname, int mode, int flags) {
 int my_stat(const char *pathname, struct stat *buf) {
     if (g_in_hook) return orig_stat(pathname, buf);
     g_in_hook = true;
+    
+    if (OneCore::RuntimeHelper::isSuspiciousPath(pathname)) {
+        LOGW("Blocked access(stat): %s", pathname);
+        g_in_hook = false;
+        errno = ENOENT;
+        return -1;
+    }
+
     int res = orig_stat(redirect_path(pathname).c_str(), buf);
     g_in_hook = false;
     return res;
@@ -263,6 +376,14 @@ int my_stat(const char *pathname, struct stat *buf) {
 int my_lstat(const char *pathname, struct stat *buf) {
     if (g_in_hook) return orig_lstat(pathname, buf);
     g_in_hook = true;
+    
+    if (OneCore::RuntimeHelper::isSuspiciousPath(pathname)) {
+        LOGW("Blocked access(lstat): %s", pathname);
+        g_in_hook = false;
+        errno = ENOENT;
+        return -1;
+    }
+
     int res = orig_lstat(redirect_path(pathname).c_str(), buf);
     g_in_hook = false;
     return res;
@@ -271,6 +392,14 @@ int my_lstat(const char *pathname, struct stat *buf) {
 int my_fstatat(int dirfd, const char *pathname, struct stat *buf, int flags) {
     if (g_in_hook) return orig_fstatat(dirfd, pathname, buf, flags);
     g_in_hook = true;
+    
+    if (pathname && OneCore::RuntimeHelper::isSuspiciousPath(pathname)) {
+        LOGW("Blocked access(fstatat): %s", pathname);
+        g_in_hook = false;
+        errno = ENOENT;
+        return -1;
+    }
+
     int res;
     if (pathname && pathname[0] == '/') {
         res = orig_fstatat(dirfd, redirect_path(pathname).c_str(), buf, flags);
@@ -322,13 +451,32 @@ int my_execve(const char *filename, char *const argv[], char *const envp[]) {
 void* my_dlopen_ext(const char* filename, int flags, const void* extinfo) {
     if (g_in_hook) return orig_dlopen_ext(filename, flags, extinfo);
     g_in_hook = true;
-    void* res;
-    if (filename) {
-        std::string path = redirect_path(filename);
-        res = orig_dlopen_ext(path.c_str(), flags, extinfo);
-    } else {
-        res = orig_dlopen_ext(filename, flags, extinfo);
+    
+    if (OneCore::RuntimeHelper::shouldBlockDlopen(filename)) {
+        LOGW("Blocked dlopen_ext for %s (anti-detect)", filename);
+        g_in_hook = false;
+        return nullptr;
     }
+
+    void* res;
+    const char* target_path = filename;
+    std::string redirected;
+    if (filename) {
+        redirected = redirect_path(filename);
+        target_path = redirected.c_str();
+        if (redirected != filename) {
+            LOGI("HOOK: dlopen_ext redirected %s -> %s", filename, target_path);
+        }
+    }
+
+    res = orig_dlopen_ext(target_path, flags, extinfo);
+    
+    if (!res && filename) {
+        LOGE("dlopen_ext FAIL: %s (asked as %s) | error=%s", target_path, filename, dlerror());
+    } else if (res && filename) {
+        LOGI("dlopen_ext SUCCESS: %s", target_path);
+    }
+
     g_in_hook = false;
     return res;
 }
@@ -336,16 +484,32 @@ void* my_dlopen_ext(const char* filename, int flags, const void* extinfo) {
 void* my_dlopen(const char* filename, int flags) {
     if (g_in_hook) return orig_dlopen(filename, flags);
     g_in_hook = true;
-    void* res;
-    if (filename) {
-        std::string path = redirect_path(filename);
-        if (path != filename) {
-            LOGI("HOOK: dlopen redirected %s -> %s", filename, path.c_str());
-        }
-        res = orig_dlopen(path.c_str(), flags);
-    } else {
-        res = orig_dlopen(filename, flags);
+    
+    if (OneCore::RuntimeHelper::shouldBlockDlopen(filename)) {
+        LOGW("Blocked dlopen for %s (anti-detect)", filename);
+        g_in_hook = false;
+        return nullptr;
     }
+
+    void* res;
+    const char* target_path = filename;
+    std::string redirected;
+    if (filename) {
+        redirected = redirect_path(filename);
+        target_path = redirected.c_str();
+        if (redirected != filename) {
+            LOGI("HOOK: dlopen redirected %s -> %s", filename, target_path);
+        }
+    }
+
+    res = orig_dlopen(target_path, flags);
+
+    if (!res && filename) {
+        LOGE("dlopen FAIL: %s (asked as %s) | error=%s", target_path, filename, dlerror());
+    } else if (res && filename) {
+        LOGI("dlopen SUCCESS: %s", target_path);
+    }
+
     g_in_hook = false;
     return res;
 }
@@ -353,6 +517,14 @@ void* my_dlopen(const char* filename, int flags) {
 FILE* my_fopen(const char* filename, const char* mode) {
     if (g_in_hook) return orig_fopen(filename, mode);
     g_in_hook = true;
+    
+    if (OneCore::RuntimeHelper::isSuspiciousPath(filename)) {
+        LOGW("Blocked access(fopen): %s", filename);
+        g_in_hook = false;
+        errno = ENOENT;
+        return NULL;
+    }
+
     FILE* res;
     if (filename) {
         std::string path = redirect_path(filename);
@@ -423,8 +595,7 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
     OneCore::bypassHiddenApi(env);
 
     LOGI("Phase 2: Modular Internal Hooks");
-    OneCore::installFileSystemHooks();
-    OneCore::installRuntimeHooks();
+    // OneCore::installFileSystemHooks(); // Disabled: replaced by unified hooks in this file
     OneCore::installJniHooks(env);
     OneCore::installEnvironmentProtector();
     OneCore::installDexHooks();
@@ -448,6 +619,15 @@ Java_com_onecore_sdk_NativeHookManager_initHooks(JNIEnv* env, jclass clazz, jstr
         safe_hook(dlsym(libc, "execve"), (void*)my_execve, (void**)&orig_execve, "execve");
         safe_hook(dlsym(libc, "getppid"), (void*)my_getppid, (void**)&orig_getppid, "getppid");
         safe_hook(dlsym(libc, "__opendir2"), (void*)my_opendir2, (void**)&orig_opendir2, "__opendir2");
+        
+        // Runtime Logic Hooks
+        safe_hook(dlsym(libc, "fork"), (void*)my_fork, (void**)&orig_fork, "fork");
+        safe_hook(dlsym(libc, "ptrace"), (void*)my_ptrace, (void**)&orig_ptrace, "ptrace");
+        safe_hook(dlsym(libc, "__system_property_get"), (void*)my_system_property_get, (void**)&orig_system_property_get, "__system_property_get");
+        safe_hook(dlsym(libc, "getuid"), (void*)my_getuid, (void**)&orig_getuid, "getuid");
+        safe_hook(dlsym(libc, "geteuid"), (void*)my_geteuid, (void**)&orig_geteuid, "geteuid");
+        safe_hook(dlsym(libc, "getgid"), (void*)my_getgid, (void**)&orig_getgid, "getgid");
+
         dlclose(libc);
     } else {
         LOGE("CRITICAL: Could not open libc.so!");
@@ -479,7 +659,7 @@ Java_com_onecore_sdk_IORedirector_initNativeHooks(JNIEnv* env, jclass clazz, jst
     Java_com_onecore_sdk_NativeHookManager_initHooks(env, clazz, virtual_root, package_name);
 }
 
-// --- JNI Implementation for NativeHook (Memory Ops) ---
+// --- Memory Operations ---
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_onecore_sdk_NativeHook_hookFunction(JNIEnv* env, jobject obj, jlong target, jlong replace) {
@@ -520,38 +700,10 @@ Java_com_onecore_sdk_NativeHook_writeMemoryNative(JNIEnv* env, jobject obj, jlon
     }
 }
 
-// --- UID Spoofing Hook ---
-static uid_t g_fake_uid = 10100;
-static uid_t (*orig_getuid)() = nullptr;
-static uid_t (*orig_geteuid)() = nullptr;
-static uid_t (*orig_getgid)() = nullptr;
-
-uid_t my_getuid() {
-    if (g_in_hook) return orig_getuid();
-    return g_fake_uid;
-}
-
-uid_t my_geteuid() {
-    if (g_in_hook) return orig_geteuid();
-    return g_fake_uid;
-}
-
-uid_t my_getgid() {
-    if (g_in_hook) return orig_getgid();
-    return 2000; // Fake shell/system group
-}
-
 extern "C" JNIEXPORT void JNICALL
 Java_com_onecore_sdk_core_UidSpoofing_applyNative(JNIEnv* env, jclass clazz, jint fakeUid) {
     g_fake_uid = (uid_t)fakeUid;
-    void* libc = dlopen("libc.so", RTLD_NOW);
-    if (libc) {
-        DobbyHook(dlsym(libc, "getuid"), (void*)my_getuid, (void**)&orig_getuid);
-        DobbyHook(dlsym(libc, "geteuid"), (void*)my_geteuid, (void**)&orig_geteuid);
-        DobbyHook(dlsym(libc, "getgid"), (void*)my_getgid, (void**)&orig_getgid);
-        LOGI("Native UID Spoof applied: %d", fakeUid);
-        dlclose(libc);
-    }
+    LOGI("Native UID Spoof value updated to: %d", fakeUid);
 }
 
 extern "C" JNIEXPORT void JNICALL

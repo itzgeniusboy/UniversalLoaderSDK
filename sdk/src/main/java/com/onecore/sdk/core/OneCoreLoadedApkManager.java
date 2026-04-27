@@ -38,10 +38,19 @@ public class OneCoreLoadedApkManager {
             ai.sourceDir = apkPath;
             ai.publicSourceDir = apkPath;
             ai.dataDir = context.getDir("v_data_" + packageName, Context.MODE_PRIVATE).getAbsolutePath();
+            ai.deviceProtectedDataDir = ai.dataDir;
+            ai.credentialProtectedDataDir = ai.dataDir;
             ai.uid = context.getApplicationInfo().uid;
+            ai.flags = context.getApplicationInfo().flags; // Inherit flags for compatibility
             
             File libDir = context.getDir("v_lib_" + packageName, Context.MODE_PRIVATE);
             ai.nativeLibraryDir = libDir.getAbsolutePath();
+            // Modern Android requires primaryCpuAbi to be set for native libs to work properly in some cases
+            ai.primaryCpuAbi = android.os.Build.SUPPORTED_ABIS[0];
+            
+            Log.d(TAG, "OneCore-Apk: Creating LoadedApk for " + packageName);
+            Log.d(TAG, "OneCore-Apk: DataDir: " + ai.dataDir);
+            Log.d(TAG, "OneCore-Apk: LibDir: " + ai.nativeLibraryDir);
             
             // CompatibilityInfo
             Object compatInfo = ReflectionHelper.getStaticFieldValue("android.content.res.CompatibilityInfo", "DEFAULT_COMPATIBILITY_INFO");
@@ -50,6 +59,7 @@ public class OneCoreLoadedApkManager {
             Object loadedApk = ReflectionHelper.invokeMethod(activityThread, "getPackageInfoNoCheck", ai, compatInfo);
             
             if (loadedApk != null) {
+                Log.i(TAG, "OneCore-Apk: LoadedApk created, patching fields...");
                 // Patch the new LoadedApk
                 ReflectionHelper.setFieldValue(loadedApk, classLoader, "mClassLoader");
                 ReflectionHelper.setFieldValue(loadedApk, resources, "mResources");
@@ -58,6 +68,12 @@ public class OneCoreLoadedApkManager {
                 ReflectionHelper.setFieldValue(loadedApk, ai.dataDir, "mDataDir");
                 ReflectionHelper.setFieldValue(loadedApk, ai.nativeLibraryDir, "mLibDir", "mBaseLibDir", "mAppLibDir");
                 
+                // Android 10+ fixes
+                try {
+                    ReflectionHelper.setFieldValue(loadedApk, ai.sourceDir, "mResDir");
+                    ReflectionHelper.setFieldValue(loadedApk, ai.publicSourceDir, "mSplitResDirs");
+                } catch (Exception ignored) {}
+
                 // Inject into ActivityThread maps
                 WeakReference<Object> ref = new WeakReference<>(loadedApk);
                 if (mPackages != null) {
