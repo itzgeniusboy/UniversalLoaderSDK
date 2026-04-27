@@ -153,12 +153,50 @@ static uid_t (*orig_getgid)() = nullptr;
 static void* (*orig_ANativeWindow_fromSurface)(void* env, jobject surface) = nullptr;
 static void (*orig_ANativeWindow_acquire)(void* window) = nullptr;
 static void (*orig_ANativeWindow_release)(void* window) = nullptr;
+static int (*orig_ANativeWindow_setBuffersGeometry)(void* window, int32_t width, int32_t height, int32_t format) = nullptr;
+static int (*orig_ANativeWindow_unlockAndPost)(void* window) = nullptr;
+
 static EGLSurface (*orig_eglCreateWindowSurface)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list) = nullptr;
 static EGLBoolean (*orig_eglMakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx) = nullptr;
 
 static EGLBoolean (*orig_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface) = nullptr;
 
 static EGLNativeWindowType g_target_window = nullptr;
+
+static int g_egl_frame_count = 0;
+static int g_vk_frame_count = 0;
+
+static void print_rendering_diagnosis() {
+    static int last_diag_time = 0;
+    int curr_time = (int)time(NULL);
+    if (curr_time - last_diag_time < 5) return;
+    last_diag_time = curr_time;
+
+    LOGI("---------------- RENDERING DIAGNOSIS ----------------");
+    if (g_target_window == nullptr) {
+        LOGW("DIAG: ISSUE - NO TARGET SURFACE SET (Native layer has no output window)");
+    } else {
+        LOGI("DIAG: SUCCESS - Target Redirection Window is: %p", g_target_window);
+    }
+    
+    LOGI("DIAG: EGL Frames Count: %d", g_egl_frame_count);
+    LOGI("DIAG: Vulkan Frames Count: %d", g_vk_frame_count);
+    
+    if (g_egl_frame_count > 0) {
+        LOGI("DIAG: ACTIVE BACKEND: EGL");
+    } else if (g_vk_frame_count > 0) {
+        LOGI("DIAG: ACTIVE BACKEND: VULKAN");
+    } else {
+        LOGW("DIAG: ISSUE - NO RENDERING DETECTED (0 frames detected)");
+    }
+    
+    if ((g_egl_frame_count > 0 || g_vk_frame_count > 0) && g_target_window != nullptr) {
+        LOGI("DIAG: REDIRECTION STATUS: SUCCESSFUL (Data should be flowing)");
+    } else if (g_egl_frame_count > 0 || g_vk_frame_count > 0) {
+        LOGE("DIAG: REDIRECTION STATUS: FAILED (Frames rendered but no target set)");
+    }
+    LOGI("-----------------------------------------------------");
+}
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_onecore_sdk_NativeHookManager_setTargetSurface(JNIEnv* env, jclass clazz, jobject surface) {
@@ -179,6 +217,30 @@ Java_com_onecore_sdk_NativeHookManager_setTargetSurface(JNIEnv* env, jclass claz
         }
     }
     LOGI("Native target window set: %p", g_target_window);
+}
+
+int my_ANativeWindow_setBuffersGeometry(void* window, int32_t width, int32_t height, int32_t format) {
+    if (g_in_hook) return orig_ANativeWindow_setBuffersGeometry(window, width, height, format);
+    g_in_hook = true;
+    LOGI("HOOK: ANativeWindow_setBuffersGeometry(win=%p, w=%d, h=%d, fmt=%d)", window, width, height, format);
+    int res = orig_ANativeWindow_setBuffersGeometry(window, width, height, format);
+    g_in_hook = false;
+    return res;
+}
+
+int my_ANativeWindow_unlockAndPost(void* window) {
+    if (g_in_hook) return orig_ANativeWindow_unlockAndPost(window);
+    g_in_hook = true;
+    
+    static int canvas_frame_count = 0;
+    canvas_frame_count++;
+    if (canvas_frame_count % 60 == 0) {
+        LOGI("ANativeWindow_unlockAndPost: 60 Canvas frames rendered");
+    }
+    
+    int res = orig_ANativeWindow_unlockAndPost(window);
+    g_in_hook = false;
+    return res;
 }
 
 void* my_ANativeWindow_fromSurface(void* env, jobject surface) {
@@ -217,7 +279,7 @@ void* my_ASurfaceControl_createFromWindow(void* parent, void* window, const char
     g_in_hook = true;
     void* win_target = window;
     if (g_target_window != nullptr) {
-        LOGI("SurfaceControl Redirect: %p -> %p", window, g_target_window);
+        LOGI("SurfaceControl Redirect: %p -> %p (Debug: %s)", window, g_target_window, debug_name ? debug_name : "null");
         win_target = g_target_window;
     }
     void* res = orig_ASurfaceControl_createFromWindow(parent, win_target, debug_name);
@@ -277,15 +339,16 @@ void* my_eglGetProcAddress(const char* procname) {
 EGLBoolean my_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     if (g_in_hook) return orig_eglSwapBuffers(dpy, surface);
     g_in_hook = true;
-    static int frame_count = 0;
-    if (++frame_count % 60 == 0) {
-        LOGI("eglSwapBuffers: 60 frames rendered on thread %d", (int)gettid());
-    }
+    
+    g_egl_frame_count++;
+    
+    print_rendering_diagnosis();
+
     EGLBoolean res = orig_eglSwapBuffers(dpy, surface);
     if (res) {
         static bool backend_logged = false;
         if (!backend_logged) {
-            LOGI(">>> ACTIVE BACKEND: EGL <<<");
+            LOGI(">>> RENDER BACKEND DETECTED: EGL <<<");
             backend_logged = true;
         }
     }
@@ -322,16 +385,15 @@ static VkResult my_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPre
     if (g_in_hook) return orig_vkQueuePresentKHR(queue, pPresentInfo);
     g_in_hook = true;
     
-    static int vk_frame_count = 0;
-    if (++vk_frame_count % 60 == 0) {
-        LOGI("vkQueuePresentKHR: 60 Vulkan frames rendered on thread %d", (int)gettid());
-    }
+    g_vk_frame_count++;
+    
+    print_rendering_diagnosis();
     
     VkResult res = orig_vkQueuePresentKHR(queue, pPresentInfo);
     if (res == VK_SUCCESS) {
         static bool vk_backend_logged = false;
         if (!vk_backend_logged) {
-            LOGI(">>> ACTIVE BACKEND: VULKAN <<<");
+            LOGI(">>> RENDER BACKEND DETECTED: VULKAN <<<");
             vk_backend_logged = true;
         }
     }
@@ -894,6 +956,8 @@ static void install_all_hooks(JavaVM* vm) {
         safe_hook(dlsym(libandroid, "ANativeWindow_fromSurface"), (void*)my_ANativeWindow_fromSurface, (void**)&orig_ANativeWindow_fromSurface, "ANativeWindow_fromSurface");
         safe_hook(dlsym(libandroid, "ANativeWindow_acquire"), (void*)my_ANativeWindow_acquire, (void**)&orig_ANativeWindow_acquire, "ANativeWindow_acquire");
         safe_hook(dlsym(libandroid, "ANativeWindow_release"), (void*)my_ANativeWindow_release, (void**)&orig_ANativeWindow_release, "ANativeWindow_release");
+        safe_hook(dlsym(libandroid, "ANativeWindow_setBuffersGeometry"), (void*)my_ANativeWindow_setBuffersGeometry, (void**)&orig_ANativeWindow_setBuffersGeometry, "ANativeWindow_setBuffersGeometry");
+        safe_hook(dlsym(libandroid, "ANativeWindow_unlockAndPost"), (void*)my_ANativeWindow_unlockAndPost, (void**)&orig_ANativeWindow_unlockAndPost, "ANativeWindow_unlockAndPost");
         safe_hook(dlsym(libandroid, "ASurfaceControl_createFromWindow"), (void*)my_ASurfaceControl_createFromWindow, (void**)&orig_ASurfaceControl_createFromWindow, "ASurfaceControl_createFromWindow");
         dlclose(libandroid);
     }
@@ -916,6 +980,13 @@ static void install_all_hooks(JavaVM* vm) {
         safe_hook(dlsym(libvulkan, "vkGetInstanceProcAddr"), (void*)my_vkGetInstanceProcAddr, (void**)&orig_vkGetInstanceProcAddr, "vkGetInstanceProcAddr");
         safe_hook(dlsym(libvulkan, "vkGetDeviceProcAddr"), (void*)my_vkGetDeviceProcAddr, (void**)&orig_vkGetDeviceProcAddr, "vkGetDeviceProcAddr");
         dlclose(libvulkan);
+    }
+
+    // Diagnostic: Check for libhwui
+    void* libhwui = dlopen("libhwui.so", RTLD_NOLOAD);
+    if (libhwui) {
+        LOGI("DIAG: libhwui.so is loaded. System UI rendering might be active.");
+        dlclose(libhwui);
     }
 
     LOGI("Installing Path Redirection Hooks (LibC)");
