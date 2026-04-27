@@ -195,7 +195,7 @@ static std::string redirect_path(const char* path) {
     return s_path;
 }
 
-int my_open(const char *pathname, int flags, mode_t mode) {
+static int my_open(const char *pathname, int flags, mode_t mode) {
     std::string r_path = redirect_path(pathname);
     // Log OBB access for debugging
     if (r_path.find("/obb") != std::string::npos) {
@@ -211,7 +211,7 @@ int my_openat(int dirfd, const char *pathname, int flags, mode_t mode) {
     return orig_openat(dirfd, pathname, flags, mode);
 }
 
-int my_access(const char *pathname, int mode) {
+static int my_access(const char *pathname, int mode) {
     return orig_access(redirect_path(pathname).c_str(), mode);
 }
 

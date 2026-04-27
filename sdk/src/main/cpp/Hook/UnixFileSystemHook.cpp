@@ -27,12 +27,12 @@ const char* redirect_path(const char* path) {
     return path;
 }
 
-int my_open(const char *pathname, int flags, mode_t mode) {
+static int my_open(const char *pathname, int flags, mode_t mode) {
     const char* redirected = redirect_path(pathname);
     return orig_open(redirected, flags, mode);
 }
 
-int my_access(const char *pathname, int mode) {
+static int my_access(const char *pathname, int mode) {
     const char* redirected = redirect_path(pathname);
     return orig_access(redirected, mode);
 }
