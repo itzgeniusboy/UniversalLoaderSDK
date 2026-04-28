@@ -1,4 +1,4 @@
-name: Build OneCore SDK & Loader
+name: Build OneCore Dashboard
 
 on:
   push:
@@ -45,34 +45,27 @@ jobs:
       run: |
         keytool -genkey -v -keystore release.keystore -alias onecore -keyalg RSA -keysize 2048 -validity 10000 -storepass onecore123 -keypass onecore123 -dname "CN=OneCore SDK, O=OneCore, C=US"
 
-    - name: Grant Execute Permission for Gradlew
-      run: chmod +x gradlew
-
-    - name: Build SDK and Loader
-      run: ./gradlew :sdk:assembleRelease :loader:assembleRelease --no-daemon --stacktrace
+    - name: Build SDK and Dashboard App
+      run: ./gradlew :sdk:assembleRelease :app:assembleDebug --no-daemon --stacktrace
 
     - name: Create GitHub Release
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v1.0.${{ github.run_number }}
-        name: OneCore Release v1.0.${{ github.run_number }}
+        tag_name: v3.0.${{ github.run_number }}
+        name: OneCore Dashboard v3.0.${{ github.run_number }}
         files: |
-          loader/build/outputs/apk/release/*.apk
+          app/build/outputs/apk/debug/*.apk
           sdk/build/outputs/aar/*.aar
         draft: false
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Upload SDK AAR
+    - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: OneCore-SDK-AAR
-        path: sdk/build/outputs/aar/*.aar
-
-    - name: Upload Loader APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: OneCore-Loader-APK
-        path: loader/build/outputs/apk/release/*.apk
+        name: OneCore-Dashboard-Build
+        path: |
+          app/build/outputs/apk/debug/*.apk
+          sdk/build/outputs/aar/*.aar

@@ -30,7 +30,7 @@ public class IORedirector {
     public static String redirectPath(String originalPath, String packageName) {
         if (originalPath == null) return null;
 
-        String virtualRoot = "/data/data/com.onecore.loader/files/virtual/" + packageName;
+        String virtualRoot = "/data/data/com.onecore.sdk.container/files/virtual/" + packageName;
 
         // 1. Data redirection
         if (originalPath.startsWith("/data/data/" + packageName)) {

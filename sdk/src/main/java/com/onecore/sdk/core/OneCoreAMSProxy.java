@@ -133,7 +133,7 @@ public class OneCoreAMSProxy implements InvocationHandler {
                     if (intent.getComponent() != null && !intent.getComponent().getPackageName().equals(sHostPackage)) {
                         String guestPkg = intent.getComponent().getPackageName();
                         int procIndex = OneCoreProcessManager.getProcessIndex(guestPkg);
-                        String stubClassName = "com.onecore.loader.StubService$P" + procIndex;
+                        String stubClassName = "com.onecore.sdk.core.StubService";
                         
                         android.content.Intent stubService = new android.content.Intent();
                         stubService.setClassName(sHostPackage, stubClassName);

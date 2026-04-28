@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.onecore.sdk">
+    package="com.onecore.sdk.container">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
@@ -36,6 +36,10 @@
                   android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <service android:name="com.onecore.sdk.core.SandboxHeartbeatService"
+                 android:process=":sandbox"
+                 android:exported="false" />
+
+        <service android:name="com.onecore.sdk.core.StubService"
                  android:process=":sandbox"
                  android:exported="false" />
 

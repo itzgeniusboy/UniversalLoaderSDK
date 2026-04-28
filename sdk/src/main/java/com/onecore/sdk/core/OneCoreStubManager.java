@@ -33,7 +33,7 @@ public class OneCoreStubManager {
             // Select stub based on Intent flags and launch requirements
             int flags = intent.getFlags();
             int procIndex = OneCoreProcessManager.getProcessIndex(targetPkg);
-            String stubClass = "com.onecore.loader.StubActivity_P" + procIndex;
+            String stubClass = "com.onecore.sdk.core.StubActivity";
 
             // Lookup ActivityInfo for additional metadata like launchMode or taskAffinity
             android.content.pm.ActivityInfo ai = OneCorePackageManagerProxy.getActivityInfo(component);
@@ -41,12 +41,12 @@ public class OneCoreStubManager {
             if (ai != null) {
                 // If the app specifies a custom taskAffinity or a specific launchMode
                 if (ai.launchMode == android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE) {
-                    stubClass = "com.onecore.loader.StubActivity_P3";
+                    stubClass = "com.onecore.sdk.core.StubActivity";
                 } else if (ai.launchMode == android.content.pm.ActivityInfo.LAUNCH_SINGLE_TASK) {
-                    stubClass = "com.onecore.loader.StubActivity_P2";
+                    stubClass = "com.onecore.sdk.core.StubActivity";
                 } else if (ai.taskAffinity != null && !ai.taskAffinity.equals(ai.packageName)) {
                     // Custom taskAffinity requested - use a dedicated task stub
-                    stubClass = "com.onecore.loader.StubActivity_P2";
+                    stubClass = "com.onecore.sdk.core.StubActivity";
                 }
             }
 
@@ -54,7 +54,7 @@ public class OneCoreStubManager {
             if ((flags & Intent.FLAG_ACTIVITY_NEW_TASK) != 0) {
                 // If not already singleInstance, upgrade to P2 (singleTask)
                 if (!stubClass.endsWith("P3")) {
-                    stubClass = "com.onecore.loader.StubActivity_P2";
+                    stubClass = "com.onecore.sdk.core.StubActivity";
                 }
             }
             

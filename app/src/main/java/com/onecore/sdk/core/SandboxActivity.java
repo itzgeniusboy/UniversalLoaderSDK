@@ -104,7 +104,7 @@ public class SandboxActivity extends Activity {
             
             Logger.i(TAG, "Virtual startup sequence initiated. StubActivity hosting rendering.");
             
-            // Finish loader activity immediately after handoff to StubActivity
+            // Finish dashboard activity immediately after handoff to StubActivity
             finish();
 
         } catch (Exception e) {

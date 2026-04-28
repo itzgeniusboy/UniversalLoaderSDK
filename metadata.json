@@ -1,6 +1,6 @@
 {
-  "name": "OneCore SDK",
-  "description": "Comprehensive Android Loader SDK for stealth, virtualization, and advanced instrumentation.",
+  "name": "OneCore Dashboard",
+  "description": "Comprehensive Android Sandbox Dashboard for stealth, virtualization, and advanced instrumentation.",
   "requestFramePermissions": [],
   "majorCapabilities": [],
   "cloningMetadata": [

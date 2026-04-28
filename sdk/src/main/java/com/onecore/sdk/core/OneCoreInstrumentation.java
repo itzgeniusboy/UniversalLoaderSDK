@@ -36,7 +36,7 @@ public class OneCoreInstrumentation extends Instrumentation {
         
         // Rewrite intent for StubActivity
         Context context = (who != null) ? who : OneCoreSDK.getContext();
-        String hostPkg = (context != null) ? context.getPackageName() : "com.onecore.loader";
+        String hostPkg = (context != null) ? context.getPackageName() : "com.onecore.sdk.container";
         intent = OneCoreStubManager.replaceWithStub(intent, hostPkg);
 
         if (intent == null) return null;
@@ -153,7 +153,7 @@ public class OneCoreInstrumentation extends Instrumentation {
         mBase.callActivityOnResume(activity);
         if (activity != null && activity.getIntent() != null) {
             String targetActivity = activity.getIntent().getStringExtra("target_activity");
-            // Only fix rendering for virtual/guest activities to prevent rotating the loader
+            // Only fix rendering for virtual/guest activities to prevent rotating the container app
             if (targetActivity != null) {
                 OneCoreRenderingFixer.fix(activity);
             }
