@@ -22,7 +22,9 @@ import com.onecore.sdk.core.StubActivity;
 import com.onecore.sdk.utils.Logger;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Launcher and Container Activity.
@@ -46,6 +48,9 @@ public class LauncherActivity extends Activity {
         mAppGrid = findViewById(R.id.app_grid);
         mAdapter = new AppAdapter(this, mVirtualApps);
         mAppGrid.setAdapter(mAdapter);
+
+        // Load persisted apps
+        loadInstalledApps();
 
         findViewById(R.id.btn_add_app).setOnClickListener(v -> {
             showAppSelectionDialog();
@@ -91,29 +96,37 @@ public class LauncherActivity extends Activity {
         Logger.i(TAG, "Dashboard Status Updated. Native=" + nativeOk + ", Spoof=" + spoofOk);
     }
 
-    private void showAppSelectionDialog() {
-        PackageManager pm = getPackageManager();
-        List<ApplicationInfo> packages = pm.getInstalledApplications(PackageManager.GET_META_DATA);
-        
-        int addedCount = 0;
-        String[] targets = {"com.whatsapp", "com.whatsapp.w4b", "com.instagram.android", "com.facebook.katana", "com.pubg.imobile"};
-        
-        for (String target : targets) {
+    private void loadInstalledApps() {
+        mVirtualApps.clear();
+        Set<String> pkgs = com.onecore.sdk.core.VirtualAppManager.get(this).getInstalledPackages();
+        for (String pkg : pkgs) {
             try {
-                ApplicationInfo info = pm.getApplicationInfo(target, 0);
-                addVirtualApp(info.packageName, pm.getApplicationLabel(info).toString());
-                addedCount++;
-            } catch (PackageManager.NameNotFoundException ignored) {}
+                ApplicationInfo info = getPackageManager().getApplicationInfo(pkg, 0);
+                addVirtualApp(pkg, getPackageManager().getApplicationLabel(info).toString());
+            } catch (Exception e) {
+                // App might have been uninstalled from system
+            }
+        }
+        mAdapter.notifyDataSetChanged();
+    }
+
+    private void showAppSelectionDialog() {
+        // Show a list of all apps installed on the device
+        final List<ApplicationInfo> installedApps = getPackageManager().getInstalledApplications(PackageManager.GET_META_DATA);
+        final List<String> appNames = new ArrayList<>();
+        for (ApplicationInfo info : installedApps) {
+            appNames.add(getPackageManager().getApplicationLabel(info).toString() + "\n(" + info.packageName + ")");
         }
 
-        if (addedCount == 0) {
-            // If no target apps found, add some test placeholders
-            addVirtualApp("com.android.settings", "Settings (Sandbox)");
-            addVirtualApp("com.android.chrome", "Browser (Sandbox)");
-            Toast.makeText(this, "No common apps found. Added system apps for testing.", Toast.LENGTH_LONG).show();
-        } else {
-            Toast.makeText(this, "Found " + addedCount + " apps to clone!", Toast.LENGTH_SHORT).show();
-        }
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Select App to Add to Sandbox");
+        builder.setItems(appNames.toArray(new String[0]), (dialog, which) -> {
+            ApplicationInfo selected = installedApps.get(which);
+            com.onecore.sdk.core.VirtualAppManager.get(this).addApp(selected.packageName);
+            addVirtualApp(selected.packageName, getPackageManager().getApplicationLabel(selected).toString());
+            Toast.makeText(this, "Added: " + selected.packageName, Toast.LENGTH_SHORT).show();
+        });
+        builder.show();
     }
 
     private void addVirtualApp(String pkg, String label) {
