@@ -39,6 +39,22 @@
                  android:process=":sandbox"
                  android:exported="false" />
 
+        <activity android:name=".LauncherActivity" android:exported="true" android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".TestActivity" android:exported="true" />
+        
+        <provider
+            android:name=".core.provider.VirtualFileProvider"
+            android:authorities="${applicationId}.virtual.fileprovider"
+            android:exported="true"
+            android:multiprocess="true"
+            android:grantUriPermissions="true" />
+
         <activity android:name=".SocialLoginDemo" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

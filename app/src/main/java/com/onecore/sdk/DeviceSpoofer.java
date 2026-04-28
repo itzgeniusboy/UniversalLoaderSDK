@@ -33,13 +33,44 @@ public class DeviceSpoofer {
     /**
      * Powerful: Spoofs system properties by hooking the Build class.
      */
-    public static void applySpoof() {
+    public void applySpoof() {
         try {
             Logger.i(TAG, "Applying Hardware Identity Mask...");
-            // In a full implementation, we use reflection to modify 
-            // the static fields in android.os.Build.
+            
+            setBuildField("MODEL", FAKE_DATA.get("MODEL"));
+            setBuildField("MANUFACTURER", FAKE_DATA.get("MANUFACTURER"));
+            setBuildField("BRAND", FAKE_DATA.get("BRAND"));
+            setBuildField("PRODUCT", FAKE_DATA.get("PRODUCT"));
+            setBuildField("HARDWARE", FAKE_DATA.get("HARDWARE"));
+            setBuildField("DEVICE", FAKE_DATA.get("PRODUCT"));
+            setBuildField("BOARD", FAKE_DATA.get("PRODUCT"));
+            
+            // Spoof Serial (deprecated but often still checked)
+            if (Build.VERSION.SDK_INT < 26) {
+                setBuildField("SERIAL", "0123456789ABCDEF");
+            }
+            
+            Logger.i(TAG, "Identity Mask Success: Handset spoofed as " + FAKE_DATA.get("MODEL"));
         } catch (Exception e) {
             Logger.e(TAG, "Spoofing Failed: " + e.getMessage());
         }
+    }
+
+    private void setBuildField(String name, String value) {
+        try {
+            java.lang.reflect.Field field = Build.class.getDeclaredField(name);
+            field.setAccessible(true);
+            field.set(null, value);
+        } catch (Exception e) {
+            Logger.v(TAG, "Could not spoof field: " + name);
+        }
+    }
+
+    public static DeviceSpoofer getInstance() {
+        return new DeviceSpoofer();
+    }
+
+    public void init(android.content.Context context) {
+        applySpoof();
     }
 }

@@ -44,8 +44,14 @@ public class StubActivity extends Activity implements SurfaceHolder.Callback {
         setContentView(surfaceView);
 
         // 3. Resolve target - DEFER launch until surfaceCreated
-        pendingPkg = getIntent().getStringExtra("target_package");
-        pendingActivity = getIntent().getStringExtra("target_activity");
+        Intent targetIntent = getIntent().getParcelableExtra("EXTRA_TARGET_INTENT");
+        if (targetIntent != null && targetIntent.getComponent() != null) {
+            pendingPkg = targetIntent.getComponent().getPackageName();
+            pendingActivity = targetIntent.getComponent().getClassName();
+        } else {
+            pendingPkg = getIntent().getStringExtra("target_package");
+            pendingActivity = getIntent().getStringExtra("target_activity");
+        }
         
         if (pendingPkg == null) {
             Logger.w(TAG, "Redirection failed: StubActivity.onCreate reached with no targets!");
@@ -176,6 +182,37 @@ public class StubActivity extends Activity implements SurfaceHolder.Callback {
         Logger.w(TAG, "Host Surface DESTROYED. Rendering will stop.");
         com.onecore.sdk.NativeHookManager.setTargetSurface(null);
         VirtualDisplayManager.getInstance(this).syncSurface(null);
+    }
+
+    @Override
+    public boolean onTouchEvent(android.view.MotionEvent event) {
+        int displayId = VirtualDisplayManager.getInstance(this).getDisplayId();
+        if (displayId == android.view.Display.DEFAULT_DISPLAY) {
+            return super.onTouchEvent(event);
+        }
+
+        // Forward touch to Virtual Display
+        try {
+            android.hardware.input.InputManager im = (android.hardware.input.InputManager) getSystemService(android.content.Context.INPUT_SERVICE);
+            java.lang.reflect.Method injectMethod = android.hardware.input.InputManager.class.getMethod("injectInputEvent", android.view.InputEvent.class, int.class);
+            
+            // Adjust coordinates if needed (stub and virtual display should match in size)
+            android.view.MotionEvent motionEvent = android.view.MotionEvent.obtain(event);
+            
+            // We use the hidden displayId parameter of injectInputEvent if available
+            // or we try to set the displayId on the event itself using reflection
+            try {
+                java.lang.reflect.Method setDisplayIdMethod = android.view.MotionEvent.class.getMethod("setDisplayId", int.class);
+                setDisplayIdMethod.invoke(motionEvent, displayId);
+            } catch (Exception ignored) {}
+
+            injectMethod.invoke(im, motionEvent, 0); // 0 = INJECT_INPUT_EVENT_MODE_ASYNC
+            motionEvent.recycle();
+            return true;
+        } catch (Exception e) {
+            Logger.e(TAG, "Input injection failed: " + e.getMessage());
+        }
+        return super.onTouchEvent(event);
     }
 
     @Override

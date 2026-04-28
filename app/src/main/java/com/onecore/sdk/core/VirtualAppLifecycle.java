@@ -12,6 +12,19 @@ import com.onecore.sdk.utils.Logger;
 public class VirtualAppLifecycle implements Application.ActivityLifecycleCallbacks {
     private static final String TAG = "OneCore-Lifecycle";
 
+    public void onAppCreate(Context context, String packageName) {
+        Logger.i(TAG, "Virtual App created: " + packageName);
+        
+        // 1. Initialize Sandbox Environment
+        com.onecore.sdk.core.env.BEnvironment.init(context);
+        
+        // 2. Install System Hooks
+        com.onecore.sdk.core.system.HookManager.init(context);
+        
+        // 3. Initialize Specialized Game Hooks
+        BGMIHooks.initHooks();
+    }
+
     @Override
     public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
         Logger.d(TAG, "Activity Ready: " + activity.getClass().getName());
