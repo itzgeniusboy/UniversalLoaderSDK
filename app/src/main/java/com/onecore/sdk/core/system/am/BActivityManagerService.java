@@ -28,18 +28,18 @@ public class BActivityManagerService extends IBActivityManagerService.Stub {
 
     @Override
     public int startService(Intent intent, int userId) throws RemoteException {
-        ServiceManager.startService(null, intent);
+        com.onecore.sdk.core.system.VirtualServiceManager.getInstance().startService(intent);
         return 0;
     }
 
     @Override
     public int stopService(Intent intent, int userId) throws RemoteException {
-        return ServiceManager.stopService(intent) ? 1 : 0;
+        return 1;
     }
 
     @Override
     public boolean bindService(Intent intent, IBinder connection, int userId) throws RemoteException {
-        return ServiceManager.bindService(null, intent, connection) != null;
+        return com.onecore.sdk.core.system.VirtualServiceManager.getInstance().onBindService(intent) != null;
     }
 
     @Override
