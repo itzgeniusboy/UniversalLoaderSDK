@@ -11,7 +11,7 @@ public class BEnvironment {
     private static File sVirtualRoot;
 
     public static void init(Context context) {
-        sVirtualRoot = new File(context.getFilesRelativePath() + "/virtual");
+        sVirtualRoot = new File(context.getFilesDir().getAbsolutePath() + "/virtual");
         if (!sVirtualRoot.exists()) {
             sVirtualRoot.mkdirs();
         }

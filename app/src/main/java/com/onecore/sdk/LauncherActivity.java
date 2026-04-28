@@ -149,9 +149,9 @@ public class LauncherActivity extends Activity {
     private void launchApp(VirtualApp app) {
         Intent intent = new Intent(this, StubActivity.class);
         intent.putExtra("target_package", app.packageName);
-        intent.putExtra("target_activity", "com.epicgames.portal.Main"); // Typical game entry
+        intent.putExtra("target_activity", "com.onecore.sdk.core.SandboxActivity"); // Generic Entry
         startActivity(intent);
-        Toast.makeText(this, "Launching in Sandbox: " + app.label, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Launching " + app.label + " in OneCore Sandbox...", Toast.LENGTH_SHORT).show();
     }
 
     // --- Helper Classes ---

@@ -552,16 +552,16 @@ static std::string redirect_path(const char* path) {
     // --- Advanced Unix FileSystem Hooks ---
     // Mimics UnixFileSystemHook.cpp logic from reference
     
-    // 1. Data Redirection
+    // 1. Data Redirection (Generic)
     if (s_path.find("/data/data/") == 0 || s_path.find("/data/user/") == 0) {
-        std::string target_pkg = "com.pubg.imobile"; // This should be dynamic in full prod
-        if (s_path.find("/" + target_pkg + "/") != std::string::npos) {
-             // Redirect /data/data/com.pubg.imobile -> [v_root]/data/com.pubg.imobile
-             size_t pos = s_path.find(target_pkg);
-             std::string sub = s_path.substr(pos + target_pkg.length());
-             std::string redirected = g_virtual_root + "/data/" + target_pkg + sub;
-             LOGD("VFS: Redirecting data path: %s -> %s", path, redirected.c_str());
-             return redirected;
+        // Redirection logic should ideally be dynamic. 
+        // For now, we strip the prefix and append to our virtual root.
+        size_t start = s_path.find("/", 11); // Skip /data/data/ or /data/user/0/
+        if (start != std::string::npos) {
+            std::string sub = s_path.substr(start);
+            std::string redirected = g_virtual_root + "/data" + sub;
+            LOGD("VFS: Redirecting path: %s -> %s", path, redirected.c_str());
+            return redirected;
         }
     }
 
